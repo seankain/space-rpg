@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://dpt7cikcglr03"]
+
+[ext_resource type="Script" uid="uid://bm2d1ryqpf2ur" path="res://Scenes/Levels/Level.cs" id="1_eue8q"]
+[ext_resource type="PackedScene" uid="uid://dwmuot2vcojgs" path="res://Scenes/Player.tscn" id="2_bd37o"]
+[ext_resource type="Script" uid="uid://bw7g01snbvbif" path="res://Scenes/Levels/Spawn.cs" id="2_biobi"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bd37o"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_r0mdn"]
+sky_material = SubResource("ProceduralSkyMaterial_bd37o")
+
+[sub_resource type="Environment" id="Environment_bepgf"]
+background_mode = 2
+sky = SubResource("Sky_r0mdn")
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8sr5h"]
+albedo_color = Color(0, 0.12156863, 0, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ff37e"]
+
+[node name="Intro" type="Node3D" unique_id=1935817490]
+script = ExtResource("1_eue8q")
+PlayerScene = ExtResource("2_bd37o")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1306754410]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1445901784]
+environment = SubResource("Environment_bepgf")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=491692949]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7158203, 0, -4.0948486)
+use_collision = true
+size = Vector3(50, 1, 50)
+material = SubResource("StandardMaterial3D_8sr5h")
+
+[node name="Spawn" type="Node3D" parent="." unique_id=849846787]
+script = ExtResource("2_biobi")
+
+[node name="Area3D" type="Area3D" parent="Spawn" unique_id=1302383498]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Spawn/Area3D" unique_id=299170377]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1753888, 0)
+shape = SubResource("BoxShape3D_ff37e")

@@ -1,0 +1,94 @@
+[gd_scene format=3 uid="uid://dq0a063uqyuam"]
+
+[ext_resource type="Script" uid="uid://cbp2bq1l00fnr" path="res://Scripts/MainMenu.cs" id="1_35riq"]
+[ext_resource type="PackedScene" uid="uid://dwmuot2vcojgs" path="res://Scenes/Player.tscn" id="2_p4pvn"]
+[ext_resource type="Texture2D" uid="uid://bc6u5fu8m683h" path="res://Icons/x_icon.png" id="5_s3ie0"]
+[ext_resource type="PackedScene" uid="uid://3ok6wcslu3f0" path="res://Scenes/Menu/NewGameMenu.tscn" id="9_tjif3"]
+
+[node name="MainMenu" type="Control" unique_id=437305289 node_paths=PackedStringArray("NewGameButton", "LoadGameButton", "OptionsButton", "QuitButton", "NewGameMenu", "MenuButtonsContainer")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_35riq")
+PlayerScene = ExtResource("2_p4pvn")
+NewGameButton = NodePath("ButtonBoxContainer/NewGameButton")
+LoadGameButton = NodePath("ButtonBoxContainer/LoadGameButton")
+OptionsButton = NodePath("ButtonBoxContainer/OptionsButton")
+QuitButton = NodePath("QuitButton")
+NewGameMenu = NodePath("NewGameMenu")
+MenuButtonsContainer = NodePath("ButtonBoxContainer")
+
+[node name="QuitButton" type="TextureButton" parent="." unique_id=1015728005]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -105.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 72.0
+grow_horizontal = 0
+
+[node name="TextureRect" type="TextureRect" parent="QuitButton" unique_id=2065167308]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 22.0
+offset_top = 6.0
+offset_right = 1002.0
+offset_bottom = 986.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.05, 0.05)
+texture = ExtResource("5_s3ie0")
+
+[node name="MainTitle" type="Label" parent="." unique_id=1711185057]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -89.5
+offset_right = 89.5
+offset_bottom = 47.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 34
+text = "SPACE RPG"
+
+[node name="ButtonBoxContainer" type="VBoxContainer" parent="." unique_id=1640764909]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NewGameButton" type="Button" parent="ButtonBoxContainer" unique_id=424267062]
+layout_mode = 2
+text = "NEW GAME"
+
+[node name="LoadGameButton" type="Button" parent="ButtonBoxContainer" unique_id=1852574606]
+layout_mode = 2
+text = "LOAD GAME"
+
+[node name="OptionsButton" type="Button" parent="ButtonBoxContainer" unique_id=1491430007]
+layout_mode = 2
+text = "OPTIONS"
+
+[node name="NewGameMenu" parent="." unique_id=1980102180 instance=ExtResource("9_tjif3")]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5

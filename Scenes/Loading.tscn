@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://buageav384fk3"]
+
+[ext_resource type="Script" uid="uid://dstgak6xycwua" path="res://Scripts/LoadingScreen.cs" id="1_sid5e"]
+
+[node name="Control" type="Control" unique_id=572280357 node_paths=PackedStringArray("progressBar")]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_sid5e")
+progressBar = NodePath("ProgressBar")
+
+[node name="ProgressBar" type="ProgressBar" parent="." unique_id=1635658083]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -13.5
+offset_right = 498.0
+offset_bottom = 13.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4

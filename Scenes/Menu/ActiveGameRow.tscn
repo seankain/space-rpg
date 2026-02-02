@@ -1,0 +1,36 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3oghk6nhxty0"]
+
+[ext_resource type="Script" uid="uid://bc6v2khfvob70" path="res://Scripts/ActiveGameRow.cs" id="1_bmylq"]
+
+[node name="ActiveGameRow" type="Control" node_paths=PackedStringArray("ServerName", "ActivePlayerCount", "Latency", "JoinButton")]
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_bmylq")
+ServerName = NodePath("HBoxContainer/GameNameText")
+ActivePlayerCount = NodePath("HBoxContainer/ActivePlayersText")
+Latency = NodePath("HBoxContainer/Latency")
+JoinButton = NodePath("HBoxContainer/Button")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="GameNameText" type="Label" parent="HBoxContainer"]
+layout_mode = 2
+
+[node name="ActivePlayersText" type="Label" parent="HBoxContainer"]
+layout_mode = 2
+
+[node name="Latency" type="Label" parent="HBoxContainer"]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 2
+size_flags_vertical = 4
+text = "Join"

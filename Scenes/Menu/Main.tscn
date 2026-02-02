@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://bssxriq6wh25v"]
+
+[ext_resource type="Script" uid="uid://dbut6qnwko0ef" path="res://Scripts/LevelManager.cs" id="1_anwqe"]
+[ext_resource type="PackedScene" uid="uid://dq0a063uqyuam" path="res://Scenes/Menu/MainMenu.tscn" id="1_r150o"]
+[ext_resource type="PackedScene" uid="uid://buageav384fk3" path="res://Scenes/Loading.tscn" id="2_wg0mu"]
+
+[node name="Main" type="Node3D" unique_id=1966222181 node_paths=PackedStringArray("Menu", "LoadingScreen", "LevelRoot")]
+script = ExtResource("1_anwqe")
+Menu = NodePath("MainMenu")
+LoadingScreen = NodePath("LoadingScreen")
+LevelRoot = NodePath("LevelRoot")
+
+[node name="LevelRoot" type="Node3D" parent="." unique_id=607545056]
+
+[node name="MainMenu" parent="." unique_id=1389756639 instance=ExtResource("1_r150o")]
+
+[node name="LoadingScreen" parent="." unique_id=572280357 instance=ExtResource("2_wg0mu")]
+visible = false

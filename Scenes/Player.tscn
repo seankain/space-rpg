@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://dwmuot2vcojgs"]
+
+[ext_resource type="Script" uid="uid://54e8usnkjvhb" path="res://Scripts/Player.cs" id="1_kyqiw"]
+[ext_resource type="PackedScene" uid="uid://bsmcga7dbv6um" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/fbx/Knight.fbx" id="2_gntrk"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dewec"]
+height = 2.4562988
+
+[node name="CharacterBody3D" type="CharacterBody3D" unique_id=170045460]
+script = ExtResource("1_kyqiw")
+
+[node name="CameraRig" type="Marker3D" parent="." unique_id=1172471362]
+
+[node name="Marker3D" type="Marker3D" parent="CameraRig" unique_id=1652276417]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.87484, 2.79481)
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/Marker3D" unique_id=1253120678]
+
+[node name="Knight" parent="." unique_id=1417328467 instance=ExtResource("2_gntrk")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.015864372, -0.008872271, -0.09103346)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1229240280]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1297607, 0)
+shape = SubResource("CapsuleShape3D_dewec")
