@@ -8,7 +8,20 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Label" type="Label" parent="." unique_id=1175265229]
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=134893302]
 layout_mode = 0
 offset_right = 40.0
-offset_bottom = 23.0
+offset_bottom = 40.0
+
+[node name="SaveNumLabel" type="Label" parent="HBoxContainer" unique_id=1635210811]
+layout_mode = 2
+text = "#1"
+
+[node name="LocationLabel" type="Label" parent="HBoxContainer" unique_id=1175265229]
+layout_mode = 2
+text = "Tutorial Area"
+
+[node name="DateTimeLabel" type="Label" parent="HBoxContainer" unique_id=636249465]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "2/5/2026 10:24PM"

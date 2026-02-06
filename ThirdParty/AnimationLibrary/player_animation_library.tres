@@ -1,0 +1,28 @@
+[gd_resource type="AnimationLibrary" format=3 uid="uid://cgkt2fhrfo21d"]
+
+[ext_resource type="Animation" uid="uid://ct75qll7nh7d7" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Long.res" id="1_p6cps"]
+[ext_resource type="Animation" uid="uid://0qc7261060hj" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Short.res" id="2_h8njf"]
+[ext_resource type="Animation" uid="uid://ttlhsf8ypk2i" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Idle.res" id="3_hn6nc"]
+[ext_resource type="Animation" uid="uid://cpyqvgt47l8r7" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Land.res" id="4_0k2t0"]
+[ext_resource type="Animation" uid="uid://dw5jx80di68a7" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Start.res" id="5_6u0xd"]
+[ext_resource type="Animation" uid="uid://dlu73jt7ngtng" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_A.res" id="6_ygs62"]
+[ext_resource type="Animation" uid="uid://x2o1ghnoph5a" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_B.res" id="7_yv53y"]
+[ext_resource type="Animation" uid="uid://di7siotrgq5n4" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/T-Pose.res" id="8_r5voj"]
+[ext_resource type="Animation" uid="uid://b5edocmoes73y" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_A.res" id="9_dbf6o"]
+[ext_resource type="Animation" uid="uid://bbbv85dgtgbn0" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_B.res" id="10_mmulm"]
+[ext_resource type="Animation" uid="uid://dfd5t33gjftc5" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_C.res" id="11_8w570"]
+
+[resource]
+_data = {
+&"Jump_Full_Long": ExtResource("1_p6cps"),
+&"Jump_Full_Short": ExtResource("2_h8njf"),
+&"Jump_Idle": ExtResource("3_hn6nc"),
+&"Jump_Land": ExtResource("4_0k2t0"),
+&"Jump_Start": ExtResource("5_6u0xd"),
+&"Running_A": ExtResource("6_ygs62"),
+&"Running_B": ExtResource("7_yv53y"),
+&"T-Pose": ExtResource("8_r5voj"),
+&"Walking_A": ExtResource("9_dbf6o"),
+&"Walking_B": ExtResource("10_mmulm"),
+&"Walking_C": ExtResource("11_8w570")
+}

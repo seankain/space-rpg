@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://cbp2bq1l00fnr" path="res://Scripts/MainMenu.cs" id="1_35riq"]
 [ext_resource type="PackedScene" uid="uid://dwmuot2vcojgs" path="res://Scenes/Player.tscn" id="2_p4pvn"]
-[ext_resource type="Texture2D" uid="uid://bc6u5fu8m683h" path="res://Icons/x_icon.png" id="5_s3ie0"]
 [ext_resource type="PackedScene" uid="uid://3ok6wcslu3f0" path="res://Scenes/Menu/NewGameMenu.tscn" id="9_tjif3"]
 
 [node name="MainMenu" type="Control" unique_id=437305289 node_paths=PackedStringArray("NewGameButton", "LoadGameButton", "OptionsButton", "QuitButton", "NewGameMenu", "MenuButtonsContainer")]
@@ -17,34 +16,9 @@ PlayerScene = ExtResource("2_p4pvn")
 NewGameButton = NodePath("ButtonBoxContainer/NewGameButton")
 LoadGameButton = NodePath("ButtonBoxContainer/LoadGameButton")
 OptionsButton = NodePath("ButtonBoxContainer/OptionsButton")
-QuitButton = NodePath("QuitButton")
+QuitButton = NodePath("")
 NewGameMenu = NodePath("NewGameMenu")
 MenuButtonsContainer = NodePath("ButtonBoxContainer")
-
-[node name="QuitButton" type="TextureButton" parent="." unique_id=1015728005]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -105.0
-offset_top = 4.0
-offset_right = -4.0
-offset_bottom = 72.0
-grow_horizontal = 0
-
-[node name="TextureRect" type="TextureRect" parent="QuitButton" unique_id=2065167308]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 22.0
-offset_top = 6.0
-offset_right = 1002.0
-offset_bottom = 986.0
-grow_horizontal = 2
-grow_vertical = 2
-scale = Vector2(0.05, 0.05)
-texture = ExtResource("5_s3ie0")
 
 [node name="MainTitle" type="Label" parent="." unique_id=1711185057]
 layout_mode = 1
@@ -76,6 +50,10 @@ grow_vertical = 2
 layout_mode = 2
 text = "NEW GAME"
 
+[node name="SaveButton" type="Button" parent="ButtonBoxContainer" unique_id=1139734000]
+layout_mode = 2
+text = "SAVE GAME"
+
 [node name="LoadGameButton" type="Button" parent="ButtonBoxContainer" unique_id=1852574606]
 layout_mode = 2
 text = "LOAD GAME"
@@ -83,6 +61,10 @@ text = "LOAD GAME"
 [node name="OptionsButton" type="Button" parent="ButtonBoxContainer" unique_id=1491430007]
 layout_mode = 2
 text = "OPTIONS"
+
+[node name="QuitButton" type="Button" parent="ButtonBoxContainer" unique_id=866437092]
+layout_mode = 2
+text = "QUIT"
 
 [node name="NewGameMenu" parent="." unique_id=1980102180 instance=ExtResource("9_tjif3")]
 visible = false

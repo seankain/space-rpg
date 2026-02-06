@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://bp6tthygma07k"]
+
+[ext_resource type="PackedScene" uid="uid://bxjapklfjwk5v" path="res://Scenes/Menu/SavedGameMenuItem.tscn" id="1_3hgsy"]
+
+[node name="SaveGameMenu" type="CenterContainer" unique_id=34334761]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1978732843]
+layout_mode = 2
+
+[node name="VScrollBar" type="VScrollBar" parent="HBoxContainer" unique_id=15781412]
+visible = false
+layout_mode = 2
+
+[node name="SavedGamesVBoxContainer" type="VBoxContainer" parent="HBoxContainer" unique_id=1328698257]
+layout_mode = 2
+
+[node name="SavedGameMenuItem" parent="HBoxContainer/SavedGamesVBoxContainer" unique_id=2131587606 instance=ExtResource("1_3hgsy")]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 8

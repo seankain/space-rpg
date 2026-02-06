@@ -13,6 +13,9 @@ public partial class LevelManager : Node3D
     public MainMenu Menu;
 
     [Export]
+    public InGameMenu InGameMenu;
+
+    [Export]
     public LoadingScreen LoadingScreen;
 
     [Export]
@@ -26,10 +29,19 @@ public partial class LevelManager : Node3D
     {
         if (@event is InputEventKey eventKey)
         {
-            if (eventKey.Pressed && eventKey.Keycode == Key.Escape)
+            if (eventKey.Pressed)
             {
+                if(eventKey.Keycode == Key.Escape)
+                {
                 ToggleMenu();
+                }
+                if(eventKey.Keycode == Key.Tab)
+                {
+                    ToggleInGameMenu();
+                }
             }
+            
+            
         }
     }
 
@@ -45,6 +57,21 @@ public partial class LevelManager : Node3D
             Input.MouseMode = Input.MouseModeEnum.Captured;
         }
     }
+
+        private void ToggleInGameMenu()
+    {
+        this.InGameMenu.Visible = !this.InGameMenu.Visible;
+        if (this.InGameMenu.Visible)
+        {
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+        }
+        else
+        {
+            Input.MouseMode = Input.MouseModeEnum.Captured;
+        }
+    }
+
+
 
     private void AddPlayer(long peerId)
     {

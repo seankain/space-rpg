@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://cqyj4yj6c52ky"]
+
+[ext_resource type="Script" uid="uid://itomwvn7bid5" path="res://Scripts/InGameMenu.cs" id="1_na1s4"]
+
+[node name="InGameMenu" type="Control" unique_id=1184288820]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_na1s4")
+
+[node name="TabContainer" type="TabContainer" parent="." unique_id=606715186]
+layout_mode = 0
+offset_right = 1152.0
+offset_bottom = 647.0
+current_tab = 0
+
+[node name="Quests" type="Control" parent="TabContainer" unique_id=460501886]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="TabContainer/Quests" unique_id=709896680]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -574.0
+offset_top = -305.5
+offset_right = 574.0
+offset_bottom = 305.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Quests/ScrollContainer" unique_id=1052148431]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="Party" type="Control" parent="TabContainer" unique_id=1502819334]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="Map" type="Control" parent="TabContainer" unique_id=1706169813]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 3

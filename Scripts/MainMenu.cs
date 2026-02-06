@@ -16,7 +16,7 @@ public partial class MainMenu : Control
      [Export]
      public Button OptionsButton;
     [Export]
-    public TextureButton QuitButton;
+    public Button QuitButton;
      [Export]
     public NewGameMenu NewGameMenu;
 
@@ -31,7 +31,7 @@ public partial class MainMenu : Control
         NewGameButton.Pressed += OnNewGameButtonPressed;
         LoadGameButton.Pressed += OnLoadGameButtonPressed;
         QuitButton.Pressed += OnQuitButtonPressed;
-        NewGameMenu.StartButton.Pressed += ()=>{OnNewGameStarted?.Invoke(this,new());};
+        NewGameMenu.StartButton.Pressed += ()=>{OnNewGameStarted?.Invoke(this,new());this.Hide();};
         // JoinButton.Pressed += OnJoinButtonPressed;
 
     }

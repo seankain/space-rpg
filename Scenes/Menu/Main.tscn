@@ -3,10 +3,12 @@
 [ext_resource type="Script" uid="uid://dbut6qnwko0ef" path="res://Scripts/LevelManager.cs" id="1_anwqe"]
 [ext_resource type="PackedScene" uid="uid://dq0a063uqyuam" path="res://Scenes/Menu/MainMenu.tscn" id="1_r150o"]
 [ext_resource type="PackedScene" uid="uid://buageav384fk3" path="res://Scenes/Loading.tscn" id="2_wg0mu"]
+[ext_resource type="PackedScene" uid="uid://cqyj4yj6c52ky" path="res://Scenes/Menu/Inventory/InGameMenu.tscn" id="4_aksbj"]
 
-[node name="Main" type="Node3D" unique_id=1966222181 node_paths=PackedStringArray("Menu", "LoadingScreen", "LevelRoot")]
+[node name="Main" type="Node3D" unique_id=1966222181 node_paths=PackedStringArray("Menu", "InGameMenu", "LoadingScreen", "LevelRoot")]
 script = ExtResource("1_anwqe")
 Menu = NodePath("MainMenu")
+InGameMenu = NodePath("InGameMenu")
 LoadingScreen = NodePath("LoadingScreen")
 LevelRoot = NodePath("LevelRoot")
 
@@ -15,4 +17,7 @@ LevelRoot = NodePath("LevelRoot")
 [node name="MainMenu" parent="." unique_id=1389756639 instance=ExtResource("1_r150o")]
 
 [node name="LoadingScreen" parent="." unique_id=572280357 instance=ExtResource("2_wg0mu")]
+visible = false
+
+[node name="InGameMenu" parent="." unique_id=1184288820 instance=ExtResource("4_aksbj")]
 visible = false
