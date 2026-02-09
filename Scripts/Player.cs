@@ -6,6 +6,28 @@ public partial class Player : CharacterBody3D
 	public const float Speed = 5.0f;
 	public const float JumpVelocity = 4.5f;
 
+[Export]
+	public AnimationPlayer anim;
+
+    public override void _Ready()
+    {
+	
+        this.anim.Play("player_animation_library/Idle_A");
+    }
+
+    public override void _Process(double delta)
+	{
+		// I just put this here to show my son some animations, move to AnimationTree
+		if(this.Velocity.Length() > 0.0)
+		{
+			this.anim.Play("player_animation_library/Running_A");
+		}
+		else
+		{
+			this.anim.Play("player_animation_library/Idle_A");
+		}
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
 		Vector3 velocity = Velocity;

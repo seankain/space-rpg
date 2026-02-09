@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://bon4gwioj7taq"]
+
+[ext_resource type="Animation" uid="uid://cvwncm6s7jwu1" path="res://ThirdParty/AnimationLibrary/Idle_Talking.res" id="2_m7bvo"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gejva"]
+radius = 0.29052734
+height = 1.7353516
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_lvqg6"]
+_data = {
+&"Idle_Talking": ExtResource("2_m7bvo")
+}
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_b5x2e"]
+
+[node name="NpcRoot" type="CharacterBody3D" unique_id=2102439674]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1136396632]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.89208984, 0)
+shape = SubResource("CapsuleShape3D_gejva")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=932781960]
+root_node = NodePath("")
+libraries/NpcAnimLib = SubResource("AnimationLibrary_lvqg6")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=953564636]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9520086, 0)
+mesh = SubResource("CapsuleMesh_b5x2e")

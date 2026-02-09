@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bm2d1ryqpf2ur" path="res://Scenes/Levels/Level.cs" id="1_eue8q"]
 [ext_resource type="PackedScene" uid="uid://dwmuot2vcojgs" path="res://Scenes/Player.tscn" id="2_bd37o"]
 [ext_resource type="Script" uid="uid://bw7g01snbvbif" path="res://Scenes/Levels/Spawn.cs" id="2_biobi"]
+[ext_resource type="PackedScene" uid="uid://bf86h8d44kvyj" path="res://ThirdParty/Molten_Maps/Assets/gtlf/Wall_With_Door_Green.glb" id="4_bd37o"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bd37o"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -46,3 +47,6 @@ script = ExtResource("2_biobi")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Spawn/Area3D" unique_id=299170377]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1753888, 0)
 shape = SubResource("BoxShape3D_ff37e")
+
+[node name="SciFi Assets" parent="." unique_id=558118010 instance=ExtResource("4_bd37o")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.879599, 0.4648924, 18.677044)
