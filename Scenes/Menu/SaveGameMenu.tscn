@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://bxjapklfjwk5v" path="res://Scenes/Menu/SavedGameMenuItem.tscn" id="1_3hgsy"]
 [ext_resource type="Script" uid="uid://4mtaq86gmyvf" path="res://Scripts/SaveGameMenu.cs" id="1_pn3bm"]
 
-[node name="Control" type="Control" unique_id=990720820]
+[node name="Control" type="Control" unique_id=990720820 node_paths=PackedStringArray("CreateSaveButton", "CancelButton", "SaveVBox")]
 layout_mode = 3
 anchors_preset = 8
 anchor_left = 0.5
@@ -13,20 +13,42 @@ anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_pn3bm")
+SavedGameMenuItemScene = ExtResource("1_3hgsy")
+CreateSaveButton = NodePath("HBoxContainer/NewSaveButton")
+CancelButton = NodePath("HBoxContainer/CancelButton")
+SaveVBox = NodePath("ScrollContainer/SavedGamesVBoxContainer")
 
-[node name="SavedGamesVBoxContainer" type="VBoxContainer" parent="." unique_id=1328698257]
-layout_mode = 0
+[node name="ScrollContainer" type="ScrollContainer" parent="." unique_id=1516431542]
+custom_minimum_size = Vector2(300, 100)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SavedGamesVBoxContainer" type="VBoxContainer" parent="ScrollContainer" unique_id=1328698257]
+custom_minimum_size = Vector2(280, 100)
+layout_mode = 2
+
+[node name="Panel" parent="ScrollContainer/SavedGamesVBoxContainer" unique_id=134818533 instance=ExtResource("1_3hgsy")]
+layout_mode = 2
+
+[node name="Panel2" parent="ScrollContainer/SavedGamesVBoxContainer" unique_id=868188490 instance=ExtResource("1_3hgsy")]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1330081765]
+layout_mode = 1
+offset_left = -68.255
+offset_top = 70.07
+offset_right = 78.745
+offset_bottom = 110.06997
+
+[node name="NewSaveButton" type="Button" parent="HBoxContainer" unique_id=1392366607]
+layout_mode = 2
 size_flags_horizontal = 0
-size_flags_vertical = 4
+text = "New Save"
 
-[node name="Panel" parent="." unique_id=134818533 instance=ExtResource("1_3hgsy")]
-layout_mode = 0
-anchors_preset = 0
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 0.0
-anchor_bottom = 0.0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 0.0
-offset_bottom = 0.0
+[node name="CancelButton" type="Button" parent="HBoxContainer" unique_id=565126823]
+layout_mode = 2
+text = "Cancel"
