@@ -50,6 +50,14 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 - An NPC scene (`Scenes/Npc.tscn`) exists but has no behavior script.
 - `PlayerHud.cs` and `InGameMenu.cs` are empty shells.
 
+### Inventory basis (`Scripts/Pickup.cs`, `Scripts/InventoryMenu.cs`, `Scenes/Items/MaguffinCube.tscn`)
+
+First slice of the [inventory plan](plans/inventory-system.md):
+
+- `Pickup` — an `Area3D` carrying an item id + quantity; pressing **Interact** (E) while in range adds the item to the party inventory and frees the node. Pickups slowly spin for visibility. Collected pickups are *not* yet persisted in world state, so reloading a save respawns them.
+- `Scenes/Items/MaguffinCube.tscn` — a glowing purple cube pickup for the Maguffin Cube quest item; one is placed in the Intro level near spawn.
+- `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name and description. Refreshes whenever the tab becomes visible.
+
 ### Data model stubs (`Scripts/Data/`)
 
 These are plain C# classes (not Godot nodes/resources) sketching the future game systems. `SaveData` and `GameState` are live (used by the save/load system); the rest are not used by gameplay code yet.
@@ -60,7 +68,10 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, and the `List<CharacterEntity>` party. |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
-| `Item`, `EquippableItem`, `Weapon`, `Armor` | `Item.cs`, `EquippableItem.cs` | Item hierarchy with equip-slot validity, physical damage/defense. |
+| `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
+| `EquippableItem`, `Weapon`, `Armor` | `EquippableItem.cs` | Equippable subtypes with equip-slot validity, physical damage/defense. |
+| `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
+| `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube quest item plus one sample item per category. |
 | `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Equipment slots (head, eyes, hands, chest, legs). Note: slots are currently typed as the `EQUIPSLOT` enum rather than referencing an equipped `Item`. |
 | `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
@@ -69,7 +80,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 
 - Turn-based combat encounters
 - Quest tracking / journal
-- Inventory and equipment UI (Tab opens an empty `InGameMenu`)
+- Inventory depth — equipment UI, item use/drop, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC behavior and dialogue
 - Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
 - Options menu

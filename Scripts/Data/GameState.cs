@@ -11,4 +11,6 @@ public class GameState
     public Vector3? PlayerPosition {get;set;}
     public Vector3? PlayerRotation {get;set;}
     public List<CharacterEntity> Party{get;set;} = new();
+    // Shared party inventory; equipment stays per-character on EquipSlots.
+    public Inventory Inventory {get;set;} = new();
 }

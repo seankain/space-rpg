@@ -7,17 +7,24 @@ public enum EQUIPSLOT
     CHEST,
     LEGS
 }
-public class EquippableItem : Item
+public abstract class EquippableItem : Item
 {
     public EQUIPSLOT ValidEquipSlot{get;set;}
+
+    protected EquippableItem()
+    {
+        MaxStackSize = 1;
+    }
 }
 
 public class Weapon : EquippableItem
 {
+    public override ItemCategory Category => ItemCategory.Weapon;
     public uint PhysicalDamage {get;set;}
 }
 
 public class Armor : EquippableItem
 {
+    public override ItemCategory Category => ItemCategory.Armor;
     public uint PhysicalDefense {get;set;}
 }

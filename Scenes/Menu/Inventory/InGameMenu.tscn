@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cqyj4yj6c52ky"]
 
 [ext_resource type="Script" uid="uid://itomwvn7bid5" path="res://Scripts/InGameMenu.cs" id="1_na1s4"]
+[ext_resource type="Script" uid="uid://fw073je33phfm" path="res://Scripts/InventoryMenu.cs" id="2_invmn"]
 
 [node name="InGameMenu" type="Control" unique_id=1184288820]
 layout_mode = 3
@@ -44,10 +45,58 @@ visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 
-[node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687]
+[node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687 node_paths=PackedStringArray("CategoryTabs", "StackList", "ItemNameLabel", "ItemDescriptionLabel")]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 2
+script = ExtResource("2_invmn")
+CategoryTabs = NodePath("VBoxContainer/CategoryTabs")
+StackList = NodePath("VBoxContainer/HSplitContainer/StackList")
+ItemNameLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ItemName")
+ItemDescriptionLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ItemDescription")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Inventory"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CategoryTabs" type="TabBar" parent="TabContainer/Inventory/VBoxContainer"]
+layout_mode = 2
+tab_count = 5
+tab_0/title = "All"
+tab_1/title = "Weapons"
+tab_2/title = "Armor"
+tab_3/title = "Consumables"
+tab_4/title = "Quest Items"
+
+[node name="HSplitContainer" type="HSplitContainer" parent="TabContainer/Inventory/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StackList" type="ItemList" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsPanel" type="PanelContainer" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Details" type="VBoxContainer" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel"]
+layout_mode = 2
+
+[node name="ItemName" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ItemDescription" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
 
 [node name="Map" type="Control" parent="TabContainer" unique_id=1706169813]
 visible = false
