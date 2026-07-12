@@ -40,7 +40,7 @@ public partial class CameraController : Node3D
             var mouseMotionEvent = (InputEventMouseMotion)@event;
             var rot = this.Rotation;
             rot.X -= mouseMotionEvent.Relative.Y * MouseSensitivity;
-            rot.X = Mathf.Clamp(this.Rotation.X, -TiltMax, TiltMax);
+            rot.X = Mathf.Clamp(rot.X, Mathf.DegToRad(-TiltMax), Mathf.DegToRad(TiltMax));
             rot.Y += -mouseMotionEvent.Relative.X * MouseSensitivity;
             this.Rotation = rot;
         }
