@@ -22,9 +22,9 @@ public partial class LevelManager : Node3D
     public Node3D LevelRoot;
     public override void _Ready()
     {
-        Menu.OnNewGameStarted += (o,e)=>
+        Menu.OnNewGameStarted += (o,creation)=>
         {
-            var state = SaveManager.Instance.StartNewGame();
+            var state = SaveManager.Instance.StartNewGame(creation);
             StartLevel(state.CurrentLevelPath);
         };
         Menu.OnGameLoadRequested += (o,save)=>
