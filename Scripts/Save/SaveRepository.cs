@@ -8,7 +8,8 @@ using System.Text.Json;
 // exercised without booting the engine. SaveManager owns the Godot-facing side.
 public class SaveRepository
 {
-    public const int CurrentSaveVersion = 1;
+    // v2: GameState gained Inventory (v1 saves migrate to an empty inventory).
+    public const int CurrentSaveVersion = 2;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -83,6 +84,8 @@ public class SaveRepository
         {
             throw new InvalidDataException($"Save state at '{statePath}' has no level to restore.");
         }
+        // Pre-v2 saves (or hand-edited files) have no inventory block.
+        state.Inventory ??= new Inventory();
         return state;
     }
 
