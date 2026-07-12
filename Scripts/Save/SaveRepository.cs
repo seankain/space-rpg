@@ -9,7 +9,8 @@ using System.Text.Json;
 public class SaveRepository
 {
     // v2: GameState gained Inventory (v1 saves migrate to an empty inventory).
-    public const int CurrentSaveVersion = 2;
+    // v3: GameState gained Quests (older saves migrate to an empty quest log).
+    public const int CurrentSaveVersion = 3;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -86,6 +87,8 @@ public class SaveRepository
         }
         // Pre-v2 saves (or hand-edited files) have no inventory block.
         state.Inventory ??= new Inventory();
+        // Pre-v3 saves have no quest log.
+        state.Quests ??= new List<QuestProgress>();
         return state;
     }
 

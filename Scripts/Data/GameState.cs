@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 public class GameState
@@ -13,4 +14,21 @@ public class GameState
     public List<CharacterEntity> Party{get;set;} = new();
     // Shared party inventory; equipment stays per-character on EquipSlots.
     public Inventory Inventory {get;set;} = new();
+    // Per-quest progress against QuestCatalog definitions; quests the player
+    // hasn't touched have no entry (implicitly Unstarted).
+    public List<QuestProgress> Quests {get;set;} = new();
+
+    public QUESTSUCCESSSTATE GetQuestState(uint questId) =>
+        Quests.FirstOrDefault(q => q.QuestId == questId)?.State ?? QUESTSUCCESSSTATE.Unstarted;
+
+    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
+    {
+        var progress = Quests.FirstOrDefault(q => q.QuestId == questId);
+        if (progress == null)
+        {
+            progress = new QuestProgress { QuestId = questId };
+            Quests.Add(progress);
+        }
+        progress.State = state;
+    }
 }

@@ -33,6 +33,13 @@ public partial class CameraController : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        // Only steer the camera while the mouse is captured for gameplay;
+        // when a menu or dialogue has released the cursor, moving it toward
+        // a button shouldn't spin the view.
+        if (Input.MouseMode != Input.MouseModeEnum.Captured)
+        {
+            return;
+        }
         if (@event is InputEventMouseMotion)
         {
             currentState = CameraState.Freelook;

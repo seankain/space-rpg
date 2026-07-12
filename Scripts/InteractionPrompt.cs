@@ -41,7 +41,8 @@ public partial class InteractionPrompt : Label3D
 		Text = $"[{FirstBindingLabel(ActionName)}] {ActionDescription}";
 	}
 
-	private static string FirstBindingLabel(string actionName)
+	// Shared with other UI that shows key hints (e.g. the dialogue box).
+	public static string FirstBindingLabel(string actionName)
 	{
 		if (!InputMap.HasAction(actionName))
 		{
