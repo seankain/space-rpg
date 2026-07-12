@@ -8,9 +8,11 @@
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dewec"]
 height = 2.4562988
 
-[node name="CharacterBody3D" type="CharacterBody3D" unique_id=170045460 node_paths=PackedStringArray("anim")]
+[node name="CharacterBody3D" type="CharacterBody3D" unique_id=170045460 node_paths=PackedStringArray("anim", "cameraRig", "meshRoot")]
 script = ExtResource("1_kyqiw")
 anim = NodePath("AnimationPlayer")
+cameraRig = NodePath("CameraRig")
+meshRoot = NodePath("Knight")
 
 [node name="CameraRig" type="Marker3D" parent="." unique_id=1172471362]
 script = ExtResource("2_dewec")
