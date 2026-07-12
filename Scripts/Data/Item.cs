@@ -18,6 +18,9 @@ public abstract class Item
     public abstract ItemCategory Category {get;}
     // How many of this item a single inventory stack can hold.
     public uint MaxStackSize {get;set;} = 99;
+    // Base worth in credits: merchants sell at this and buy back at a
+    // discount (see Trade). 0 means the item can't be traded.
+    public uint Value {get;set;}
 }
 
 // Healing items and other one-shot usables.

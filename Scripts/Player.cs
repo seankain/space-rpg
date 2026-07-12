@@ -46,9 +46,10 @@ public partial class Player : CharacterBody3D
 			velocity += GetGravity() * (float)delta;
 		}
 
-		// Conversations lock movement; polled input would otherwise still fire
-		// (e.g. Space both confirms a dialogue choice and jumps).
-		bool inputLocked = DialogueManager.IsDialogueActive;
+		// Conversations and open shop menus lock movement; polled input would
+		// otherwise still fire (e.g. Space both confirms a dialogue choice
+		// and jumps).
+		bool inputLocked = DialogueManager.IsDialogueActive || ShopMenu.IsShopOpen;
 
 		// Handle Jump.
 		if (!inputLocked && Input.IsActionJustPressed("Jump") && IsOnFloor())

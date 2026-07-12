@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), an in-game menu with a quest log and party inventory management (use/equip/drop), and a set of stubbed data classes exist.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), and a set of stubbed data classes exist.
 
 ## Project setup
 
@@ -92,6 +92,16 @@ First slice of the [inventory plan](plans/inventory-system.md):
 - `Scenes/Items/MaguffinCube.tscn` — a glowing purple cube pickup for the Maguffin Cube quest item; one is placed in the Intro level near spawn.
 - `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name, description, and stats (damage/defense/heal). The details panel also manages the party: a dropdown picks a party member (with live HP readout) and **Use** (consumables heal the member, consuming one), **Equip** (weapons/armor go into the member's matching slot; anything displaced returns to the inventory), and **Drop** (discards one; quest items can't be dropped) act on the selected stack, with the member's current equipment listed alongside. Refreshes whenever the tab becomes visible.
 
+### Enterable interiors and shops (`Scripts/World/Door.cs`, `Scenes/Levels/ShopInterior.tscn`, `Scripts/ShopMenu.cs`)
+
+Prototype of interior dwellings the player can walk into, plus the first merchant:
+
+- `Door` (`Scripts/World/Door.cs`) — a doorway the player activates with **Interact** (E), built on the same code-built zone + `InteractionPrompt` plumbing as NPCs/pickups. An entrance door records the player's position and current level into `GameState`'s return-point fields, then swaps levels through `LevelManager.StartLevel`, so the loading screen shows; an exit door (`ReturnsToPrevious`) consumes the return point to put the player back outside. Because the return point lives in `GameState`, saving inside an interior and loading later still walks back out correctly (save version 5).
+- `Scenes/World/ShopBuilding.tscn` — placeholder exterior: a large cube with a flat door plane, placed in the Intro plaza chunk; its door loads the shop interior.
+- `Scenes/Levels/ShopInterior.tscn` — a small hollow-box interior level (CSG room, counter, spawn marker, exit door) with a shopkeeper NPC and the shop UI declared in-scene.
+- `ShopkeeperNpc` (`Scripts/Npc/ShopkeeperNpc.cs`) — merchant NPC whose opening stock (parallel item-id/quantity arrays) and bankroll are exported scene properties; talking to them offers to open the trading screen. Merchant stock/credits reset when the interior reloads (not yet persisted).
+- `ShopMenu` (`Scripts/ShopMenu.cs`, `Scenes/Menu/ShopMenu.tscn`) — scene-declared trading screen: Buy tab lists the merchant's stock, Sell tab the party inventory, with a details/price panel and result messages. Pricing rules live in the engine-free `Trade` class (buy at catalog `Item.Value`, sell back at half; quest items and zero-value items can't be sold), executing against `GameState.Credits` (the party's shared credits, new games start with 250) and the `Merchant`'s credits/stock. While the shop is open, movement and other interactions are locked the same way as during dialogue, and Escape closes the menu.
+
 ### Quest log (`Scripts/QuestLogMenu.cs`)
 
 First slice of the [quest plan](plans/quest-system.md)'s Phase 3 journal:
@@ -105,16 +115,18 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | Class | File | Purpose |
 |-------|------|---------|
 | `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
-| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, the `List<CharacterEntity>` party, the shared `Inventory`, and `Quests` progress (with get/set quest-state helpers). |
+| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, and `Quests` progress (with get/set quest-state helpers). |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
-| `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
+| `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap, credit `Value`) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
 | `EquippableItem`, `Weapon`, `Armor` | `EquippableItem.cs` | Equippable subtypes with equip-slot validity, physical damage/defense. |
 | `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
 | `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube quest item plus one sample item per category. |
 | `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Per-character equipment: one nullable equipped-item id per slot (head, eyes, hands, chest, legs) with get/set/equip-swap helpers. Live — serialized in saves (save version 4; older saves load with empty slots). |
 | `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
 | `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest. |
+| `Merchant` | `Merchant.cs` | A trading NPC's side of the shop ledger: name, credits, and stock `Inventory`. Built from `ShopkeeperNpc` scene exports; not yet persisted. |
+| `Trade` | `Trade.cs` | Engine-free buy/sell rules and execution between the party (`GameState.Credits`/`Inventory`) and a `Merchant`: buy at `Item.Value`, sell at half, quest/zero-value items untradable; returns user-facing result messages. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
 
 ## Not yet implemented
@@ -123,6 +135,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 - Quest depth — stages/objectives in the journal, HUD notifications, rewards; see the [quest plan](plans/quest-system.md)
 - Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
+- Shop depth — merchant stock/credit persistence across visits, buying/selling in quantities, per-merchant price modifiers, more interiors (houses) beyond the prototype shop
 - Party followers in the world (recruited members are data-only; see the [party plan](plans/party-system.md))
 - Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
 - Options menu
