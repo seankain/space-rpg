@@ -1,15 +1,15 @@
 using Godot;
 using System;
 
-public partial class SaveGameMenu : Control
+public partial class LoadGameMenu : Control
 {
-	public event EventHandler OnSaveGameMenuExitRequest;
+	public event EventHandler OnExitRequest;
+	// Raised after the save's GameState has been restored into SaveManager;
+	// LevelManager reacts by loading the restored level.
+	public event EventHandler<SaveData> OnLoadRequested;
 
 	[Export]
 	public PackedScene SavedGameMenuItemScene;
-
-	[Export]
-	public Button CreateSaveButton;
 
 	[Export]
 	public Button CancelButton;
@@ -17,23 +17,22 @@ public partial class SaveGameMenu : Control
 	[Export]
 	public VBoxContainer SaveVBox;
 
+	[Export]
+	public Label EmptyListLabel;
+
 	private ConfirmationDialog confirmDialog;
 	private Action confirmedAction;
+	private AcceptDialog errorDialog;
 
 	public override void _Ready()
 	{
-		CancelButton.ButtonDown += ()=>{OnSaveGameMenuExitRequest?.Invoke(this,new());};
-		CreateSaveButton.ButtonDown += HandleCreateSave;
+		CancelButton.ButtonDown += ()=>{OnExitRequest?.Invoke(this,new());};
 		VisibilityChanged += () => { if (Visible) { RefreshList(); } };
 		confirmDialog = new ConfirmationDialog();
 		AddChild(confirmDialog);
 		confirmDialog.Confirmed += () => confirmedAction?.Invoke();
-	}
-
-	private void HandleCreateSave()
-	{
-		SaveManager.Instance.CreateSave();
-		RefreshList();
+		errorDialog = new AcceptDialog();
+		AddChild(errorDialog);
 	}
 
 	private void RefreshList()
@@ -43,38 +42,42 @@ public partial class SaveGameMenu : Control
 			SaveVBox.RemoveChild(child);
 			child.QueueFree();
 		}
-		foreach (var save in SaveManager.Instance.ListSaves())
+		var saves = SaveManager.Instance.ListSaves();
+		EmptyListLabel.Visible = saves.Count == 0;
+		foreach (var save in saves)
 		{
 			var row = SavedGameMenuItemScene.Instantiate<SavedGameMenuItem>();
 			row.PopulateFromSavedData(save);
-			row.SelectPressed += HandleOverwriteRequested;
+			row.SelectPressed += HandleLoadRequested;
 			row.DeletePressed += HandleDeleteRequested;
 			SaveVBox.AddChild(row);
 		}
 	}
 
-	private void HandleOverwriteRequested(SaveData save)
+	private void HandleLoadRequested(SaveData save)
 	{
-		Confirm($"Overwrite save #{save.SaveNumber}?", () =>
+		try
 		{
-			SaveManager.Instance.OverwriteSave(save);
-			RefreshList();
-		});
+			SaveManager.Instance.LoadSave(save);
+		}
+		catch (Exception e)
+		{
+			GD.PushError($"Failed to load save #{save.SaveNumber}: {e.Message}");
+			errorDialog.DialogText = $"Save #{save.SaveNumber} could not be loaded. The file may be corrupted.";
+			errorDialog.PopupCentered();
+			return;
+		}
+		OnLoadRequested?.Invoke(this, save);
 	}
 
 	private void HandleDeleteRequested(SaveData save)
 	{
-		Confirm($"Delete save #{save.SaveNumber}? This cannot be undone.", () =>
+		confirmedAction = () =>
 		{
 			SaveManager.Instance.DeleteSave(save);
 			RefreshList();
-		});
-	}
-
-	private void Confirm(string message, Action onConfirmed)
-	{
-		confirmedAction = onConfirmed;
-		confirmDialog.DialogText = message;
+		};
+		confirmDialog.DialogText = $"Delete save #{save.SaveNumber}? This cannot be undone.";
 		confirmDialog.PopupCentered();
 	}
 
@@ -86,7 +89,7 @@ public partial class SaveGameMenu : Control
 			if(keyEvent.Pressed && keyEvent.Keycode == Key.Escape)
 			{
 				GetViewport().SetInputAsHandled();
-				OnSaveGameMenuExitRequest?.Invoke(this,new());
+				OnExitRequest?.Invoke(this,new());
 			}
 		}
 	}

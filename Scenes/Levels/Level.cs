@@ -12,18 +12,24 @@ public partial class Level : Node3D
 
     private void AddPlayer()
     {
-        var p = GD.Load<PackedScene>(PlayerScene.ResourcePath);
-        var player = p.Instantiate();
+        var player = (Node3D)PlayerScene.Instantiate();
         AddChild(player);
-        GD.Print("Adding player");
-        var levelChildren = GetChildren();
-        foreach (var c in levelChildren)
+        var state = SaveManager.Instance?.CurrentState;
+        if (state?.PlayerPosition != null)
         {
-            if (c is Spawn)
+            player.GlobalPosition = SaveManager.ToGodot(state.PlayerPosition.Value);
+            if (state.PlayerRotation != null)
             {
-                if (((Spawn)c).IsOccupied)
-                    GD.Print("Setting player position");
-                ((Node3D)player).GlobalPosition = ((Node3D)c).GlobalPosition;
+                player.Rotation = SaveManager.ToGodot(state.PlayerRotation.Value);
+            }
+            return;
+        }
+        foreach (var c in GetChildren())
+        {
+            if (c is Spawn spawn)
+            {
+                player.GlobalPosition = spawn.GlobalPosition;
+                break;
             }
         }
     }

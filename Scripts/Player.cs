@@ -3,6 +3,7 @@ using System;
 
 public partial class Player : CharacterBody3D
 {
+	public const string GroupName = "Player";
 	public const float Speed = 5.0f;
 	public const float JumpVelocity = 4.5f;
 
@@ -11,7 +12,7 @@ public partial class Player : CharacterBody3D
 
     public override void _Ready()
     {
-	
+		AddToGroup(GroupName);
         this.anim.Play("player_animation_library/Idle_A");
     }
 

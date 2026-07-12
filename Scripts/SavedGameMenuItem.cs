@@ -3,25 +3,33 @@ using System;
 
 public partial class SavedGameMenuItem : Control
 {
+	public event Action<SaveData> SelectPressed;
+	public event Action<SaveData> DeletePressed;
+
 	[Export]
 	public Label SaveNumber;
 	[Export]
 	public Label SaveDate;
 	[Export]
 	public Label LocationName;
-	public void PopulateFromSavedData(SaveData saveData)
-	{
-		this.SaveDate.Text = saveData.SaveCreationTime.ToString();
-		this.SaveNumber.Text = saveData.SaveNumber.ToString();
-		this.LocationName.Text = saveData.SaveLocationFriendlyName;
-	}
-	// Called when the node enters the scene tree for the first time.
+	[Export]
+	public Button SelectButton;
+	[Export]
+	public Button DeleteButton;
+
+	public SaveData Save { get; private set; }
+
 	public override void _Ready()
 	{
+		SelectButton.Pressed += () => { if (Save != null) { SelectPressed?.Invoke(Save); } };
+		DeleteButton.Pressed += () => { if (Save != null) { DeletePressed?.Invoke(Save); } };
 	}
 
-	// Called every frame. 'delta' is the elapsed time since the previous frame.
-	public override void _Process(double delta)
+	public void PopulateFromSavedData(SaveData saveData)
 	{
+		Save = saveData;
+		this.SaveNumber.Text = $"#{saveData.SaveNumber}";
+		this.SaveDate.Text = saveData.SaveTime.ToString("g");
+		this.LocationName.Text = saveData.SaveLocationFriendlyName;
 	}
 }
