@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), and a set of stubbed data classes exist. Combat and the quest journal are not yet implemented.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, and a set of stubbed data classes exist. The quest journal is not yet implemented.
 
 ## Project setup
 
@@ -58,8 +58,20 @@ First slice of the [NPC plan](plans/npc-system.md) (Phase 1 plus a taste of Phas
 - Three demo NPCs (colored mesh capsules) live in the Intro level:
   - **Rig** (green, `RecruitNpc`) — asks "Can I join up with you?"; Yes adds him to `GameState.Party` as a `CharacterEntity` (id 2) and despawns the capsule (followers are the [party plan](plans/party-system.md)'s Phase 2). Already-recruited saves skip spawning him on reload.
   - **Dockmaster Hale** (blue, `QuestGiverNpc`) — offers the "Return the Maguffin" fetch quest; branches for offer/decline, in-progress reminder, turn-in (removes the Maguffin Cube from inventory, marks the quest `Success`), and post-completion thanks. Handing it in works even if the cube was picked up before taking the quest.
-  - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice calls `BattleManager.StartBattle` (`Scripts/Battle/BattleManager.cs`), a stub seam for the turn-based combat task.
+  - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice starts a real turn-based battle via `BattleManager.StartBattle`; winning despawns him for the visit (defeat is not yet persisted, so he respawns on reload).
 - Quest progress lives in `GameState.Quests` (`QuestProgress` records against `QuestCatalog` definitions) and round-trips through saves (save version 3; older saves load with an empty quest log). Quest/party/join feedback is `GD.Print`-only until the HUD grows toasts.
+
+### Turn-based battles (`Scripts/Battle/`)
+
+Phase 1 of the [battle plan](plans/battle-system.md) — a playable JRPG-style combat loop:
+
+- `BattleManager` — autoload owning the field ↔ battle mode switch: `StartBattle(opponentName, onVictory)` pauses the scene tree, hides the running level (its state survives untouched), builds a `BattleScene` above the field, and swaps the camera. Victory restores the field and fires the callback (Vex despawns); defeat is a game over — the level is torn down and `LevelManager.ShowGameOverLoadMenu()` puts the player in front of the Load Game menu to restore a previous save.
+- `BattleScene` — code-built generic arena (flat ground plane, directional light, procedural-sky environment override on the battle camera) with placeholder capsules and billboarded name/HP labels for combatants; downed fighters keel over. Runs the turn loop: rounds repeat until a side is wiped, all living combatants acting once per round in Dexterity order (party wins ties). Enemy AI favors a damage power when affordable, otherwise attacks a random living party member.
+- `BattleHud` — code-built UI (same stub style as the dialogue box): top message bar, party HP/PP readout, and an action menu that walks **Attack / Power / Item** down to a target pick, awaited by the turn loop as a `Task`. Also owns the Game Over panel.
+- `BattleArenaTheme` — battle areas are themed by the current world area: `GameState.LocationName` maps to ground/sky/sun colors (Station Deck, Desert Wastes, Verdant Fields; unknown areas fall back to Station Deck).
+- `Power`/`PowerCatalog` — powers cost power points (the `MagicPoints` field on `CharacterEntity`, shown as PP): Plasma Surge (damage) and Nano Mend (heal), known by every party member for now.
+- `EnemyCatalog` — encounters keyed by the challenging NPC's display name ("Vex" → Vex + a Dock Drone); unknown names get a generic one-enemy fight. Duplicate enemy names are disambiguated (A/B/...).
+- `BattleCombatant`/`BattleAction` — runtime battle state; party combatants wrap their `CharacterEntity` and write HP/PP/XP back on victory (downed members revive at 1 HP). Items used in battle are consumables from the shared party inventory and are consumed on use.
 
 ### Inventory basis (`Scripts/Pickup.cs`, `Scripts/InventoryMenu.cs`, `Scenes/Items/MaguffinCube.tscn`)
 
@@ -91,7 +103,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 
 ## Not yet implemented
 
-- Turn-based combat encounters (`BattleManager.StartBattle` is a print-only stub seam)
+- Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters, defeated-NPC persistence; see the [battle plan](plans/battle-system.md)
 - Quest journal UI and HUD notifications (quest *progress* persists; see the [quest plan](plans/quest-system.md))
 - Inventory depth — equipment UI, item use/drop, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)

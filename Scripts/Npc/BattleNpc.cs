@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+using Godot;
 
-// A hostile-ish NPC whose dialogue can start a turn-based battle. The battle
-// itself is stubbed behind BattleManager.StartBattle and is picked up by the
-// combat task; this NPC only owns the challenge conversation.
+// A hostile-ish NPC whose dialogue can start a turn-based battle. Picking
+// the fight hands off to BattleManager, which swaps the game into battle
+// mode once this conversation closes. Winning despawns the challenger for
+// this visit (defeat persistence in world state comes later); losing is a
+// game over handled entirely by BattleManager.
 public partial class BattleNpc : Npc
 {
 	protected override void OnInteract()
@@ -16,13 +19,9 @@ public partial class BattleNpc : Npc
 				new DialogueChoice
 				{
 					Label = "Settle it",
-					Action = () => BattleManager.StartBattle(DisplayName),
-					// Placeholder beat until BattleManager actually swaps to a
-					// battle scene — then this line goes away.
-					Next = new DialogueLine
-					{
-						Text = $"(The turn-based battle system isn't built yet. {DisplayName} holsters his cutter... for now.)",
-					},
+					// No Next: the conversation ends and the deferred battle
+					// takes over the frame after.
+					Action = () => BattleManager.StartBattle(DisplayName, OnBattleWon),
 				},
 				new DialogueChoice
 				{
@@ -36,5 +35,13 @@ public partial class BattleNpc : Npc
 			},
 		};
 		DialogueManager.Instance.Start(challenge, ShowPromptIfPlayerInRange);
+	}
+
+	private void OnBattleWon()
+	{
+		if (!IsQueuedForDeletion())
+		{
+			QueueFree();
+		}
 	}
 }

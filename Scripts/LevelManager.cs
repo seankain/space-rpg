@@ -4,6 +4,11 @@ using System.Collections.Generic;
 
 public partial class LevelManager : Node3D
 {
+    // Set in _Ready; Main.tscn instances exactly one of these. Lets systems
+    // that live outside the scene (BattleManager autoload) reach the level
+    // root and menus.
+    public static LevelManager Instance { get; private set; }
+
     [Export]
     public PackedScene PlayerScene;
     [Export]
@@ -22,6 +27,7 @@ public partial class LevelManager : Node3D
     public Node3D LevelRoot;
     public override void _Ready()
     {
+        Instance = this;
         Menu.OnNewGameStarted += (o,creation)=>
         {
             var state = SaveManager.Instance.StartNewGame(creation);
@@ -95,5 +101,19 @@ public partial class LevelManager : Node3D
     public void ChangeLevel(int levelIndex)
     {
         StartLevel(LevelScenes[levelIndex].ResourcePath);
+    }
+
+    // Game-over exit from a lost battle: the run is over, so drop the level
+    // and put the player in front of the Load Game menu to restore a save
+    // (New Game remains reachable behind its Back button).
+    public void ShowGameOverLoadMenu()
+    {
+        foreach (var child in LevelRoot.GetChildren())
+        {
+            child.QueueFree();
+        }
+        Menu.Visible = true;
+        Menu.OnLoadGameButtonPressed();
+        Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 }
