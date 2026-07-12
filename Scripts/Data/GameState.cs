@@ -11,6 +11,18 @@ public class GameState
     // Null until first captured; a fresh game spawns at the level's Spawn marker instead.
     public Vector3? PlayerPosition {get;set;}
     public Vector3? PlayerRotation {get;set;}
+    // Where the exit door of the current interior (shop, house) returns the
+    // player: captured by the entrance Door, consumed by the exit Door. All
+    // null while the player is outside.
+    public string ReturnLevelPath {get;set;}
+    public string ReturnLocationName {get;set;}
+    public Vector3? ReturnPosition {get;set;}
+    public Vector3? ReturnRotation {get;set;}
+    // Party-shared credits for trading with merchants. The initializer doubles
+    // as the migration default: pre-v5 saves have no Credits field, so they
+    // load with the new-game amount.
+    public uint Credits {get;set;} = StartingCredits;
+    public const uint StartingCredits = 250;
     public List<CharacterEntity> Party{get;set;} = new();
     // Shared party inventory; equipment stays per-character on EquipSlots.
     public Inventory Inventory {get;set;} = new();

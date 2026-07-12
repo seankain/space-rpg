@@ -1,0 +1,108 @@
+[gd_scene format=3 uid="uid://dshpmenu0c4v2"]
+
+[ext_resource type="Script" path="res://Scripts/ShopMenu.cs" id="1_shopm"]
+
+[node name="ShopMenu" type="Control" node_paths=PackedStringArray("ShopNameLabel", "PlayerCreditsLabel", "ShopCreditsLabel", "ModeTabs", "StackList", "ItemNameLabel", "ItemDescriptionLabel", "PriceLabel", "ActionButton", "ResultLabel", "CloseButton")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shopm")
+ShopNameLabel = NodePath("Panel/Margin/Column/Header/ShopName")
+PlayerCreditsLabel = NodePath("Panel/Margin/Column/Header/PlayerCredits")
+ShopCreditsLabel = NodePath("Panel/Margin/Column/Header/ShopCredits")
+ModeTabs = NodePath("Panel/Margin/Column/ModeTabs")
+StackList = NodePath("Panel/Margin/Column/HSplitContainer/StackList")
+ItemNameLabel = NodePath("Panel/Margin/Column/HSplitContainer/DetailsPanel/Details/ItemName")
+ItemDescriptionLabel = NodePath("Panel/Margin/Column/HSplitContainer/DetailsPanel/Details/ItemDescription")
+PriceLabel = NodePath("Panel/Margin/Column/HSplitContainer/DetailsPanel/Details/Price")
+ActionButton = NodePath("Panel/Margin/Column/HSplitContainer/DetailsPanel/Details/ActionButton")
+ResultLabel = NodePath("Panel/Margin/Column/HSplitContainer/DetailsPanel/Details/Result")
+CloseButton = NodePath("Panel/Margin/Column/CloseButton")
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.15
+anchor_top = 0.1
+anchor_right = 0.85
+anchor_bottom = 0.9
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Column" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ShopName" type="Label" parent="Panel/Margin/Column/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+
+[node name="PlayerCredits" type="Label" parent="Panel/Margin/Column/Header"]
+layout_mode = 2
+
+[node name="ShopCredits" type="Label" parent="Panel/Margin/Column/Header"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+
+[node name="ModeTabs" type="TabBar" parent="Panel/Margin/Column"]
+layout_mode = 2
+tab_count = 2
+tab_0/title = "Buy"
+tab_1/title = "Sell"
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Panel/Margin/Column"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StackList" type="ItemList" parent="Panel/Margin/Column/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsPanel" type="PanelContainer" parent="Panel/Margin/Column/HSplitContainer"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Details" type="VBoxContainer" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel"]
+layout_mode = 2
+
+[node name="ItemName" type="Label" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ItemDescription" type="Label" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
+
+[node name="Price" type="Label" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="ActionButton" type="Button" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+disabled = true
+text = "Buy"
+
+[node name="Result" type="Label" parent="Panel/Margin/Column/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="CloseButton" type="Button" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Leave"

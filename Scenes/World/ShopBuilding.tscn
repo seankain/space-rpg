@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://ct8mvn2shq4d1"]
+
+[ext_resource type="Script" path="res://Scripts/World/Door.cs" id="1_door"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_walls"]
+albedo_color = Color(0.35, 0.38, 0.45, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_door"]
+albedo_color = Color(0.55, 0.35, 0.16, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_door"]
+material = SubResource("StandardMaterial3D_door")
+size = Vector2(1.6, 2.4)
+
+[node name="ShopBuilding" type="Node3D"]
+
+[node name="Building" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+use_collision = true
+size = Vector3(6, 6, 6)
+material = SubResource("StandardMaterial3D_walls")
+
+[node name="DoorPlane" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 3.02)
+mesh = SubResource("QuadMesh_door")
+
+[node name="Door" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
+script = ExtResource("1_door")
+TargetScenePath = "res://Scenes/Levels/ShopInterior.tscn"
+TargetDisplayName = "Trading Post"

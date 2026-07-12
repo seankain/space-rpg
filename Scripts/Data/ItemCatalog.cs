@@ -28,6 +28,7 @@ public static class ItemCatalog
             Description = "A repurposed mining tool. The safety interlock was removed a long time ago.",
             ValidEquipSlot = EQUIPSLOT.RIGHT_HAND,
             PhysicalDamage = 3,
+            Value = 120,
         });
         Register(new Armor
         {
@@ -36,6 +37,7 @@ public static class ItemCatalog
             Description = "Bolt-on chest plating rated for micrometeorites and small-arms fire.",
             ValidEquipSlot = EQUIPSLOT.CHEST,
             PhysicalDefense = 2,
+            Value = 90,
         });
         Register(new ConsumableItem
         {
@@ -43,6 +45,7 @@ public static class ItemCatalog
             Name = "Medkit",
             Description = "A sealed trauma kit. Restores a modest amount of health.",
             HealAmount = 5,
+            Value = 25,
         });
     }
 

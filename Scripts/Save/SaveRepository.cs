@@ -13,7 +13,11 @@ public class SaveRepository
     // v4: CharacterEquipSlots stores equipped item ids instead of the old
     //     unused enum placeholders (nothing could equip before, so older
     //     saves just load with every slot empty).
-    public const int CurrentSaveVersion = 4;
+    // v5: GameState gained party Credits and interior return-point fields
+    //     (pre-v5 saves load with the new-game starting credits and no
+    //     pending interior to return from — GameState's property defaults
+    //     cover both, so there is no explicit migration step).
+    public const int CurrentSaveVersion = 5;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
