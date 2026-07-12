@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://itomwvn7bid5" path="res://Scripts/InGameMenu.cs" id="1_na1s4"]
 [ext_resource type="Script" uid="uid://fw073je33phfm" path="res://Scripts/InventoryMenu.cs" id="2_invmn"]
+[ext_resource type="Script" uid="uid://dxq3vml0k8n5b" path="res://Scripts/QuestLogMenu.cs" id="3_qstlg"]
 
 [node name="InGameMenu" type="Control" unique_id=1184288820]
 layout_mode = 3
@@ -18,34 +19,59 @@ offset_right = 1152.0
 offset_bottom = 647.0
 current_tab = 0
 
-[node name="Quests" type="Control" parent="TabContainer" unique_id=460501886]
+[node name="Quests" type="Control" parent="TabContainer" unique_id=460501886 node_paths=PackedStringArray("QuestList", "QuestTitleLabel", "QuestStatusLabel", "QuestDescriptionLabel")]
 layout_mode = 2
 metadata/_tab_index = 0
+script = ExtResource("3_qstlg")
+QuestList = NodePath("VBoxContainer/HSplitContainer/QuestList")
+QuestTitleLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/QuestTitle")
+QuestStatusLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/QuestStatus")
+QuestDescriptionLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/QuestDescription")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="TabContainer/Quests" unique_id=709896680]
+[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Quests"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -574.0
-offset_top = -305.5
-offset_right = 574.0
-offset_bottom = 305.5
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Quests/ScrollContainer" unique_id=1052148431]
+[node name="HSplitContainer" type="HSplitContainer" parent="TabContainer/Quests/VBoxContainer"]
 layout_mode = 2
-size_flags_horizontal = 4
+size_flags_vertical = 3
+
+[node name="QuestList" type="ItemList" parent="TabContainer/Quests/VBoxContainer/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsPanel" type="PanelContainer" parent="TabContainer/Quests/VBoxContainer/HSplitContainer"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Details" type="VBoxContainer" parent="TabContainer/Quests/VBoxContainer/HSplitContainer/DetailsPanel"]
+layout_mode = 2
+
+[node name="QuestTitle" type="Label" parent="TabContainer/Quests/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="QuestStatus" type="Label" parent="TabContainer/Quests/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+
+[node name="QuestDescription" type="Label" parent="TabContainer/Quests/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
 
 [node name="Party" type="Control" parent="TabContainer" unique_id=1502819334]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 
-[node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687 node_paths=PackedStringArray("CategoryTabs", "StackList", "ItemNameLabel", "ItemDescriptionLabel")]
+[node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687 node_paths=PackedStringArray("CategoryTabs", "StackList", "ItemNameLabel", "ItemDescriptionLabel", "EquippedLabel", "MemberSelect", "UseButton", "EquipButton", "DropButton", "ActionResultLabel")]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 2
@@ -54,6 +80,12 @@ CategoryTabs = NodePath("VBoxContainer/CategoryTabs")
 StackList = NodePath("VBoxContainer/HSplitContainer/StackList")
 ItemNameLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ItemName")
 ItemDescriptionLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ItemDescription")
+EquippedLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/Equipped")
+MemberSelect = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberRow/MemberSelect")
+UseButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions/UseButton")
+EquipButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions/EquipButton")
+DropButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions/DropButton")
+ActionResultLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ActionResult")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Inventory"]
 layout_mode = 1
@@ -96,6 +128,47 @@ theme_override_font_sizes/font_size = 24
 [node name="ItemDescription" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
 layout_mode = 2
 size_flags_vertical = 3
+autowrap_mode = 3
+
+[node name="Equipped" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="MemberRow" type="HBoxContainer" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="MemberLabel" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberRow"]
+layout_mode = 2
+text = "Party member:"
+
+[node name="MemberSelect" type="OptionButton" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Actions" type="HBoxContainer" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="UseButton" type="Button" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Use"
+
+[node name="EquipButton" type="Button" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Equip"
+
+[node name="DropButton" type="Button" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Drop"
+
+[node name="ActionResult" type="Label" parent="TabContainer/Inventory/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
 autowrap_mode = 3
 
 [node name="Map" type="Control" parent="TabContainer" unique_id=1706169813]
