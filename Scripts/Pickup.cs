@@ -15,12 +15,41 @@ public partial class Pickup : Area3D
 	[Export]
 	public float SpinRadiansPerSecond = 1.0f;
 
+	// Height above the pickup's origin where the interaction hint floats.
+	[Export]
+	public float PromptHeight = 0.75f;
+
 	private bool playerInRange;
+	private InteractionPrompt prompt;
 
 	public override void _Ready()
 	{
-		BodyEntered += body => { if (body.IsInGroup(Player.GroupName)) playerInRange = true; };
-		BodyExited += body => { if (body.IsInGroup(Player.GroupName)) playerInRange = false; };
+		var item = ItemCatalog.Get(ItemId);
+		prompt = new InteractionPrompt
+		{
+			ActionName = "Interact",
+			ActionDescription = item != null ? $"Pick up {item.Name}" : "Pick up",
+			Position = new Vector3(0, PromptHeight, 0),
+			Visible = false,
+		};
+		AddChild(prompt);
+
+		BodyEntered += body =>
+		{
+			if (body.IsInGroup(Player.GroupName))
+			{
+				playerInRange = true;
+				prompt.Visible = true;
+			}
+		};
+		BodyExited += body =>
+		{
+			if (body.IsInGroup(Player.GroupName))
+			{
+				playerInRange = false;
+				prompt.Visible = false;
+			}
+		};
 	}
 
 	public override void _Process(double delta)
