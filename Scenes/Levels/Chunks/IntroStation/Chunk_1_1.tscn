@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://etu5j3p7y2k6r"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.05, 0.2, 0.08, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_planter"]
+albedo_color = Color(0.35, 0.24, 0.14, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trunk"]
+albedo_color = Color(0.3, 0.2, 0.1, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_canopy"]
+albedo_color = Color(0.12, 0.5, 0.18, 1)
+
+[node name="Chunk_1_1" type="Node3D"]
+
+[node name="Floor" type="CSGBox3D" parent="."]
+use_collision = true
+size = Vector3(64, 1, 64)
+material = SubResource("StandardMaterial3D_floor")
+
+[node name="PlanterA" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, 6)
+use_collision = true
+size = Vector3(8, 1, 3)
+material = SubResource("StandardMaterial3D_planter")
+
+[node name="PlanterB" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, 12)
+use_collision = true
+size = Vector3(8, 1, 3)
+material = SubResource("StandardMaterial3D_planter")
+
+[node name="TreeATrunk" type="CSGCylinder3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, -9)
+use_collision = true
+radius = 0.4
+height = 3.0
+material = SubResource("StandardMaterial3D_trunk")
+
+[node name="TreeACanopy" type="CSGSphere3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.5, -9)
+radius = 2.0
+material = SubResource("StandardMaterial3D_canopy")
+
+[node name="TreeBTrunk" type="CSGCylinder3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 2, 2)
+use_collision = true
+radius = 0.4
+height = 3.0
+material = SubResource("StandardMaterial3D_trunk")
+
+[node name="TreeBCanopy" type="CSGSphere3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 4.5, 2)
+radius = 2.0
+material = SubResource("StandardMaterial3D_canopy")

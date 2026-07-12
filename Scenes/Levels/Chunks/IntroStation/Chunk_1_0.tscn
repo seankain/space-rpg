@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://dvn6r2k9s4h7p"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.13, 0.13, 0.16, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crate"]
+albedo_color = Color(0.45, 0.3, 0.15, 1)
+
+[node name="Chunk_1_0" type="Node3D"]
+
+[node name="Floor" type="CSGBox3D" parent="."]
+use_collision = true
+size = Vector3(64, 1, 64)
+material = SubResource("StandardMaterial3D_floor")
+
+[node name="Crate1" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1.5, -6)
+use_collision = true
+size = Vector3(2, 2, 2)
+material = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate2" type="CSGBox3D" parent="."]
+transform = Transform3D(0.9238795, 0, 0.38268343, 0, 1, 0, -0.38268343, 0, 0.9238795, -5.4, 1.5, -6.6)
+use_collision = true
+size = Vector3(2, 2, 2)
+material = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.8, 3.5, -6.2)
+use_collision = true
+size = Vector3(2, 2, 2)
+material = SubResource("StandardMaterial3D_crate")
+
+[node name="Crate4" type="CSGBox3D" parent="."]
+transform = Transform3D(0.70710677, 0, -0.70710677, 0, 1, 0, 0.70710677, 0, 0.70710677, 9, 1.5, 11)
+use_collision = true
+size = Vector3(2, 2, 2)
+material = SubResource("StandardMaterial3D_crate")
+
+[node name="LongContainer" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 2, -14)
+use_collision = true
+size = Vector3(10, 3, 4)
+material = SubResource("StandardMaterial3D_crate")

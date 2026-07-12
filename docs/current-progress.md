@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, and a set of stubbed data classes exist. The quest journal is not yet implemented.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), and a set of stubbed data classes exist. The quest journal is not yet implemented.
 
 ## Project setup
 
@@ -41,8 +41,18 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 - `LevelManager` also handles global input: **Escape** toggles the main menu (and mouse capture), **Tab** toggles the in-game menu.
 - `ChangeLevel(int)` exists for swapping levels from an exported `LevelScenes` array but nothing calls it yet.
 
+### Level chunking (`Scripts/World/ChunkManager.cs`, `Scenes/Levels/Chunks/`)
+
+Phase 1 of the [level chunking plan](plans/level-chunking.md) — the world streams in 64×64-unit hand-authored chunks (no procedural generation):
+
+- Chunks are scene files organized per area as `Scenes/Levels/Chunks/<AreaName>/Chunk_<x>_<z>.tscn`; chunk `(x, z)` is centered on world `(x·64, 0, z·64)` and its content is authored in local coordinates within `[-32, 32)`. The grid is discovered from file names — no manifest.
+- `ChunkManager` (a node in the level scene, with the area directory exported) loads chunks within `LoadRadius` of the player's chunk each physics frame (threaded) and frees chunks beyond `UnloadRadius`; the gap prevents border thrashing. The starting neighborhood (saved position, else `Spawn`) loads synchronously on ready so ground exists before the player's first physics frame.
+- The level scene keeps global content (sun, sky, `Spawn`, `ChunkManager`); chunks hold local content (ground, props, pickups, NPCs).
+- The Intro station is a 2×2 chunked area: the old Intro content is `IntroStation/Chunk_0_0.tscn` (plaza with the NPCs and Maguffin Cube), plus a cargo yard `(1,0)`, landing pads `(0,1)`, and a hydroponics garden `(1,1)`.
+
 ### Demo level and player (`Scenes/Levels/Intro.tscn`, `Scripts/Player.cs`)
 
+- `Intro.tscn` is now a thin level shell (light, sky, `Spawn`, `ChunkManager`) whose ground and props stream in from the `IntroStation` chunk directory (see Level chunking above).
 - `Level.cs` instances the player scene on ready and moves it to a `Spawn` node's position.
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
