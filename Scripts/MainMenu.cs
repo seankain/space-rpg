@@ -3,7 +3,7 @@ using System;
 
 public partial class MainMenu : Control
 {
-    public event EventHandler OnNewGameStarted;
+    public event EventHandler<CharacterCreationData> OnNewGameStarted;
     public event EventHandler<SaveData> OnGameLoadRequested;
     [Export]
     public PackedScene PlayerScene;
@@ -36,7 +36,13 @@ public partial class MainMenu : Control
         LoadGameButton.Pressed += OnLoadGameButtonPressed;
         QuitButton.Pressed += OnQuitButtonPressed;
         SaveGameButton.Pressed += OnSaveButtonPressed;
-        NewGameMenu.StartButton.Pressed += ()=>{OnNewGameStarted?.Invoke(this,new());this.SaveGameButton.Disabled=false;this.Reset();this.Hide();};
+        NewGameMenu.OnCharacterCreated += (o,creation)=>
+        {
+            this.SaveGameButton.Disabled = false;
+            this.Reset();
+            this.Hide();
+            OnNewGameStarted?.Invoke(this, creation);
+        };
         SaveGameMenu.OnSaveGameMenuExitRequest += (o,e)=>{Reset();};
         LoadGameMenu.OnExitRequest += (o,e)=>{Reset();};
         LoadGameMenu.OnLoadRequested += (o,save)=>

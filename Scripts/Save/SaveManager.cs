@@ -22,7 +22,7 @@ public partial class SaveManager : Node
             warning => GD.PushWarning(warning));
     }
 
-    public GameState StartNewGame()
+    public GameState StartNewGame(CharacterCreationData creation)
     {
         CurrentState = new GameState
         {
@@ -34,13 +34,13 @@ public partial class SaveManager : Node
                 new CharacterEntity
                 {
                     Id = 1,
-                    Name = "Player",
+                    Name = string.IsNullOrWhiteSpace(creation?.Name) ? "Player" : creation.Name.Trim(),
                     Level = 1,
                     HealthPoints = 10,
                     MaxHealthPoints = 10,
                     MagicPoints = 5,
                     MaxMagicPoints = 5,
-                    Stats = new CharacterStats(),
+                    Stats = creation?.Stats ?? new CharacterStats(),
                     EquipSlots = new CharacterEquipSlots(),
                     ActiveStatusEffects = new List<ActiveStatusEffect>(),
                 }

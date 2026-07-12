@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://djei40t2g2yrk" path="res://Scenes/Menu/NewGameMenu.cs" id="1_p15mu"]
 
-[node name="NewGameMenu" type="Control" unique_id=1980102180 node_paths=PackedStringArray("StartButton")]
+[node name="NewGameMenu" type="Control" unique_id=1980102180 node_paths=PackedStringArray("StartButton", "NameEdit", "PointsRemainingLabel", "StatsGrid")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,7 +10,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_p15mu")
-StartButton = NodePath("VBoxContainer/Button")
+StartButton = NodePath("VBoxContainer/StartButton")
+NameEdit = NodePath("VBoxContainer/NameRow/NameEdit")
+PointsRemainingLabel = NodePath("VBoxContainer/PointsRemainingLabel")
+StatsGrid = NodePath("VBoxContainer/StatsGrid")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=243164626]
 layout_mode = 1
@@ -19,23 +22,42 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -63.5
-offset_top = -33.0
-offset_right = 63.5
-offset_bottom = 33.0
+offset_left = -140.0
+offset_top = -160.0
+offset_right = 140.0
+offset_bottom = 160.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 8
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=265930366]
+[node name="TitleLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Create Your Character"
+horizontal_alignment = 1
+
+[node name="NameRow" type="HBoxContainer" parent="VBoxContainer" unique_id=265930366]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer" unique_id=288977141]
+[node name="NameLabel" type="Label" parent="VBoxContainer/NameRow" unique_id=288977141]
 layout_mode = 2
 text = "Name: "
 
-[node name="LineEdit" type="LineEdit" parent="VBoxContainer/HBoxContainer" unique_id=1548007731]
+[node name="NameEdit" type="LineEdit" parent="VBoxContainer/NameRow" unique_id=1548007731]
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Enter a name"
+max_length = 24
 
-[node name="Button" type="Button" parent="VBoxContainer" unique_id=1182826436]
+[node name="PointsRemainingLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Stat points remaining: 10"
+horizontal_alignment = 1
+
+[node name="StatsGrid" type="GridContainer" parent="VBoxContainer"]
+layout_mode = 2
+columns = 4
+
+[node name="StartButton" type="Button" parent="VBoxContainer" unique_id=1182826436]
 layout_mode = 2
 text = "Start"
