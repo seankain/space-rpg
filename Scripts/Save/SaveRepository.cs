@@ -10,7 +10,10 @@ public class SaveRepository
 {
     // v2: GameState gained Inventory (v1 saves migrate to an empty inventory).
     // v3: GameState gained Quests (older saves migrate to an empty quest log).
-    public const int CurrentSaveVersion = 3;
+    // v4: CharacterEquipSlots stores equipped item ids instead of the old
+    //     unused enum placeholders (nothing could equip before, so older
+    //     saves just load with every slot empty).
+    public const int CurrentSaveVersion = 4;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -89,6 +92,13 @@ public class SaveRepository
         state.Inventory ??= new Inventory();
         // Pre-v3 saves have no quest log.
         state.Quests ??= new List<QuestProgress>();
+        // Pre-v4 saves stored placeholder enum slots whose properties no
+        // longer bind; make sure every member has an (empty) slot block.
+        state.Party ??= new List<CharacterEntity>();
+        foreach (var member in state.Party)
+        {
+            member.EquipSlots ??= new CharacterEquipSlots();
+        }
         return state;
     }
 

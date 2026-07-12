@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), and a set of stubbed data classes exist. The quest journal is not yet implemented.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), an in-game menu with a quest log and party inventory management (use/equip/drop), and a set of stubbed data classes exist.
 
 ## Project setup
 
@@ -57,7 +57,7 @@ Phase 1 of the [level chunking plan](plans/level-chunking.md) — the world stre
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
 - `Spawn.cs` tracks whether bodies occupy a spawn point via an `Area3D` trigger.
-- `PlayerHud.cs` and `InGameMenu.cs` are empty shells.
+- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests and Inventory tabs are driven by their own `QuestLogMenu`/`InventoryMenu` scripts; the Party and Map tabs are still empty).
 
 ### NPCs and stub dialogue (`Scripts/Npc/`, `Scripts/Dialogue/`)
 
@@ -90,7 +90,13 @@ First slice of the [inventory plan](plans/inventory-system.md):
 - `Pickup` — an `Area3D` carrying an item id + quantity; pressing **Interact** (E) while in range adds the item to the party inventory and frees the node. Pickups slowly spin for visibility. While the player is in range, a world-space prompt (e.g. "[E] Pick up Maguffin Cube") floats above the item. Collected pickups are *not* yet persisted in world state, so reloading a save respawns them.
 - `InteractionPrompt` (`Scripts/InteractionPrompt.cs`) — reusable billboarded `Label3D` hint for interactable objects. Resolves the key glyph from the `InputMap` at runtime (so rebinding Interact updates the hint) and renders fixed-size with no depth test so it stays readable at any distance. Shared with the NPC "[E] Talk" prompt, and its key-glyph resolver also feeds the dialogue box's continue hint.
 - `Scenes/Items/MaguffinCube.tscn` — a glowing purple cube pickup for the Maguffin Cube quest item; one is placed in the Intro level near spawn.
-- `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name and description. Refreshes whenever the tab becomes visible.
+- `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name, description, and stats (damage/defense/heal). The details panel also manages the party: a dropdown picks a party member (with live HP readout) and **Use** (consumables heal the member, consuming one), **Equip** (weapons/armor go into the member's matching slot; anything displaced returns to the inventory), and **Drop** (discards one; quest items can't be dropped) act on the selected stack, with the member's current equipment listed alongside. Refreshes whenever the tab becomes visible.
+
+### Quest log (`Scripts/QuestLogMenu.cs`)
+
+First slice of the [quest plan](plans/quest-system.md)'s Phase 3 journal:
+
+- `QuestLogMenu` — drives the Quests tab of the in-game menu (Tab): every quest the player has picked up, grouped into Main Quests / Side Quests (in progress) and Completed / Failed sections in one list; selecting a quest shows its title, main/side + status line, and description. Shows a "no quests yet" hint until the first quest is taken. Stage subtitles/objectives wait on the quest plan's stage work.
 
 ### Data model stubs (`Scripts/Data/`)
 
@@ -106,7 +112,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `EquippableItem`, `Weapon`, `Armor` | `EquippableItem.cs` | Equippable subtypes with equip-slot validity, physical damage/defense. |
 | `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
 | `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube quest item plus one sample item per category. |
-| `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Equipment slots (head, eyes, hands, chest, legs). Note: slots are currently typed as the `EQUIPSLOT` enum rather than referencing an equipped `Item`. |
+| `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Per-character equipment: one nullable equipped-item id per slot (head, eyes, hands, chest, legs) with get/set/equip-swap helpers. Live — serialized in saves (save version 4; older saves load with empty slots). |
 | `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
 | `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
@@ -114,8 +120,8 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 ## Not yet implemented
 
 - Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters, defeated-NPC persistence; see the [battle plan](plans/battle-system.md)
-- Quest journal UI and HUD notifications (quest *progress* persists; see the [quest plan](plans/quest-system.md))
-- Inventory depth — equipment UI, item use/drop, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
+- Quest depth — stages/objectives in the journal, HUD notifications, rewards; see the [quest plan](plans/quest-system.md)
+- Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
 - Party followers in the world (recruited members are data-only; see the [party plan](plans/party-system.md))
 - Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
