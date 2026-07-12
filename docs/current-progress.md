@@ -54,7 +54,8 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 
 First slice of the [inventory plan](plans/inventory-system.md):
 
-- `Pickup` — an `Area3D` carrying an item id + quantity; pressing **Interact** (E) while in range adds the item to the party inventory and frees the node. Pickups slowly spin for visibility. Collected pickups are *not* yet persisted in world state, so reloading a save respawns them.
+- `Pickup` — an `Area3D` carrying an item id + quantity; pressing **Interact** (E) while in range adds the item to the party inventory and frees the node. Pickups slowly spin for visibility. While the player is in range, a world-space prompt (e.g. "[E] Pick up Maguffin Cube") floats above the item. Collected pickups are *not* yet persisted in world state, so reloading a save respawns them.
+- `InteractionPrompt` (`Scripts/InteractionPrompt.cs`) — reusable billboarded `Label3D` hint for interactable objects. Resolves the key glyph from the `InputMap` at runtime (so rebinding Interact updates the hint) and renders fixed-size with no depth test so it stays readable at any distance. Intended to be shared with the NPC "[E] Talk" prompt from the [NPC plan](plans/npc-system.md).
 - `Scenes/Items/MaguffinCube.tscn` — a glowing purple cube pickup for the Maguffin Cube quest item; one is placed in the Intro level near spawn.
 - `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name and description. Refreshes whenever the tab becomes visible.
 
