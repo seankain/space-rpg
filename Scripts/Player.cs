@@ -46,15 +46,19 @@ public partial class Player : CharacterBody3D
 			velocity += GetGravity() * (float)delta;
 		}
 
+		// Conversations lock movement; polled input would otherwise still fire
+		// (e.g. Space both confirms a dialogue choice and jumps).
+		bool inputLocked = DialogueManager.IsDialogueActive;
+
 		// Handle Jump.
-		if (Input.IsActionJustPressed("Jump") && IsOnFloor())
+		if (!inputLocked && Input.IsActionJustPressed("Jump") && IsOnFloor())
 		{
 			velocity.Y = JumpVelocity;
 		}
 
 		// Get the input direction and handle the movement/deceleration.
 		// As good practice, you should replace UI actions with custom gameplay actions.
-		Vector2 inputDir = Input.GetVector("Left", "Right", "Forward", "Backward");
+		Vector2 inputDir = inputLocked ? Vector2.Zero : Input.GetVector("Left", "Right", "Forward", "Backward");
 		// Rotate the input by the camera's yaw so "forward" is wherever the camera points.
 		Vector3 direction = new Vector3(inputDir.X, 0, inputDir.Y).Rotated(Vector3.Up, cameraRig.GlobalRotation.Y).Normalized();
 		if (direction != Vector3.Zero)

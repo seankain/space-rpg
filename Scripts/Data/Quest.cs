@@ -39,3 +39,12 @@ public class QuestPrereqFlag
     public QUESTSUCCESSSTATE SuccessState {get;set;}
 
 }
+
+// Per-save quest progress (definitions stay in QuestCatalog, same
+// definition/progress split as items). Lives in GameState.Quests.
+public class QuestProgress
+{
+    public uint QuestId {get;set;}
+    public QUESTSUCCESSSTATE State {get;set;} = QUESTSUCCESSSTATE.Unstarted;
+    public uint CurrentStageNumber {get;set;}
+}

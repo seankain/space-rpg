@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, and a set of stubbed data classes exist. Combat, quests, inventory, and NPCs are not yet implemented.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), and a set of stubbed data classes exist. Combat and the quest journal are not yet implemented.
 
 ## Project setup
 
@@ -47,15 +47,26 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
 - `Spawn.cs` tracks whether bodies occupy a spawn point via an `Area3D` trigger.
-- An NPC scene (`Scenes/Npc.tscn`) exists but has no behavior script.
 - `PlayerHud.cs` and `InGameMenu.cs` are empty shells.
+
+### NPCs and stub dialogue (`Scripts/Npc/`, `Scripts/Dialogue/`)
+
+First slice of the [NPC plan](plans/npc-system.md) (Phase 1 plus a taste of Phase 2's placement), with a homegrown dialogue box standing in until the [Yarn Spinner integration](plans/npc-dialogue-yarn.md):
+
+- `Npc` (`Scripts/Npc/Npc.cs`) — base script on `Scenes/Npc.tscn`: exported display name and capsule tint color, a code-built `Area3D` interaction zone, the shared `InteractionPrompt` ("[E] Talk to ..."), and face-the-player on interact. Subclasses override `OnInteract()` to start their conversation.
+- `DialogueManager` — autoload (registered in `project.godot`) owning the "in dialogue" mode: shows one `DialogueLine` at a time in a bottom-screen box (speaker, text, choice buttons or an "[E] Continue" hint), releases the mouse while talking, and restores capture on end. `DialogueLine`/`DialogueChoice` (`Scripts/Dialogue/Dialogue.cs`) are a minimal hand-authored tree — NPC scripts build them in code. Player movement/jump, pickups, NPC re-interaction, and camera look are all suppressed while a dialogue is active.
+- Three demo NPCs (colored mesh capsules) live in the Intro level:
+  - **Rig** (green, `RecruitNpc`) — asks "Can I join up with you?"; Yes adds him to `GameState.Party` as a `CharacterEntity` (id 2) and despawns the capsule (followers are the [party plan](plans/party-system.md)'s Phase 2). Already-recruited saves skip spawning him on reload.
+  - **Dockmaster Hale** (blue, `QuestGiverNpc`) — offers the "Return the Maguffin" fetch quest; branches for offer/decline, in-progress reminder, turn-in (removes the Maguffin Cube from inventory, marks the quest `Success`), and post-completion thanks. Handing it in works even if the cube was picked up before taking the quest.
+  - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice calls `BattleManager.StartBattle` (`Scripts/Battle/BattleManager.cs`), a stub seam for the turn-based combat task.
+- Quest progress lives in `GameState.Quests` (`QuestProgress` records against `QuestCatalog` definitions) and round-trips through saves (save version 3; older saves load with an empty quest log). Quest/party/join feedback is `GD.Print`-only until the HUD grows toasts.
 
 ### Inventory basis (`Scripts/Pickup.cs`, `Scripts/InventoryMenu.cs`, `Scenes/Items/MaguffinCube.tscn`)
 
 First slice of the [inventory plan](plans/inventory-system.md):
 
 - `Pickup` — an `Area3D` carrying an item id + quantity; pressing **Interact** (E) while in range adds the item to the party inventory and frees the node. Pickups slowly spin for visibility. While the player is in range, a world-space prompt (e.g. "[E] Pick up Maguffin Cube") floats above the item. Collected pickups are *not* yet persisted in world state, so reloading a save respawns them.
-- `InteractionPrompt` (`Scripts/InteractionPrompt.cs`) — reusable billboarded `Label3D` hint for interactable objects. Resolves the key glyph from the `InputMap` at runtime (so rebinding Interact updates the hint) and renders fixed-size with no depth test so it stays readable at any distance. Intended to be shared with the NPC "[E] Talk" prompt from the [NPC plan](plans/npc-system.md).
+- `InteractionPrompt` (`Scripts/InteractionPrompt.cs`) — reusable billboarded `Label3D` hint for interactable objects. Resolves the key glyph from the `InputMap` at runtime (so rebinding Interact updates the hint) and renders fixed-size with no depth test so it stays readable at any distance. Shared with the NPC "[E] Talk" prompt, and its key-glyph resolver also feeds the dialogue box's continue hint.
 - `Scenes/Items/MaguffinCube.tscn` — a glowing purple cube pickup for the Maguffin Cube quest item; one is placed in the Intro level near spawn.
 - `InventoryMenu` — drives the Inventory tab of the in-game menu (Tab): a `TabBar` filters stacks by category (All / Weapons / Armor / Consumables / Quest Items), an `ItemList` shows stacks with quantities, and a details panel shows the selected item's name and description. Refreshes whenever the tab becomes visible.
 
@@ -66,7 +77,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | Class | File | Purpose |
 |-------|------|---------|
 | `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
-| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, and the `List<CharacterEntity>` party. |
+| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, the `List<CharacterEntity>` party, the shared `Inventory`, and `Quests` progress (with get/set quest-state helpers). |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
 | `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
@@ -74,15 +85,17 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
 | `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube quest item plus one sample item per category. |
 | `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Equipment slots (head, eyes, hands, chest, legs). Note: slots are currently typed as the `EQUIPSLOT` enum rather than referencing an equipped `Item`. |
-| `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. |
+| `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
+| `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
 
 ## Not yet implemented
 
-- Turn-based combat encounters
-- Quest tracking / journal
+- Turn-based combat encounters (`BattleManager.StartBattle` is a print-only stub seam)
+- Quest journal UI and HUD notifications (quest *progress* persists; see the [quest plan](plans/quest-system.md))
 - Inventory depth — equipment UI, item use/drop, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
-- NPC behavior and dialogue
+- NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
+- Party followers in the world (recruited members are data-only; see the [party plan](plans/party-system.md))
 - Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
 - Options menu
 - Multiplayer (the server browser is debug-only UI)
@@ -90,6 +103,6 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 ## Known issues / cleanup candidates
 
 - `Spawn.cs` handlers look inverted: `BodyExited` **adds** to the occupier list and `BodyEntered` **removes**, so `IsOccupied` reports the opposite of reality.
-- `CameraController` clamps tilt with `TiltMax = 75` against `Rotation.X`, which is in **radians**, so the clamp never engages; the clamp also reads `this.Rotation.X` instead of the just-updated local `rot.X`.
 - `ActiveGamesList.AddActiveGameRow` calls `GD.Load` and discards the result.
+- Escape (main menu) and Tab (in-game menu) still work while a dialogue is open, stacking menus over the dialogue box and fighting over the mouse mode.
 - Pressing Escape on the main menu before any game has started hides the menu over an empty scene.

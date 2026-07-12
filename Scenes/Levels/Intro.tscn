@@ -5,6 +5,10 @@
 [ext_resource type="Script" uid="uid://bw7g01snbvbif" path="res://Scenes/Levels/Spawn.cs" id="2_biobi"]
 [ext_resource type="PackedScene" uid="uid://bf86h8d44kvyj" path="res://ThirdParty/Molten_Maps/Assets/gtlf/Wall_With_Door_Green.glb" id="4_bd37o"]
 [ext_resource type="PackedScene" uid="uid://zhzr4q31y3thu" path="res://Scenes/Items/MaguffinCube.tscn" id="5_mcube"]
+[ext_resource type="PackedScene" uid="uid://bon4gwioj7taq" path="res://Scenes/Npc.tscn" id="6_npc"]
+[ext_resource type="Script" path="res://Scripts/Npc/RecruitNpc.cs" id="7_recruit"]
+[ext_resource type="Script" path="res://Scripts/Npc/QuestGiverNpc.cs" id="8_questgiver"]
+[ext_resource type="Script" path="res://Scripts/Npc/BattleNpc.cs" id="9_battle"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bd37o"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -54,3 +58,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.879599, 0.4648924, 18.6770
 
 [node name="MaguffinCube" parent="." instance=ExtResource("5_mcube")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -2)
+
+[node name="RecruitNpc" parent="." instance=ExtResource("6_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.55, -5)
+script = ExtResource("7_recruit")
+DisplayName = "Rig"
+BodyColor = Color(0.2, 0.8, 0.35, 1)
+
+[node name="QuestGiverNpc" parent="." instance=ExtResource("6_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.55, -7.5)
+script = ExtResource("8_questgiver")
+DisplayName = "Dockmaster Hale"
+BodyColor = Color(0.25, 0.5, 0.95, 1)
+
+[node name="BattleNpc" parent="." instance=ExtResource("6_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.55, -5.5)
+script = ExtResource("9_battle")
+DisplayName = "Vex"
+BodyColor = Color(0.9, 0.2, 0.2, 1)
