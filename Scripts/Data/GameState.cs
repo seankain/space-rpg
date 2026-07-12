@@ -29,6 +29,11 @@ public class GameState
     // Per-quest progress against QuestCatalog definitions; quests the player
     // hasn't touched have no entry (implicitly Unstarted).
     public List<QuestProgress> Quests {get;set;} = new();
+    // Display names of battle NPCs the party has beaten, so defeated
+    // challengers stay down across saves and chunk reloads and quests can
+    // check for them. Keyed by display name until field NPCs carry stable
+    // encounter ids (same caveat as EnemyCatalog).
+    public List<string> DefeatedNpcs {get;set;} = new();
 
     public QUESTSUCCESSSTATE GetQuestState(uint questId) =>
         Quests.FirstOrDefault(q => q.QuestId == questId)?.State ?? QUESTSUCCESSSTATE.Unstarted;
@@ -42,5 +47,15 @@ public class GameState
             Quests.Add(progress);
         }
         progress.State = state;
+    }
+
+    public bool IsNpcDefeated(string npcName) => DefeatedNpcs.Contains(npcName);
+
+    public void MarkNpcDefeated(string npcName)
+    {
+        if (!DefeatedNpcs.Contains(npcName))
+        {
+            DefeatedNpcs.Add(npcName);
+        }
     }
 }

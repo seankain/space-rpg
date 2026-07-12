@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://Scripts/Npc/RecruitNpc.cs" id="4_recruit"]
 [ext_resource type="Script" path="res://Scripts/Npc/QuestGiverNpc.cs" id="5_questgiver"]
 [ext_resource type="Script" path="res://Scripts/Npc/BattleNpc.cs" id="6_battle"]
+[ext_resource type="Script" path="res://Scripts/Npc/BountyGiverNpc.cs" id="8_bounty"]
 [ext_resource type="PackedScene" uid="uid://ct8mvn2shq4d1" path="res://Scenes/World/ShopBuilding.tscn" id="7_shop"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
@@ -44,3 +45,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.55, -5.5)
 script = ExtResource("6_battle")
 DisplayName = "Vex"
 BodyColor = Color(0.9, 0.2, 0.2, 1)
+
+[node name="BountyGiverNpc" parent="." instance=ExtResource("3_npc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.55, -9)
+script = ExtResource("8_bounty")
+DisplayName = "Chief Marlow"
+BodyColor = Color(0.95, 0.65, 0.15, 1)

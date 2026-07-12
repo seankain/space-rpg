@@ -65,10 +65,11 @@ First slice of the [NPC plan](plans/npc-system.md) (Phase 1 plus a taste of Phas
 
 - `Npc` (`Scripts/Npc/Npc.cs`) — base script on `Scenes/Npc.tscn`: exported display name and capsule tint color, a code-built `Area3D` interaction zone, the shared `InteractionPrompt` ("[E] Talk to ..."), and face-the-player on interact. Subclasses override `OnInteract()` to start their conversation.
 - `DialogueManager` — autoload (registered in `project.godot`) owning the "in dialogue" mode: shows one `DialogueLine` at a time in a bottom-screen box (speaker, text, choice buttons or an "[E] Continue" hint), releases the mouse while talking, and restores capture on end. `DialogueLine`/`DialogueChoice` (`Scripts/Dialogue/Dialogue.cs`) are a minimal hand-authored tree — NPC scripts build them in code. Player movement/jump, pickups, NPC re-interaction, and camera look are all suppressed while a dialogue is active.
-- Three demo NPCs (colored mesh capsules) live in the Intro level:
+- Four demo NPCs (colored mesh capsules) live in the Intro level:
   - **Rig** (green, `RecruitNpc`) — asks "Can I join up with you?"; Yes adds him to `GameState.Party` as a `CharacterEntity` (id 2) and despawns the capsule (followers are the [party plan](plans/party-system.md)'s Phase 2). Already-recruited saves skip spawning him on reload.
   - **Dockmaster Hale** (blue, `QuestGiverNpc`) — offers the "Return the Maguffin" fetch quest; branches for offer/decline, in-progress reminder, turn-in (removes the Maguffin Cube from inventory, marks the quest `Success`), and post-completion thanks. Handing it in works even if the cube was picked up before taking the quest.
-  - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice starts a real turn-based battle via `BattleManager.StartBattle`; winning despawns him for the visit (defeat is not yet persisted, so he respawns on reload).
+  - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice starts a real turn-based battle via `BattleManager.StartBattle`; winning records him in `GameState.DefeatedNpcs` (save version 6) and despawns him, and defeated challengers skip spawning on reload.
+  - **Chief Marlow** (amber, `BountyGiverNpc`) — offers the "Clear the Deck" side quest: defeat Vex, then report back to be paid a Maintenance Keycard (quest item). The turn-in checks `GameState.DefeatedNpcs`, so it works even if Vex was beaten before taking the bounty.
 - Quest progress lives in `GameState.Quests` (`QuestProgress` records against `QuestCatalog` definitions) and round-trips through saves (save version 3; older saves load with an empty quest log). Quest/party/join feedback is `GD.Print`-only until the HUD grows toasts.
 
 ### Turn-based battles (`Scripts/Battle/`)
@@ -121,17 +122,17 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap, credit `Value`) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
 | `EquippableItem`, `Weapon`, `Armor` | `EquippableItem.cs` | Equippable subtypes with equip-slot validity, physical damage/defense. |
 | `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
-| `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube quest item plus one sample item per category. |
+| `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube and Maintenance Keycard quest items plus one sample item per category. |
 | `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Per-character equipment: one nullable equipped-item id per slot (head, eyes, hands, chest, legs) with get/set/equip-swap helpers. Live — serialized in saves (save version 4; older saves load with empty slots). |
 | `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
-| `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest. |
+| `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest and the "Clear the Deck" bounty quest. |
 | `Merchant` | `Merchant.cs` | A trading NPC's side of the shop ledger: name, credits, and stock `Inventory`. Built from `ShopkeeperNpc` scene exports; not yet persisted. |
 | `Trade` | `Trade.cs` | Engine-free buy/sell rules and execution between the party (`GameState.Credits`/`Inventory`) and a `Merchant`: buy at `Item.Value`, sell at half, quest/zero-value items untradable; returns user-facing result messages. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
 
 ## Not yet implemented
 
-- Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters, defeated-NPC persistence; see the [battle plan](plans/battle-system.md)
+- Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters; see the [battle plan](plans/battle-system.md)
 - Quest depth — stages/objectives in the journal, HUD notifications, rewards; see the [quest plan](plans/quest-system.md)
 - Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
