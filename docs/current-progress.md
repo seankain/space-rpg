@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, and a set of stubbed data classes exist. Combat, quests, inventory, NPCs, and persistence are not yet implemented.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, and a set of stubbed data classes exist. Combat, quests, inventory, and NPCs are not yet implemented.
 
 ## Project setup
 
@@ -18,18 +18,26 @@ space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and qu
 
 The main menu shows New Game / Load Game / Save Game / Options / Quit buttons and swaps between sub-menus by toggling visibility:
 
-- **New Game** (`Scenes/Menu/NewGameMenu.cs`) — shows a start button. Pressing it fires `MainMenu.OnNewGameStarted`, enables the Save Game button, and hides the menu. `LevelManager` listens for this event and kicks off loading of the intro level.
-- **Save Game** (`Scripts/SaveGameMenu.cs`) — demonstrates button wiring and scene instancing. "Create Save" builds a `SaveData` record (hardcoded to location "Tutorial"), keeps it in an in-memory list, and instantiates a `SavedGameMenuItem` row (`Scripts/SavedGameMenuItem.cs`, `Scenes/Menu/SavedGameMenuItem.tscn`) showing save number, date, and location name. **Nothing is written to disk** — saves vanish when the game closes.
-- **Load Game** (`Scenes/Menu/LoadGameMenu.tscn`) — a plain `Control` with no script; opening it shows an empty panel.
+- **New Game** (`Scenes/Menu/NewGameMenu.cs`) — shows a start button. Pressing it fires `MainMenu.OnNewGameStarted`; `LevelManager` creates a fresh `GameState` via `SaveManager.StartNewGame()` and loads the intro level.
+- **Save Game** (`Scripts/SaveGameMenu.cs`) — lists real saves from disk as clickable `SavedGameMenuItem` rows. "New Save" captures the running game and writes a slot; clicking an existing row overwrites it (with confirmation); each row has a delete button (with confirmation).
+- **Load Game** (`Scripts/LoadGameMenu.cs`) — lists the same rows; clicking one restores its `GameState` and loads the saved level, placing the player at the saved position. Corrupt saves show an error dialog instead of crashing.
 - **Options** — button exists but the handler is not wired and there is no options UI.
 - **Quit** — exits the game.
+
+### Save/load system (`Scripts/Save/`)
+
+Implemented per phases 1–3 of the [save/load plan](plans/save-load-system.md):
+
+- `SaveManager` — autoload (registered in `project.godot`) owning the running `GameState` and all save/load orchestration: new game, capture (player transform via the `"Player"` node group), create/overwrite/load/delete.
+- `SaveRepository` — engine-free serialization and disk IO: one directory per slot under `user://saves/slot_<guid>/` with `meta.json` (`SaveData`) + `state.json` (`GameState`), written atomically (temp file + rename), JSON via `System.Text.Json`. Corrupt or newer-versioned saves are skipped in listings with a warning.
+- Restore flow: `LevelManager.StartLevel` is the single entry point for both new and loaded games — it clears `LevelRoot` and streams the level through `LoadingScreen`; `Level.AddPlayer` places the player at the saved position when one exists, otherwise at the level's `Spawn` marker.
 
 There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesList.cs`, `Scripts/ActiveGameRow.cs`) that populates a list with random debug rows (server name, player count, latency). It is not connected to any networking.
 
 ### Level loading (`Scripts/LevelManager.cs`, `Scripts/LoadingScreen.cs`)
 
-- `LevelManager` (attached in `Main.tscn`) listens for `OnNewGameStarted` and asks `LoadingScreen` to load `Scenes/Levels/Intro.tscn`.
-- `LoadingScreen` uses `ResourceLoader.LoadThreadedRequest` and polls status each frame, driving a progress bar, then instances the loaded scene under `LevelRoot`.
+- `LevelManager` (attached in `Main.tscn`) reacts to new-game and load-game events by calling `StartLevel`, which clears `LevelRoot` and streams the level in via `LoadingScreen`; the mouse is captured when loading completes.
+- `LoadingScreen` uses `ResourceLoader.LoadThreadedRequest` and polls status each frame, driving a progress bar, then instances the loaded scene under `LevelRoot`, hides itself, and raises `LoadCompleted`. Load failures log an error instead of spinning forever.
 - `LevelManager` also handles global input: **Escape** toggles the main menu (and mouse capture), **Tab** toggles the in-game menu.
 - `ChangeLevel(int)` exists for swapping levels from an exported `LevelScenes` array but nothing calls it yet.
 
@@ -44,12 +52,12 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 
 ### Data model stubs (`Scripts/Data/`)
 
-These are plain C# classes (not Godot nodes/resources) sketching the future game systems. None of them are used by gameplay code yet, except `SaveData` in the save menu.
+These are plain C# classes (not Godot nodes/resources) sketching the future game systems. `SaveData` and `GameState` are live (used by the save/load system); the rest are not used by gameplay code yet.
 
 | Class | File | Purpose |
 |-------|------|---------|
-| `SaveData` | `SaveData.cs` | Save-slot metadata: number, creation/save time, location name + id. No reference to actual game state yet. |
-| `GameState` | `GameState.cs` | Holds a `List<CharacterEntity>` party. Intended to become the serializable root of a saved game. |
+| `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
+| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, and the `List<CharacterEntity>` party. |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
 | `Item`, `EquippableItem`, `Weapon`, `Armor` | `Item.cs`, `EquippableItem.cs` | Item hierarchy with equip-slot validity, physical damage/defense. |
@@ -63,7 +71,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 - Quest tracking / journal
 - Inventory and equipment UI (Tab opens an empty `InGameMenu`)
 - NPC behavior and dialogue
-- Save/load persistence — see the [save and load system plan](plans/save-load-system.md)
+- Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
 - Options menu
 - Multiplayer (the server browser is debug-only UI)
 
@@ -71,8 +79,5 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 
 - `Spawn.cs` handlers look inverted: `BodyExited` **adds** to the occupier list and `BodyEntered` **removes**, so `IsOccupied` reports the opposite of reality.
 - `CameraController` clamps tilt with `TiltMax = 75` against `Rotation.X`, which is in **radians**, so the clamp never engages; the clamp also reads `this.Rotation.X` instead of the just-updated local `rot.X`.
-- `LoadingScreen` never sets `isLoading = false` or hides itself after the scene finishes loading, so `LoadThreadedGetStatus`/instancing can re-run every frame.
-- `LoadingScreen.NextScenePath` defaults to `res://Scenes/Intro.tscn`, but the scene actually lives at `res://Scenes/Levels/Intro.tscn`.
-- `MainMenu.cs` imports `Microsoft.VisualBasic`, which is unused and non-portable.
-- Both `Level.cs` and `LevelManager.AddPlayer` instantiate players; the long-term owner of spawning should be decided (relevant to load-game flow).
-- `SaveGameMenu.AddSaveToDisplay` re-loads the `PackedScene` by path even though the export already provides it (`GD.Load` result is discarded in `ActiveGamesList` similarly).
+- `ActiveGamesList.AddActiveGameRow` calls `GD.Load` and discards the result.
+- Pressing Escape on the main menu before any game has started hides the menu over an empty scene.

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b0dvk0e8eai6n" path="res://Scripts/SavedGameMenuItem.cs" id="1_ih8r5"]
 
-[node name="Control" type="Control" unique_id=868188490 node_paths=PackedStringArray("SaveNumber", "SaveDate", "LocationName")]
+[node name="Control" type="Control" unique_id=868188490 node_paths=PackedStringArray("SaveNumber", "SaveDate", "LocationName", "SelectButton", "DeleteButton")]
 custom_minimum_size = Vector2(280, 50)
 layout_mode = 3
 anchors_preset = 8
@@ -18,6 +18,8 @@ script = ExtResource("1_ih8r5")
 SaveNumber = NodePath("HBoxContainer/SaveNumLabel")
 SaveDate = NodePath("HBoxContainer/DateTimeLabel")
 LocationName = NodePath("HBoxContainer/LocationLabel")
+SelectButton = NodePath("SelectButton")
+DeleteButton = NodePath("DeleteButton")
 metadata/_edit_use_anchors_ = true
 
 [node name="Panel" type="Panel" parent="." unique_id=134818533]
@@ -37,6 +39,21 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
+[node name="SelectButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -139.5
+offset_top = -21.5
+offset_right = 139.5
+offset_bottom = 21.5
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
 [node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=134893302]
 custom_minimum_size = Vector2(267, 23)
 layout_mode = 1
@@ -48,6 +65,7 @@ offset_top = -11.5
 offset_bottom = 11.5
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="SaveNumLabel" type="Label" parent="HBoxContainer" unique_id=1635210811]
 layout_mode = 2
@@ -61,3 +79,18 @@ text = "Tutorial Area"
 layout_mode = 2
 size_flags_horizontal = 0
 text = "2/5/2026 10:24PM"
+
+[node name="DeleteButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -32.0
+offset_top = -14.0
+offset_right = -8.0
+offset_bottom = 14.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "X"

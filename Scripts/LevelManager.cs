@@ -22,7 +22,28 @@ public partial class LevelManager : Node3D
     public Node3D LevelRoot;
     public override void _Ready()
     {
-        Menu.OnNewGameStarted += (o,e)=>{LoadingScreen.LoadNext("res://Scenes/Levels/Intro.tscn");};
+        Menu.OnNewGameStarted += (o,e)=>
+        {
+            var state = SaveManager.Instance.StartNewGame();
+            StartLevel(state.CurrentLevelPath);
+        };
+        Menu.OnGameLoadRequested += (o,save)=>
+        {
+            // LoadGameMenu already restored the GameState into SaveManager.
+            StartLevel(SaveManager.Instance.CurrentState.CurrentLevelPath);
+        };
+        LoadingScreen.LoadCompleted += (o,e)=>{Input.MouseMode = Input.MouseModeEnum.Captured;};
+    }
+
+    // Single entry point for starting a level, whether from a new game or a
+    // loaded save: clears whatever level is running, then streams in the next.
+    public void StartLevel(string scenePath)
+    {
+        foreach (var child in LevelRoot.GetChildren())
+        {
+            child.QueueFree();
+        }
+        LoadingScreen.LoadNext(scenePath);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -40,8 +61,8 @@ public partial class LevelManager : Node3D
                     ToggleInGameMenu();
                 }
             }
-            
-            
+
+
         }
     }
 
@@ -71,32 +92,8 @@ public partial class LevelManager : Node3D
         }
     }
 
-
-
-    private void AddPlayer(long peerId)
-    {
-        var p = GD.Load<PackedScene>(PlayerScene.ResourcePath);
-        var player = p.Instantiate();
-        player.Name = peerId.ToString();
-        AddChild(player);
-        GD.Print("Adding player");
-        foreach (var spawnNode in GetTree().GetNodesInGroup("SpawnPositions"))
-        {
-            GD.Print("Spawn node");
-            if (spawnNode.Name == $"spawn{player.Name}")
-            {
-                GD.Print("Setting player position");
-                ((Node3D)player).GlobalPosition = ((Node3D)spawnNode).GlobalPosition;
-            }
-        }
-
-    }
-
     public void ChangeLevel(int levelIndex)
     {
-        var levelScene = GD.Load<PackedScene>(LevelScenes[levelIndex].ResourcePath);
-        var levelInstance = levelScene.Instantiate();
-        GetNode("LevelRoot").AddChild(levelInstance);
-
+        StartLevel(LevelScenes[levelIndex].ResourcePath);
     }
 }

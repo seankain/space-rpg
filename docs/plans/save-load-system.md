@@ -2,6 +2,21 @@
 
 Goal: players can create named save slots, see them listed with metadata, load one to resume exactly where they left off, and trust that saves survive crashes and game updates.
 
+## Status: Phases 1–3 implemented
+
+Phases 1–3 are done (see `Scripts/Save/` and the menu scripts). A few Phase 4
+items landed early because they were cheap on the way through: atomic writes,
+corrupt saves skipped in listings (and a dialog when loading one fails), and
+refusal of saves written by a newer `SaveVersion`. Still open from Phase 4:
+the migration pipeline, autosave/quicksave, thumbnails, playtime tracking, and
+async saving. Phase 5 remains the contract for future systems.
+
+Decision outcomes that differ from the recommendations below: spawn ownership
+was consolidated into `Level.cs` (not `LevelManager`) — the level owns its
+spawn markers and consults `SaveManager.CurrentState` for a restore position;
+`LevelManager.StartLevel` is the single entry point for entering a level.
+Save-anywhere is the current behavior.
+
 ## Where we are
 
 The groundwork already committed:

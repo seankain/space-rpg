@@ -1,14 +1,13 @@
 using Godot;
-using Microsoft.VisualBasic;
 using System;
-using System.ComponentModel;
 
 public partial class MainMenu : Control
 {
     public event EventHandler OnNewGameStarted;
+    public event EventHandler<SaveData> OnGameLoadRequested;
     [Export]
     public PackedScene PlayerScene;
-    
+
      [Export]
      public Button NewGameButton;
      [Export]
@@ -22,7 +21,7 @@ public partial class MainMenu : Control
      [Export]
     public NewGameMenu NewGameMenu;
     [Export]
-    public Control LoadGameMenu;
+    public LoadGameMenu LoadGameMenu;
     [Export]
     public SaveGameMenu SaveGameMenu;
 
@@ -39,6 +38,14 @@ public partial class MainMenu : Control
         SaveGameButton.Pressed += OnSaveButtonPressed;
         NewGameMenu.StartButton.Pressed += ()=>{OnNewGameStarted?.Invoke(this,new());this.SaveGameButton.Disabled=false;this.Reset();this.Hide();};
         SaveGameMenu.OnSaveGameMenuExitRequest += (o,e)=>{Reset();};
+        LoadGameMenu.OnExitRequest += (o,e)=>{Reset();};
+        LoadGameMenu.OnLoadRequested += (o,save)=>
+        {
+            this.SaveGameButton.Disabled = false;
+            this.Reset();
+            this.Hide();
+            OnGameLoadRequested?.Invoke(this, save);
+        };
     }
 
     private void Reset()

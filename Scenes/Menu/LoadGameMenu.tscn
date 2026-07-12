@@ -1,14 +1,71 @@
 [gd_scene format=3 uid="uid://ch553cyk43s55"]
 
-[node name="LoadGameMenu" type="Control" unique_id=2131172536]
+[ext_resource type="Script" path="res://Scripts/LoadGameMenu.cs" id="1_lgmsc"]
+[ext_resource type="PackedScene" uid="uid://bxjapklfjwk5v" path="res://Scenes/Menu/SavedGameMenuItem.tscn" id="2_lgmit"]
+
+[node name="LoadGameMenu" type="Control" unique_id=2131172536 node_paths=PackedStringArray("CancelButton", "SaveVBox", "EmptyListLabel")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_lgmsc")
+SavedGameMenuItemScene = ExtResource("2_lgmit")
+CancelButton = NodePath("HBoxContainer/CancelButton")
+SaveVBox = NodePath("ScrollContainer/SavedGamesVBoxContainer")
+EmptyListLabel = NodePath("EmptyListLabel")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=171735244]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+[node name="ScrollContainer" type="ScrollContainer" parent="." unique_id=171735244]
+custom_minimum_size = Vector2(300, 150)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -75.0
+offset_right = 150.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SavedGamesVBoxContainer" type="VBoxContainer" parent="ScrollContainer"]
+custom_minimum_size = Vector2(280, 100)
+layout_mode = 2
+
+[node name="EmptyListLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -80.0
+offset_top = -11.5
+offset_right = 80.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "No saved games yet."
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -73.5
+offset_top = 85.0
+offset_right = 73.5
+offset_bottom = 125.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CancelButton" type="Button" parent="HBoxContainer"]
+layout_mode = 2
+text = "Cancel"
