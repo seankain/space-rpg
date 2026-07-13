@@ -10,6 +10,7 @@ A 3rd-person adventure RPG built in Godot, with turn-based combat encounters and
 | [plans/inventory-system.md](plans/inventory-system.md) | Player inventory for items and equipment: item catalog, pickups, equip slots, UI |
 | [plans/party-system.md](plans/party-system.md) | Party system: roster, world followers, party menus, combat hooks |
 | [plans/npc-system.md](plans/npc-system.md) | NPCs: interaction plumbing, placement, behaviors, persisted world state |
+| [plans/npc-resource-files.md](plans/npc-resource-files.md) | NPC data in Godot resource files: per-NPC `.tres` definitions (id, mesh, spawn scene/chunk, items/credits) and data-driven spawning |
 | [plans/npc-dialogue-yarn.md](plans/npc-dialogue-yarn.md) | NPC dialogue authored in Yarn: plugin integration, dialogue UI, game-state bridge, commands |
 | [plans/quest-system.md](plans/quest-system.md) | Quests: definitions/progress split, QuestManager, journal UI, rewards |
 
