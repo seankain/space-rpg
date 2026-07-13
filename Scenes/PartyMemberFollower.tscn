@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://dqp7mfoll2wer"]
+
+[ext_resource type="Script" path="res://Scripts/PartyMemberFollower.cs" id="1_follow"]
+[ext_resource type="PackedScene" uid="uid://bsmcga7dbv6um" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/fbx/Knight.fbx" id="2_knight"]
+[ext_resource type="AnimationLibrary" uid="uid://cgkt2fhrfo21d" path="res://ThirdParty/AnimationLibrary/player_animation_library.tres" id="3_anim"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_follow"]
+height = 2.4562988
+
+[node name="PartyMemberFollower" type="CharacterBody3D" node_paths=PackedStringArray("anim", "meshRoot", "nameLabel")]
+collision_layer = 0
+script = ExtResource("1_follow")
+anim = NodePath("AnimationPlayer")
+meshRoot = NodePath("Knight")
+nameLabel = NodePath("NameLabel")
+
+[node name="Knight" parent="." instance=ExtResource("2_knight")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1297607, 0)
+shape = SubResource("CapsuleShape3D_follow")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+root_node = NodePath("../Knight")
+libraries/player_animation_library = ExtResource("3_anim")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
+billboard = 1
+no_depth_test = true
+fixed_size = true
+pixel_size = 0.0008
+modulate = Color(1, 1, 1, 0.85)
+outline_size = 8

@@ -1,8 +1,8 @@
 # Current Progress
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-13_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), and a set of stubbed data classes exist.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), a party system (roster rules, followers walking behind the leader, a management tab), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), and a set of stubbed data classes exist.
 
 ## Project setup
 
@@ -11,6 +11,7 @@ space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and qu
 - **Physics:** Jolt Physics
 - **Main scene:** `Scenes/Menu/Main.tscn`
 - **Input actions** (defined in `project.godot`): `Forward`/`Backward`/`Left`/`Right` (WASD), `Jump` (Space), `Interact` (E), `Inventory` (Tab)
+- **Tests:** `Tests/SpaceRpg.Tests.csproj` — xunit over the engine-free sources (`Scripts/Data/`, `SaveRepository`), excluded from the Godot build; run with `dotnet test Tests`
 
 ## What works today
 
@@ -57,7 +58,7 @@ Phase 1 of the [level chunking plan](plans/level-chunking.md) — the world stre
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
 - `Spawn.cs` tracks whether bodies occupy a spawn point via an `Area3D` trigger.
-- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests and Inventory tabs are driven by their own `QuestLogMenu`/`InventoryMenu` scripts; the Party and Map tabs are still empty).
+- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests, Party, and Inventory tabs are driven by their own `QuestLogMenu`/`PartyMenu`/`InventoryMenu` scripts; the Map tab is still empty).
 
 ### NPCs and stub dialogue (`Scripts/Npc/`, `Scripts/Dialogue/`)
 
@@ -66,11 +67,19 @@ First slice of the [NPC plan](plans/npc-system.md) (Phase 1 plus a taste of Phas
 - `Npc` (`Scripts/Npc/Npc.cs`) — base script on `Scenes/Npc.tscn`: exported display name and capsule tint color, a code-built `Area3D` interaction zone, the shared `InteractionPrompt` ("[E] Talk to ..."), and face-the-player on interact. Subclasses override `OnInteract()` to start their conversation.
 - `DialogueManager` — autoload (registered in `project.godot`) owning the "in dialogue" mode: shows one `DialogueLine` at a time in a bottom-screen box (speaker, text, choice buttons or an "[E] Continue" hint), releases the mouse while talking, and restores capture on end. `DialogueLine`/`DialogueChoice` (`Scripts/Dialogue/Dialogue.cs`) are a minimal hand-authored tree — NPC scripts build them in code. Player movement/jump, pickups, NPC re-interaction, and camera look are all suppressed while a dialogue is active.
 - Four demo NPCs (colored mesh capsules) live in the Intro level:
-  - **Rig** (green, `RecruitNpc`) — asks "Can I join up with you?"; Yes adds him to `GameState.Party` as a `CharacterEntity` (id 2) and despawns the capsule (followers are the [party plan](plans/party-system.md)'s Phase 2). Already-recruited saves skip spawning him on reload.
+  - **Rig** (green, `RecruitNpc`) — asks "Can I join up with you?"; Yes adds him to `GameState.Party` through `PartyManager` as a `CharacterEntity` (id 2), despawns the capsule, and spawns a `PartyMemberFollower` in his place. Already-recruited saves skip spawning him on reload, and a full party gets a "full crew" line instead of the offer.
   - **Dockmaster Hale** (blue, `QuestGiverNpc`) — offers the "Return the Maguffin" fetch quest; branches for offer/decline, in-progress reminder, turn-in (removes the Maguffin Cube from inventory, marks the quest `Success`), and post-completion thanks. Handing it in works even if the cube was picked up before taking the quest.
   - **Vex** (red, `BattleNpc`) — challenge dialogue whose "Settle it" choice starts a real turn-based battle via `BattleManager.StartBattle`; winning records him in `GameState.DefeatedNpcs` (save version 6) and despawns him, and defeated challengers skip spawning on reload.
   - **Chief Marlow** (amber, `BountyGiverNpc`) — offers the "Clear the Deck" side quest: defeat Vex, then report back to be paid a Maintenance Keycard (quest item). The turn-in checks `GameState.DefeatedNpcs`, so it works even if Vex was beaten before taking the bounty.
 - Quest progress lives in `GameState.Quests` (`QuestProgress` records against `QuestCatalog` definitions) and round-trips through saves (save version 3; older saves load with an empty quest log). Quest/party/join feedback is `GD.Print`-only until the HUD grows toasts.
+
+### Party system (`Scripts/Data/PartyManager.cs`, `Scripts/PartyMemberFollower.cs`, `Scripts/PartyMenu.cs`)
+
+Phases 1–3 of the [party plan](plans/party-system.md):
+
+- `PartyManager` — engine-free roster rules wrapped around the live `GameState.Party` list: index 0 is the leader (the controlled character), max active size 4, `TryAddMember` (no duplicates, no overflow), `RemoveMember` (the last member can't leave; removing the leader promotes the next), `SetLeader`, and `Move` for one-step reordering. Covered by xunit tests (`Tests/PartyManagerTests.cs`), plus a multi-member save round-trip test (`Tests/PartySaveRoundTripTests.cs`).
+- `PartyMemberFollower` (`Scenes/PartyMemberFollower.tscn`) — every member beyond the leader walks the level as a follower: the same Knight body/animations as `Player.tscn` but AI-driven, seeking the player with per-member spacing (direct pursuit; no navmesh yet) and a floating name label. Followers are physical but non-blocking (collision layer 0), and a catch-up teleport self-heals stale positions, snags, and falls. `Level.AddPlayer` spawns them on level load/restore; `SaveManager.CaptureState` persists each follower's position through the member's existing `CharacterEntity.Position` (no save-format change), and positions are only trusted on restore when they plausibly belong to the loaded level — otherwise followers fall in line behind the leader.
+- `PartyMenu` — drives the Party tab of the in-game menu (Tab): the roster list (leader starred, level/HP/PP inline) and a member sheet (level/XP, vitals, six stats, equipped gear) with the management controls: **Set Leader**, **Move Up**/**Move Down** (order feeds the future combat turn layout; moving into first place changes the leader), and **Dismiss** behind a confirmation dialog. Dismissing strips the member's equipped gear back into the shared inventory (a re-recruit builds a fresh `CharacterEntity`), and any roster change rebuilds the follower line behind the player in place. A dismissed Rig stands at his dock spot again next time the area loads.
 
 ### Turn-based battles (`Scripts/Battle/`)
 
@@ -118,6 +127,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
 | `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, and `Quests` progress (with get/set quest-state helpers). |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
+| `PartyManager` | `PartyManager.cs` | Roster rules over `GameState.Party`: leader at index 0, max size 4, add/remove/reorder. Live — used by recruiting and the Party tab. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
 | `Item`, `ConsumableItem`, `QuestItem`, `ItemCategory` | `Item.cs` | Abstract item base (id, name, description, stack cap, credit `Value`) plus consumable/quest subtypes; every item maps to an `ItemCategory` (Weapon / Armor / Consumable / QuestItem) used by the inventory UI. |
 | `EquippableItem`, `Weapon`, `Armor` | `EquippableItem.cs` | Equippable subtypes with equip-slot validity, physical damage/defense. |
@@ -137,7 +147,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 - Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
 - NPC depth — Yarn Spinner dialogue, wander/patrol behaviors, NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
 - Shop depth — merchant stock/credit persistence across visits, buying/selling in quantities, per-merchant price modifiers, more interiors (houses) beyond the prototype shop
-- Party followers in the world (recruited members are data-only; see the [party plan](plans/party-system.md))
+- Party depth — navmesh follower pathing, benched members beyond the active four, recruit/dismiss via scripted dialogue events (Yarn `<<recruit>>`), portraits in the Party tab; see the [party plan](plans/party-system.md)
 - Save/load extras — autosave/quicksave, migrations, thumbnails, playtime; see the [save and load system plan](plans/save-load-system.md)
 - Options menu
 - Multiplayer (the server browser is debug-only UI)

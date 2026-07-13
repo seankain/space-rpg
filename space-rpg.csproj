@@ -5,4 +5,8 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>spacerpg</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The xunit test project compiles the engine-free sources itself. -->
+    <Compile Remove="Tests/**" />
+  </ItemGroup>
 </Project>

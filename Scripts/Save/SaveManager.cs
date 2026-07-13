@@ -99,6 +99,19 @@ public partial class SaveManager : Node
             CurrentState.PlayerPosition = ToNumerics(player.GlobalPosition);
             CurrentState.PlayerRotation = ToNumerics(player.Rotation);
         }
+        // Followers persist through each member's CharacterEntity.Position
+        // (party plan Phase 2); Level.AddFollowers restores them.
+        foreach (var node in GetTree().GetNodesInGroup(PartyMemberFollower.GroupName))
+        {
+            if (node is PartyMemberFollower follower)
+            {
+                var member = CurrentState.Party?.FirstOrDefault(m => m.Id == follower.MemberId);
+                if (member != null)
+                {
+                    member.Position = ToNumerics(follower.GlobalPosition);
+                }
+            }
+        }
     }
 
     public static System.Numerics.Vector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
