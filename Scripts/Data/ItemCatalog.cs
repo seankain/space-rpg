@@ -10,6 +10,7 @@ public static class ItemCatalog
     public const uint PlasmaCutterId = 2;
     public const uint VacSuitPlatingId = 3;
     public const uint MedkitId = 4;
+    public const uint MaintenanceKeycardId = 5;
 
     private static readonly Dictionary<uint, Item> items = new();
 
@@ -46,6 +47,12 @@ public static class ItemCatalog
             Description = "A sealed trauma kit. Restores a modest amount of health.",
             HealAmount = 5,
             Value = 25,
+        });
+        Register(new QuestItem
+        {
+            Id = MaintenanceKeycardId,
+            Name = "Maintenance Keycard",
+            Description = "A scuffed station keycard coded for the maintenance decks. Security only hands these out to people they owe.",
         });
     }
 

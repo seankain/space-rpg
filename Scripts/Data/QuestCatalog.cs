@@ -6,6 +6,7 @@ using System.Collections.Generic;
 public static class QuestCatalog
 {
     public const uint ReturnTheMaguffinId = 1;
+    public const uint ClearTheDeckId = 2;
 
     private static readonly Dictionary<uint, Quest> quests = new();
 
@@ -17,6 +18,14 @@ public static class QuestCatalog
             Title = "Return the Maguffin",
             Description = "Dockmaster Hale lost his prized Maguffin Cube somewhere on the station. Find it and bring it back to him.",
             SideQuest = false,
+            PrereqQuests = new List<QuestPrereqFlag>(),
+        });
+        Register(new Quest
+        {
+            Id = ClearTheDeckId,
+            Title = "Clear the Deck",
+            Description = "Chief Marlow wants Vex, the thug shaking down couriers on the plaza, taught a lesson. Defeat him and report back for a maintenance keycard.",
+            SideQuest = true,
             PrereqQuests = new List<QuestPrereqFlag>(),
         });
     }

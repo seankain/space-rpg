@@ -17,7 +17,9 @@ public class SaveRepository
     //     (pre-v5 saves load with the new-game starting credits and no
     //     pending interior to return from — GameState's property defaults
     //     cover both, so there is no explicit migration step).
-    public const int CurrentSaveVersion = 5;
+    // v6: GameState gained DefeatedNpcs (beaten battle challengers stay down
+    //     across saves; pre-v6 saves load with nobody defeated).
+    public const int CurrentSaveVersion = 6;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -96,6 +98,8 @@ public class SaveRepository
         state.Inventory ??= new Inventory();
         // Pre-v3 saves have no quest log.
         state.Quests ??= new List<QuestProgress>();
+        // Pre-v6 saves have no defeated-NPC record.
+        state.DefeatedNpcs ??= new List<string>();
         // Pre-v4 saves stored placeholder enum slots whose properties no
         // longer bind; make sure every member has an (empty) slot block.
         state.Party ??= new List<CharacterEntity>();

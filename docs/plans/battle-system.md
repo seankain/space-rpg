@@ -41,6 +41,5 @@ side is wiped, and the outcome flows back into the running `GameState`.
 - Equipment feeding damage/defense once equip slots reference real items
 - Per-character learned powers and power growth on level-up
 - Enemy encounter tables per world area + random encounters
-- Defeated-NPC persistence in world state (Vex currently respawns on reload)
 - Battle intro/outro transitions, attack animations, sound
 - Real arena scenes with props per world area
