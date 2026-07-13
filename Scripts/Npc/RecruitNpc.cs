@@ -4,8 +4,8 @@ using System.Linq;
 
 // An NPC who asks to join the party (party plan Phase 1: recruiting copies a
 // definition into GameState.Party as a live CharacterEntity). Once recruited
-// the world capsule despawns — followers walking behind the leader are the
-// party plan's Phase 2, so party membership is data-only for now.
+// the world capsule despawns and a PartyMemberFollower takes over walking
+// behind the leader (party plan Phase 2).
 public partial class RecruitNpc : Npc
 {
 	// CharacterEntity id this NPC becomes in the party (the player is 1).
@@ -28,6 +28,16 @@ public partial class RecruitNpc : Npc
 
 	protected override void OnInteract()
 	{
+		var state = SaveManager.Instance?.CurrentState;
+		if (state != null && new PartyManager(state.Party).IsFull)
+		{
+			DialogueManager.Instance.Start(new DialogueLine
+			{
+				Speaker = DisplayName,
+				Text = "Looks like you're already running a full crew. Come find me if a spot opens up.",
+			}, ShowPromptIfPlayerInRange);
+			return;
+		}
 		var ask = new DialogueLine
 		{
 			Speaker = DisplayName,
@@ -76,11 +86,8 @@ public partial class RecruitNpc : Npc
 			GD.PushWarning($"RecruitNpc '{DisplayName}' cannot join: no game state.");
 			return;
 		}
-		if (state.Party.Any(m => m.Id == CharacterId))
-		{
-			return;
-		}
-		state.Party.Add(new CharacterEntity
+		var party = new PartyManager(state.Party);
+		var member = new CharacterEntity
 		{
 			Id = CharacterId,
 			Name = DisplayName,
@@ -100,8 +107,18 @@ public partial class RecruitNpc : Npc
 			},
 			EquipSlots = new CharacterEquipSlots(),
 			ActiveStatusEffects = new List<ActiveStatusEffect>(),
-		});
+		};
+		if (!party.TryAddMember(member))
+		{
+			return;
+		}
 		joined = true;
+		// The capsule QueueFrees when the dialogue closes; the follower body
+		// steps in where the NPC was standing.
+		if (GetTree().GetFirstNodeInGroup(Player.GroupName) is Node player)
+		{
+			PartyMemberFollower.Spawn(player.GetParent(), member, party.Members.Count - 1, GlobalPosition);
+		}
 		// TODO: HUD toast once PlayerHud grows one (same note as Pickup).
 		GD.Print($"{DisplayName} joined the party.");
 	}

@@ -1,3 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# .NET build output for the test project
+Tests/bin/
+Tests/obj/

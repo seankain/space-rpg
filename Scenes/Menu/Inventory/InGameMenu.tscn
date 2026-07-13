@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://itomwvn7bid5" path="res://Scripts/InGameMenu.cs" id="1_na1s4"]
 [ext_resource type="Script" uid="uid://fw073je33phfm" path="res://Scripts/InventoryMenu.cs" id="2_invmn"]
 [ext_resource type="Script" uid="uid://dxq3vml0k8n5b" path="res://Scripts/QuestLogMenu.cs" id="3_qstlg"]
+[ext_resource type="Script" path="res://Scripts/PartyMenu.cs" id="4_party"]
 
 [node name="InGameMenu" type="Control" unique_id=1184288820]
 layout_mode = 3
@@ -66,10 +67,102 @@ layout_mode = 2
 size_flags_vertical = 3
 autowrap_mode = 3
 
-[node name="Party" type="Control" parent="TabContainer" unique_id=1502819334]
+[node name="Party" type="Control" parent="TabContainer" unique_id=1502819334 node_paths=PackedStringArray("MemberList", "MemberNameLabel", "MemberRoleLabel", "MemberVitalsLabel", "MemberStatsLabel", "EquippedLabel", "SetLeaderButton", "MoveUpButton", "MoveDownButton", "DismissButton", "ActionResultLabel", "DismissConfirm")]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 1
+script = ExtResource("4_party")
+MemberList = NodePath("VBoxContainer/HSplitContainer/MemberList")
+MemberNameLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberName")
+MemberRoleLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberRole")
+MemberVitalsLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberVitals")
+MemberStatsLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/MemberStats")
+EquippedLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/Equipped")
+SetLeaderButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions/SetLeaderButton")
+MoveUpButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions/MoveUpButton")
+MoveDownButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions/MoveDownButton")
+DismissButton = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/DismissButton")
+ActionResultLabel = NodePath("VBoxContainer/HSplitContainer/DetailsPanel/Details/ActionResult")
+DismissConfirm = NodePath("DismissConfirm")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TabContainer/Party"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HSplitContainer" type="HSplitContainer" parent="TabContainer/Party/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MemberList" type="ItemList" parent="TabContainer/Party/VBoxContainer/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="DetailsPanel" type="PanelContainer" parent="TabContainer/Party/VBoxContainer/HSplitContainer"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Details" type="VBoxContainer" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel"]
+layout_mode = 2
+
+[node name="MemberName" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="MemberRole" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+
+[node name="MemberVitals" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="MemberStats" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="Equipped" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
+
+[node name="OrderActions" type="HBoxContainer" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+
+[node name="SetLeaderButton" type="Button" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Set Leader"
+
+[node name="MoveUpButton" type="Button" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Move Up"
+
+[node name="MoveDownButton" type="Button" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details/OrderActions"]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Move Down"
+
+[node name="DismissButton" type="Button" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+disabled = true
+text = "Dismiss from Party"
+
+[node name="ActionResult" type="Label" parent="TabContainer/Party/VBoxContainer/HSplitContainer/DetailsPanel/Details"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="DismissConfirm" type="ConfirmationDialog" parent="TabContainer/Party"]
+title = "Dismiss party member"
+ok_button_text = "Dismiss"
 
 [node name="Inventory" type="Control" parent="TabContainer" unique_id=399675687 node_paths=PackedStringArray("CategoryTabs", "StackList", "ItemNameLabel", "ItemDescriptionLabel", "EquippedLabel", "MemberSelect", "UseButton", "EquipButton", "DropButton", "ActionResultLabel")]
 visible = false
