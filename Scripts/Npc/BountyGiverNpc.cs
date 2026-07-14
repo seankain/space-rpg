@@ -9,9 +9,11 @@ using System.Collections.Generic;
 // Phase 2), same as QuestGiverNpc.
 public partial class BountyGiverNpc : Npc
 {
-	// Display name of the BattleNpc this bounty targets (EnemyCatalog and
-	// DefeatedNpcs both key on display names for now).
-	private const string TargetNpcName = "Vex";
+	// Stable NpcId of the BattleNpc this bounty targets — data, not code:
+	// set on the spawned scene variant (Scenes/Npc/BountyGiverNpc.tscn), so
+	// EnemyCatalog and DefeatedNpcs follow the id even if Vex is renamed.
+	[Export]
+	public string TargetNpcId = "intro.vex";
 
 	protected override void OnInteract()
 	{
@@ -22,7 +24,7 @@ public partial class BountyGiverNpc : Npc
 			return;
 		}
 		var questState = state.GetQuestState(QuestCatalog.ClearTheDeckId);
-		var targetDown = state.IsNpcDefeated(TargetNpcName);
+		var targetDown = state.IsNpcDefeated(TargetNpcId);
 		var line = questState switch
 		{
 			QUESTSUCCESSSTATE.Success => new DialogueLine

@@ -81,6 +81,12 @@ public partial class SaveManager : Node
     public GameState LoadSave(SaveData meta)
     {
         CurrentState = repository.LoadState(meta.SlotId);
+        // Pre-v7 saves keyed DefeatedNpcs by display name; rewrite the
+        // entries to stable NpcIds so renaming an NPC breaks nothing.
+        if (meta.SaveVersion < 7)
+        {
+            NpcDatabase.MigrateLegacyDefeatedNames(CurrentState);
+        }
         return CurrentState;
     }
 

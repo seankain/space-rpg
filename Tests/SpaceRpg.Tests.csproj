@@ -10,8 +10,11 @@
   </ItemGroup>
   <ItemGroup>
     <!-- The game's engine-free layers, compiled directly (no Godot SDK):
-         data model + roster rules, and save serialization for round-trips. -->
-    <Compile Include="../Scripts/Data/**/*.cs" LinkBase="GameSource/Data" />
+         data model + roster rules, and save serialization for round-trips.
+         The NpcDefinition/NpcItemStack resources and NpcDatabase are
+         Godot-facing and excluded; their engine-free core (NpcIndex) stays. -->
+    <Compile Include="../Scripts/Data/**/*.cs" LinkBase="GameSource/Data"
+             Exclude="../Scripts/Data/NpcDefinition.cs;../Scripts/Data/NpcItemStack.cs;../Scripts/Data/NpcDatabase.cs" />
     <Compile Include="../Scripts/Save/SaveRepository.cs" Link="GameSource/SaveRepository.cs" />
   </ItemGroup>
 </Project>

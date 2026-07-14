@@ -2,52 +2,43 @@ using Godot;
 using System.Collections.Generic;
 
 // A merchant NPC: talking to them offers to open the shop trading screen.
-// The shop's opening stock and bankroll are declared in the scene through
-// the exports below; the Merchant built from them lives only as long as the
-// NPC node, so stock resets when the interior reloads (persisting merchant
-// state into saves is future work).
+// The shop's opening stock and bankroll come from the NpcDefinition this NPC
+// was spawned from (Credits + InitialItems); the Merchant built from them
+// lives only as long as the NPC node, so stock resets when the interior
+// reloads (persisting merchant state into saves is future work).
 public partial class ShopkeeperNpc : Npc
 {
-	// The trading screen this shopkeeper drives, declared alongside the NPC
-	// in the interior scene (e.g. ShopInterior.tscn's ShopUi/ShopMenu).
-	[Export]
-	public ShopMenu ShopMenu;
-
-	[Export]
-	public uint StartingCredits = 400;
-
-	// Parallel arrays declaring the opening stock: StockItemIds[i] of
-	// StockQuantities[i] each (quantity defaults to 1 when the arrays are
-	// uneven). Parallel because Godot can't export a Dictionary<uint, uint>.
-	[Export]
-	public int[] StockItemIds = System.Array.Empty<int>();
-
-	[Export]
-	public int[] StockQuantities = System.Array.Empty<int>();
-
 	public Merchant Merchant { get; private set; }
 
 	public override void _Ready()
 	{
 		base._Ready();
-		Merchant = new Merchant { Name = DisplayName, Credits = StartingCredits };
-		for (var i = 0; i < StockItemIds.Length; i++)
+		Merchant = new Merchant { Name = DisplayName, Credits = Definition?.Credits ?? 0 };
+		foreach (var stack in Definition?.InitialItems ?? System.Array.Empty<NpcItemStack>())
 		{
-			var itemId = (uint)StockItemIds[i];
-			if (ItemCatalog.Get(itemId) == null)
+			if (stack == null)
 			{
-				GD.PushWarning($"Shopkeeper '{DisplayName}' stock lists unknown item id {itemId}.");
 				continue;
 			}
-			Merchant.Stock.Add(itemId, i < StockQuantities.Length ? (uint)StockQuantities[i] : 1);
+			if (ItemCatalog.Get(stack.ItemId) == null)
+			{
+				// NpcDatabase already rejects definitions with unknown item
+				// ids; this guards the definition-less fallback path.
+				GD.PushWarning($"Shopkeeper '{DisplayName}' stock lists unknown item id {stack.ItemId}.");
+				continue;
+			}
+			Merchant.Stock.Add(stack.ItemId, stack.Quantity == 0 ? 1 : stack.Quantity);
 		}
 	}
 
 	protected override void OnInteract()
 	{
-		if (ShopMenu == null)
+		// Resolved at interact time: a data-spawned NPC can't carry a
+		// NodePath export, and the menu (the hosting scene's UI layer) is
+		// guaranteed ready long before anyone can talk to the keeper.
+		if (GetTree().GetFirstNodeInGroup(ShopMenu.GroupName) is not ShopMenu shopMenu)
 		{
-			GD.PushWarning($"Shopkeeper '{DisplayName}' has no ShopMenu assigned.");
+			GD.PushWarning($"Shopkeeper '{DisplayName}' found no ShopMenu in the scene.");
 			base.OnInteract();
 			return;
 		}
@@ -63,7 +54,7 @@ public partial class ShopkeeperNpc : Npc
 					// DialogueManager.End() recaptures the mouse after this
 					// action runs, so open the menu a frame later to win
 					// that race.
-					Action = () => Callable.From(() => ShopMenu.Open(Merchant, ShowPromptIfPlayerInRange)).CallDeferred(),
+					Action = () => Callable.From(() => shopMenu.Open(Merchant, ShowPromptIfPlayerInRange)).CallDeferred(),
 				},
 				new DialogueChoice
 				{

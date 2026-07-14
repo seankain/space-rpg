@@ -36,6 +36,19 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		// NPC placement aid (npc-resource-files plan): F9 prints the chunk
+		// coordinate and chunk-local position to copy into an NpcDefinition
+		// .tres, since NPC placement is authored as numbers, not gizmos.
+		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F9 })
+		{
+			var chunk = ChunkManager.ToChunkCoord(GlobalPosition);
+			var local = GlobalPosition - new Vector3(chunk.X * ChunkManager.ChunkSize, 0f, chunk.Y * ChunkManager.ChunkSize);
+			GD.Print($"NPC placement: ChunkCoords = Vector2i({chunk.X}, {chunk.Y}), LocalPosition = Vector3({local.X:0.###}, {local.Y:0.###}, {local.Z:0.###})");
+		}
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
 		Vector3 velocity = Velocity;

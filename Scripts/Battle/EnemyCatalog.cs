@@ -22,16 +22,17 @@ public class BattleEncounter
     public List<EnemyDefinition> Enemies { get; set; } = new();
 }
 
-// Encounters keyed by the challenging NPC's display name — the only handle
-// BattleNpc dialogue has today. Once field NPCs carry real encounter ids
-// this becomes an id-keyed registry like ItemCatalog.
+// Encounters keyed by the challenging NPC's stable id (NpcDefinition.NpcId,
+// surfaced as Npc.NpcId) — an id-keyed registry like ItemCatalog, so
+// renaming an NPC's DisplayName never detaches its fight. opponentName only
+// labels the generic fallback for challengers without an authored encounter.
 public static class EnemyCatalog
 {
-    public static BattleEncounter GetEncounter(string opponentName)
+    public static BattleEncounter GetEncounter(string opponentId, string opponentName)
     {
-        switch (opponentName)
+        switch (opponentId)
         {
-            case "Vex":
+            case "intro.vex":
                 return new BattleEncounter
                 {
                     IntroMessage = "Vex draws his cutter!",
@@ -68,6 +69,7 @@ public static class EnemyCatalog
             default:
                 // Unknown challengers still produce a playable fight instead
                 // of a crash — a lone generic brawler wearing their name.
+                opponentName = string.IsNullOrEmpty(opponentName) ? opponentId : opponentName;
                 return new BattleEncounter
                 {
                     IntroMessage = $"{opponentName} squares up!",
