@@ -15,10 +15,21 @@ public partial class NpcSpawner : Node3D
 			GD.PushWarning("NpcSpawner cannot identify its hosting scene; no NPCs spawned.");
 			return;
 		}
-		foreach (var definition in NpcDatabase.ForScene(root.SceneFilePath))
+		// This _Ready fires while the hosting scene is still inside its own
+		// parent's AddChild (LoadingScreen adds the fully built level), and
+		// adding children to a node busy setting up its children fails —
+		// spawn at the end of the frame instead.
+		Callable.From(() =>
 		{
-			Spawn(definition, root);
-		}
+			if (!IsInstanceValid(root))
+			{
+				return;
+			}
+			foreach (var definition in NpcDatabase.ForScene(root.SceneFilePath))
+			{
+				Spawn(definition, root);
+			}
+		}).CallDeferred();
 	}
 
 	// Instantiates a definition's role scene, primes it with the definition
