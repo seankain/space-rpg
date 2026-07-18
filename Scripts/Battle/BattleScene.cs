@@ -307,10 +307,10 @@ public partial class BattleScene : Node3D
         // the party. Fighters wear their NPC definition's rigged mesh where
         // one resolves; capsules (party blue / definition tint) fill in for
         // the rest.
-        PlaceLine(party, SideOffset, facingDegrees: 0,
+        PlaceLine(party, SideOffset, facingDegrees: 180,
             i => PartyMemberMesh(party[i]),
             i => new Color(0.3f, 0.55f, 0.95f));
-        PlaceLine(enemies, -SideOffset, facingDegrees: 180,
+        PlaceLine(enemies, -SideOffset, facingDegrees: 0,
             i => NpcDatabase.Get(encounter.Enemies[i].NpcId)?.CharacterMesh,
             i => encounter.Enemies[i].BodyColor);
     }
@@ -363,8 +363,10 @@ public partial class BattleScene : Node3D
     }
 
     // Instantiates a rigged KayKit character and points the shared battle
-    // animations at its skeleton. KayKit models face -Z, so facingDegrees
-    // turns each line toward its opponents.
+    // animations at its skeleton. The KayKit scenes come in facing +Z, so
+    // the party line (which must look down -Z, Godot's forward, toward the
+    // enemies) takes the same 180° flip Player.tscn bakes into its Knight,
+    // while the enemy line spawns unrotated to face the party.
     private static void AddCharacterBody(CombatantVisual visual, PackedScene characterMesh, float facingDegrees)
     {
         var body = characterMesh.Instantiate<Node3D>();
