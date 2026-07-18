@@ -24,3 +24,4 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 12, 0.5, 8)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.405039, 0.44974315, -0.94753563)
 TargetScenePath = "res://Scenes/Levels/World1.tscn"
 TargetDisplayName = "World 1"
+RequiredItemId = 5
