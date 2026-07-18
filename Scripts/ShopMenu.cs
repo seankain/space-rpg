@@ -14,6 +14,10 @@ public partial class ShopMenu : Control
 	private static ShopMenu current;
 	public static bool IsShopOpen => current != null;
 
+	// How ShopkeeperNpc finds the hosting scene's menu at interact time —
+	// NPCs spawned from NpcDefinitions carry no NodePath wiring.
+	public const string GroupName = "ShopMenu";
+
 	[Export]
 	public Label ShopNameLabel;
 
@@ -61,6 +65,7 @@ public partial class ShopMenu : Control
 
 	public override void _Ready()
 	{
+		AddToGroup(GroupName);
 		ModeTabs.TabChanged += _ =>
 		{
 			selectedItemId = null;

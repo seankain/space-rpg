@@ -153,9 +153,22 @@ public partial class ChunkManager : Node3D
     {
         var chunk = (Node3D)scene.Instantiate();
         chunk.Position = new Vector3(coord.X * ChunkSize, 0f, coord.Y * ChunkSize);
+        // NPCs are authored as NpcDefinition resources, not chunk-scene
+        // nodes. Spawning them as chunk children keeps their old lifecycle:
+        // freed with the chunk on unload, _Ready state checks (defeated,
+        // recruited) re-run when it streams back in.
+        foreach (var definition in NpcDatabase.ForChunk(LevelScenePath(), coord))
+        {
+            NpcSpawner.Spawn(definition, chunk);
+        }
         AddChild(chunk);
         loaded[coord] = chunk;
     }
+
+    // The hosting level scene (e.g. Intro.tscn) — the path NpcDefinitions
+    // name in SpawnScenePath.
+    private string LevelScenePath() =>
+        Owner?.SceneFilePath ?? GetParent()?.SceneFilePath ?? "";
 
     private void UnloadFarChunks(Vector2I center)
     {

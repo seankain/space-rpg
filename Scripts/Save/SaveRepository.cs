@@ -19,7 +19,11 @@ public class SaveRepository
     //     cover both, so there is no explicit migration step).
     // v6: GameState gained DefeatedNpcs (beaten battle challengers stay down
     //     across saves; pre-v6 saves load with nobody defeated).
-    public const int CurrentSaveVersion = 6;
+    // v7: DefeatedNpcs entries are stable NpcDefinition.NpcId slugs instead
+    //     of display names. The rewrite of legacy entries needs NpcDatabase
+    //     (a Godot-side registry), so SaveManager performs it after
+    //     LoadState rather than here.
+    public const int CurrentSaveVersion = 7;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";

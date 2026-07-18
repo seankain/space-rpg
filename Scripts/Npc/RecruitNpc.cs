@@ -9,8 +9,10 @@ using System.Linq;
 public partial class RecruitNpc : Npc
 {
 	// CharacterEntity id this NPC becomes in the party (the player is 1).
-	// Doubles as the "already recruited" check when the level reloads.
-	public const ulong CharacterId = 2;
+	// Doubles as the "already recruited" check when the level reloads. Set
+	// per scene variant / instance; must be unique across recruitables.
+	[Export]
+	public ulong PartyCharacterId = 2;
 
 	private bool joined;
 
@@ -18,7 +20,7 @@ public partial class RecruitNpc : Npc
 	{
 		// Recruited on an earlier visit (or before a save): he's in the party
 		// now, not standing around the docks.
-		if (SaveManager.Instance?.CurrentState?.Party?.Any(m => m.Id == CharacterId) == true)
+		if (SaveManager.Instance?.CurrentState?.Party?.Any(m => m.Id == PartyCharacterId) == true)
 		{
 			QueueFree();
 			return;
@@ -89,7 +91,7 @@ public partial class RecruitNpc : Npc
 		var party = new PartyManager(state.Party);
 		var member = new CharacterEntity
 		{
-			Id = CharacterId,
+			Id = PartyCharacterId,
 			Name = DisplayName,
 			Level = 1,
 			HealthPoints = 8,

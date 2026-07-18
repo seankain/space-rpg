@@ -13,7 +13,7 @@ public partial class BattleNpc : Npc
 	{
 		// Beaten on an earlier visit (or before a save): stay down instead
 		// of respawning with the chunk.
-		if (SaveManager.Instance?.CurrentState?.IsNpcDefeated(DisplayName) == true)
+		if (SaveManager.Instance?.CurrentState?.IsNpcDefeated(NpcId) == true)
 		{
 			QueueFree();
 			return;
@@ -34,7 +34,7 @@ public partial class BattleNpc : Npc
 					Label = "Settle it",
 					// No Next: the conversation ends and the deferred battle
 					// takes over the frame after.
-					Action = () => BattleManager.StartBattle(DisplayName, OnBattleWon),
+					Action = () => BattleManager.StartBattle(NpcId, DisplayName, OnBattleWon),
 				},
 				new DialogueChoice
 				{
@@ -52,7 +52,7 @@ public partial class BattleNpc : Npc
 
 	private void OnBattleWon()
 	{
-		SaveManager.Instance?.CurrentState?.MarkNpcDefeated(DisplayName);
+		SaveManager.Instance?.CurrentState?.MarkNpcDefeated(NpcId);
 		if (!IsQueuedForDeletion())
 		{
 			QueueFree();

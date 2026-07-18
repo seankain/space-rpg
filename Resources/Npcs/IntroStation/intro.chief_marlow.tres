@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="NpcDefinition" load_steps=4 format=3 uid="uid://bnpcmarlow3in"]
+
+[ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
+[ext_resource type="PackedScene" uid="uid://bnpcbounty7d4" path="res://Scenes/Npc/BountyGiverNpc.tscn" id="2_role"]
+[ext_resource type="PackedScene" uid="uid://bkt46g68x3xmp" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb" id="3_mesh"]
+
+[resource]
+script = ExtResource("1_def")
+NpcId = "intro.chief_marlow"
+DisplayName = "Chief Marlow"
+SpawnScenePath = "res://Scenes/Levels/Intro.tscn"
+ChunkCoords = Vector2i(0, 0)
+LocalPosition = Vector3(8, 0.55, -9)
+RotationDegreesY = 0.0
+NpcScene = ExtResource("2_role")
+CharacterMesh = ExtResource("3_mesh")
+BodyColor = Color(0.95, 0.65, 0.15, 1)
+Credits = 0

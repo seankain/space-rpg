@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3 uid="uid://cnpcshopkp8e5"]
+
+[ext_resource type="PackedScene" uid="uid://bon4gwioj7taq" path="res://Scenes/Npc.tscn" id="1_base"]
+[ext_resource type="Script" path="res://Scripts/Npc/ShopkeeperNpc.cs" id="2_role"]
+
+[node name="ShopkeeperNpc" instance=ExtResource("1_base")]
+script = ExtResource("2_role")

@@ -4,12 +4,16 @@ using Godot;
 // talk to (docs/plans/npc-system.md Phase 1). Builds its own interaction zone
 // and "[E] Talk" prompt in code so scene instances only need a script + a few
 // exported properties. Subclasses override OnInteract to start their dialogue.
+//
+// NPCs are spawned from NpcDefinition resources (NpcSpawner.Spawn calls
+// Initialize before the node enters the tree); the exports remain as
+// fallbacks for hand-placed instances, but the definition wins when present.
 public partial class Npc : CharacterBody3D
 {
 	[Export]
 	public string DisplayName = "NPC";
 
-	// Placeholder capsule tint until NPCs get real models.
+	// Placeholder capsule tint for NPCs without a CharacterMesh.
 	[Export]
 	public Color BodyColor = Colors.White;
 
@@ -20,13 +24,43 @@ public partial class Npc : CharacterBody3D
 	[Export]
 	public float PromptHeight = 2.2f;
 
+	// The data file this NPC was spawned from; null for hand-placed nodes.
+	// Shared cached resource — read, never write.
+	public NpcDefinition Definition { get; private set; }
+
+	// Stable id for saves, quests, and encounters. Hand-placed NPCs without
+	// a definition fall back to their display name, the legacy key.
+	public string NpcId =>
+		string.IsNullOrEmpty(Definition?.NpcId) ? DisplayName : Definition.NpcId;
+
 	private bool playerInRange;
 	private Node3D player;
 	private InteractionPrompt prompt;
 
+	// Called by the spawner before this node enters the tree, so _Ready
+	// overrides (defeated/recruited checks, the shopkeeper's Merchant) can
+	// already rely on the definition.
+	public void Initialize(NpcDefinition definition)
+	{
+		Definition = definition;
+		if (definition == null)
+		{
+			return;
+		}
+		if (!string.IsNullOrEmpty(definition.DisplayName))
+		{
+			DisplayName = definition.DisplayName;
+		}
+		BodyColor = definition.BodyColor;
+	}
+
 	public override void _Ready()
 	{
-		if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } mesh)
+		if (Definition?.CharacterMesh is { } characterMesh)
+		{
+			AddCharacterMesh(characterMesh);
+		}
+		else if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } mesh)
 		{
 			mesh.MaterialOverride = new StandardMaterial3D { AlbedoColor = BodyColor };
 		}
@@ -97,6 +131,31 @@ public partial class Npc : CharacterBody3D
 		if (playerInRange && !IsQueuedForDeletion())
 		{
 			prompt.Visible = true;
+		}
+	}
+
+	// Swaps the placeholder capsule for the definition's rigged character
+	// scene (a KayKit gltf) and points the idle animation at its skeleton.
+	private void AddCharacterMesh(PackedScene characterMesh)
+	{
+		var mesh = characterMesh.Instantiate<Node3D>();
+		// KayKit characters model forward as -Z; NPC bodies treat +Z as
+		// forward (FacePlayer), the same flip Player.tscn applies to its
+		// Knight.
+		mesh.RotateY(Mathf.Pi);
+		AddChild(mesh);
+		if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } capsule)
+		{
+			capsule.QueueFree();
+		}
+		// Idle_Talking's tracks address the rig as "Skeleton3D/...", so the
+		// animation root must be the node that directly contains the
+		// skeleton (Rig_Medium in the KayKit scenes).
+		if (GetNodeOrNull<AnimationPlayer>("AnimationPlayer") is { } anim
+			&& mesh.FindChild("Skeleton3D", recursive: true, owned: false) is Skeleton3D skeleton)
+		{
+			anim.RootNode = anim.GetPathTo(skeleton.GetParent());
+			anim.Play("NpcAnimLib/Idle_Talking");
 		}
 	}
 

@@ -23,7 +23,8 @@ public partial class BattleManager : Node
 
     private BattleScene currentBattle;
     private Camera3D fieldCamera;
-    private string pendingOpponent;
+    private string pendingOpponentId;
+    private string pendingOpponentName;
     private Action pendingOnVictory;
     private Action onVictory;
 
@@ -35,30 +36,35 @@ public partial class BattleManager : Node
 
     // Entry point for dialogue choices. Deferred so the conversation can
     // finish closing (it recaptures the mouse as it ends) before battle mode
-    // takes over the tree. onVictory lets the challenger react to losing
-    // (e.g. despawn); it is not called on defeat.
-    public static void StartBattle(string opponentName, Action onVictory = null)
+    // takes over the tree. opponentId keys the EnemyCatalog encounter
+    // (Npc.NpcId); opponentName only labels the generic fallback fight.
+    // onVictory lets the challenger react to losing (e.g. despawn); it is
+    // not called on defeat.
+    public static void StartBattle(string opponentId, string opponentName, Action onVictory = null)
     {
         if (Instance == null)
         {
             GD.PushWarning("BattleManager.StartBattle called before the autoload is ready.");
             return;
         }
-        if (BattleInProgress || Instance.pendingOpponent != null)
+        if (BattleInProgress || Instance.pendingOpponentId != null)
         {
-            GD.PushWarning($"Ignoring StartBattle({opponentName}): a battle is already running.");
+            GD.PushWarning($"Ignoring StartBattle({opponentId}): a battle is already running.");
             return;
         }
-        Instance.pendingOpponent = opponentName;
+        Instance.pendingOpponentId = opponentId;
+        Instance.pendingOpponentName = opponentName;
         Instance.pendingOnVictory = onVictory;
         Callable.From(Instance.BeginPendingBattle).CallDeferred();
     }
 
     private void BeginPendingBattle()
     {
-        var opponentName = pendingOpponent;
+        var opponentId = pendingOpponentId;
+        var opponentName = pendingOpponentName;
         onVictory = pendingOnVictory;
-        pendingOpponent = null;
+        pendingOpponentId = null;
+        pendingOpponentName = null;
         pendingOnVictory = null;
 
         var state = SaveManager.Instance?.CurrentState;
@@ -68,7 +74,7 @@ public partial class BattleManager : Node
             return;
         }
 
-        var encounter = EnemyCatalog.GetEncounter(opponentName);
+        var encounter = EnemyCatalog.GetEncounter(opponentId, opponentName);
         var partyCombatants = state.Party.Select(BattleCombatant.FromPartyMember).ToList();
         var theme = BattleArenaTheme.GetForLocation(state.LocationName);
 

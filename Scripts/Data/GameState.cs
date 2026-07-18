@@ -29,10 +29,10 @@ public class GameState
     // Per-quest progress against QuestCatalog definitions; quests the player
     // hasn't touched have no entry (implicitly Unstarted).
     public List<QuestProgress> Quests {get;set;} = new();
-    // Display names of battle NPCs the party has beaten, so defeated
-    // challengers stay down across saves and chunk reloads and quests can
-    // check for them. Keyed by display name until field NPCs carry stable
-    // encounter ids (same caveat as EnemyCatalog).
+    // Stable NpcIds (NpcDefinition.NpcId, e.g. "intro.vex") of battle NPCs
+    // the party has beaten, so defeated challengers stay down across saves
+    // and chunk reloads and quests can check for them. Pre-v7 saves stored
+    // display names; SaveManager migrates those through NpcDatabase on load.
     public List<string> DefeatedNpcs {get;set;} = new();
 
     public QUESTSUCCESSSTATE GetQuestState(uint questId) =>
@@ -49,13 +49,13 @@ public class GameState
         progress.State = state;
     }
 
-    public bool IsNpcDefeated(string npcName) => DefeatedNpcs.Contains(npcName);
+    public bool IsNpcDefeated(string npcId) => DefeatedNpcs.Contains(npcId);
 
-    public void MarkNpcDefeated(string npcName)
+    public void MarkNpcDefeated(string npcId)
     {
-        if (!DefeatedNpcs.Contains(npcName))
+        if (!DefeatedNpcs.Contains(npcId))
         {
-            DefeatedNpcs.Add(npcName);
+            DefeatedNpcs.Add(npcId);
         }
     }
 }
