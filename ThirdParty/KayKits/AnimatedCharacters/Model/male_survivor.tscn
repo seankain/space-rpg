@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://dx05xnipl5tu"]
+
+[ext_resource type="PackedScene" uid="uid://sic3682wi5gn" path="res://ThirdParty/KayKits/AnimatedCharacters/Model/characterMedium.fbx" id="1_2qlru"]
+[ext_resource type="Texture2D" uid="uid://5ilihhsrl338" path="res://ThirdParty/KayKits/AnimatedCharacters/Skins/survivorMaleB.png" id="2_htok1"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rtnfb"]
+albedo_texture = ExtResource("2_htok1")
+
+[node name="characterMedium" unique_id=1810842542 instance=ExtResource("1_2qlru")]
+
+[node name="characterMedium" parent="Root/GeneralSkeleton" parent_id_path=PackedInt32Array(2089511349) index="0" unique_id=28010652]
+surface_material_override/0 = SubResource("StandardMaterial3D_rtnfb")
