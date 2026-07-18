@@ -1,11 +1,15 @@
 [gd_scene format=3 uid="uid://cakke7fsp0vn7"]
 
+[ext_resource type="Script" uid="uid://b2vqk8xnw4crd" path="res://Scripts/World/Portal.cs" id="1_portal"]
+
 [sub_resource type="PlaneMesh" id="PlaneMesh_ud74y"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ur1vv"]
 albedo_color = Color(0.050980393, 1, 0, 1)
 
 [node name="Portal" type="Node3D" unique_id=1173809222]
+script = ExtResource("1_portal")
+Surface = NodePath("MeshInstance3D")
 
 [node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=1097513554]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.056152344, -0.3166504)

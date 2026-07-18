@@ -38,7 +38,11 @@ public partial class InteractionPrompt : Label3D
 
 	private void RefreshText()
 	{
-		Text = $"[{FirstBindingLabel(ActionName)}] {ActionDescription}";
+		// An empty ActionName makes the prompt purely informational (e.g. a
+		// locked portal's "Requires Maintenance Keycard"): no key hint shown.
+		Text = string.IsNullOrEmpty(ActionName)
+			? ActionDescription
+			: $"[{FirstBindingLabel(ActionName)}] {ActionDescription}";
 	}
 
 	// Shared with other UI that shows key hints (e.g. the dialogue box).
