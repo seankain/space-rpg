@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://mrcks4gabtc8"]
+
+[ext_resource type="Script" uid="uid://bw7g01snbvbif" path="res://Scenes/Levels/Spawn.cs" id="1_w5jgj"]
+[ext_resource type="Script" uid="uid://cevdyk7xpak0r" path="res://Scripts/World/ChunkManager.cs" id="2_2stn7"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_ngmra"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_r0mdn"]
+sky_material = SubResource("ProceduralSkyMaterial_ngmra")
+
+[sub_resource type="Environment" id="Environment_18852"]
+background_mode = 2
+sky = SubResource("Sky_r0mdn")
+tonemap_mode = 2
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_s4jg6"]
+
+[node name="World1" type="Node3D" unique_id=558360510]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=915826735]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1026352548]
+environment = SubResource("Environment_18852")
+
+[node name="Spawn" type="Node3D" parent="." unique_id=780613875]
+script = ExtResource("1_w5jgj")
+
+[node name="Area3D" type="Area3D" parent="Spawn" unique_id=1595872890]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Spawn/Area3D" unique_id=518915539]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1753888, 0)
+shape = SubResource("BoxShape3D_s4jg6")
+
+[node name="ChunkManager" type="Node3D" parent="." unique_id=1276593748]
+script = ExtResource("2_2stn7")
+ChunkDirectory = "res://Scenes/Levels/Chunks/World1"

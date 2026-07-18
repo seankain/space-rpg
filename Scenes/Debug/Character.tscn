@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://b6gbpx12p513m"]
+
+[ext_resource type="PackedScene" uid="uid://sic3682wi5gn" path="res://ThirdParty/KayKits/AnimatedCharacters/Model/characterMedium.fbx" id="1_jsf6s"]
+
+[node name="Character" type="Node3D" unique_id=1968608431]
+
+[node name="characterMedium" parent="." unique_id=1810842542 instance=ExtResource("1_jsf6s")]
