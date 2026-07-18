@@ -22,3 +22,5 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 12, 0.5, 8)
 
 [node name="Portal" parent="." unique_id=1173809222 instance=ExtResource("3_umgkw")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.405039, 0.44974315, -0.94753563)
+TargetScenePath = "res://Scenes/Levels/World1.tscn"
+TargetDisplayName = "World 1"
