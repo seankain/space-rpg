@@ -11,7 +11,12 @@ public class EnemyDefinition
     public CharacterStats Stats { get; set; } = new();
     public List<uint> PowerIds { get; set; } = new();
     public uint XpReward { get; set; }
-    // Placeholder capsule tint until enemies get real models.
+    // Stable id of the world NPC this enemy embodies (NpcDefinition.NpcId).
+    // The battle scene borrows that NPC's rigged CharacterMesh; empty for
+    // enemies without a world NPC (drones, summoned mooks), which fall back
+    // to the placeholder capsule.
+    public string NpcId { get; set; } = "";
+    // Placeholder capsule tint for enemies without a rigged mesh.
     public Color BodyColor { get; set; } = Colors.Red;
 }
 
@@ -41,6 +46,7 @@ public static class EnemyCatalog
                         new EnemyDefinition
                         {
                             Name = "Vex",
+                            NpcId = "intro.vex",
                             MaxHealthPoints = 12,
                             MaxPowerPoints = 4,
                             Stats = new CharacterStats
@@ -78,6 +84,9 @@ public static class EnemyCatalog
                         new EnemyDefinition
                         {
                             Name = opponentName,
+                            // The challenger is an NPC, so their mesh still
+                            // resolves even without an authored encounter.
+                            NpcId = opponentId,
                             MaxHealthPoints = 10,
                             Stats = new CharacterStats
                             {

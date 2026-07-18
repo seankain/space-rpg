@@ -5,8 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 
 // One running battle: builds the generic arena (flat ground plane under a
-// themed skybox, placeholder capsules for combatants), then drives the turn
-// loop. Constructed and torn down by BattleManager; everything here is
+// themed skybox), spawns the combatants' rigged character meshes (falling
+// back to placeholder capsules for fighters without one), then drives the
+// turn loop. Constructed and torn down by BattleManager; everything here is
 // built in code so battles need no hand-authored scene yet.
 //
 // Turn structure: rounds repeat until one side is wiped. Each round every
@@ -17,15 +18,38 @@ public partial class BattleScene : Node3D
     private const float LineSpacing = 2.2f;
     private const float SideOffset = 3.5f;
 
+    // The player's CharacterEntity id (SaveManager.StartNewGame); the one
+    // party member who isn't a recruited NPC.
+    private const ulong PlayerEntityId = 1;
+
+    // The same Knight body Player.tscn wears in the field.
+    private const string PlayerMeshPath =
+        "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/fbx/Knight.fbx";
+
+    private const string AnimationDirectory = "res://ThirdParty/AnimationLibrary";
+    private const string AnimLibName = "BattleAnimLib";
+    private const string IdleAnim = "Idle";
+    private const string DeathAnim = "Death";
+
     private BattleEncounter encounter;
     private List<BattleCombatant> party;
     private List<BattleCombatant> enemies;
     private BattleArenaTheme theme;
 
     private BattleHud hud;
-    private readonly Dictionary<BattleCombatant, Node3D> visuals = new();
-    private readonly Dictionary<BattleCombatant, Label3D> labels = new();
+    private readonly Dictionary<BattleCombatant, CombatantVisual> visuals = new();
     private readonly Random random = new();
+
+    // One combatant's body on the battlefield: either a rigged KayKit
+    // character driven by Anim, or (Anim == null) a placeholder capsule.
+    private sealed class CombatantVisual
+    {
+        public Node3D Root;
+        public Node3D Body;
+        public AnimationPlayer Anim;
+        public Label3D Label;
+        public bool IsDown;
+    }
 
     public Camera3D BattleCamera { get; private set; }
 
@@ -280,31 +304,47 @@ public partial class BattleScene : Node3D
     private void SpawnCombatants()
     {
         // Party in a line facing -Z toward the enemy line; camera sits behind
-        // the party. Enemy capsules keep their definition's tint.
-        PlaceLine(party, SideOffset, i => new Color(0.3f, 0.55f, 0.95f));
-        PlaceLine(enemies, -SideOffset, i => encounter.Enemies[i].BodyColor);
+        // the party. Fighters wear their NPC definition's rigged mesh where
+        // one resolves; capsules (party blue / definition tint) fill in for
+        // the rest.
+        PlaceLine(party, SideOffset, facingDegrees: 0,
+            i => PartyMemberMesh(party[i]),
+            i => new Color(0.3f, 0.55f, 0.95f));
+        PlaceLine(enemies, -SideOffset, facingDegrees: 180,
+            i => NpcDatabase.Get(encounter.Enemies[i].NpcId)?.CharacterMesh,
+            i => encounter.Enemies[i].BodyColor);
     }
 
-    private void PlaceLine(List<BattleCombatant> side, float z, Func<int, Color> colorFor)
+    // The player fights in the same Knight body Player.tscn wears; recruited
+    // members were world NPCs, so the definition matching their name
+    // (recruiting copies DisplayName onto the entity) supplies the mesh.
+    private static PackedScene PartyMemberMesh(BattleCombatant member) =>
+        member.Entity?.Id == PlayerEntityId
+            ? GD.Load<PackedScene>(PlayerMeshPath)
+            : NpcDatabase.FindByDisplayName(member.Name)?.CharacterMesh;
+
+    private void PlaceLine(List<BattleCombatant> side, float z, float facingDegrees,
+        Func<int, PackedScene> meshFor, Func<int, Color> colorFor)
     {
         for (var i = 0; i < side.Count; i++)
         {
             var combatant = side[i];
             var x = (i - (side.Count - 1) / 2f) * LineSpacing;
-            var color = colorFor(i);
 
             var root = new Node3D { Position = new Vector3(x, 0, z) };
             AddChild(root);
+            var visual = new CombatantVisual { Root = root };
 
-            var mesh = new MeshInstance3D
+            if (meshFor(i) is { } characterMesh)
             {
-                Mesh = new CapsuleMesh { Radius = 0.4f, Height = 1.6f },
-                Position = new Vector3(0, 0.9f, 0),
-                MaterialOverride = new StandardMaterial3D { AlbedoColor = color },
-            };
-            root.AddChild(mesh);
+                AddCharacterBody(visual, characterMesh, facingDegrees);
+            }
+            else
+            {
+                AddCapsuleBody(visual, colorFor(i));
+            }
 
-            var label = new Label3D
+            visual.Label = new Label3D
             {
                 Position = new Vector3(0, 2.2f, 0),
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
@@ -315,38 +355,106 @@ public partial class BattleScene : Node3D
                 OutlineSize = 8,
                 OutlineModulate = new Color(0, 0, 0, 0.85f),
             };
-            root.AddChild(label);
+            root.AddChild(visual.Label);
 
-            visuals[combatant] = root;
-            labels[combatant] = label;
+            visuals[combatant] = visual;
             RefreshCombatantVisual(combatant);
         }
     }
 
+    // Instantiates a rigged KayKit character and points the shared battle
+    // animations at its skeleton. KayKit models face -Z, so facingDegrees
+    // turns each line toward its opponents.
+    private static void AddCharacterBody(CombatantVisual visual, PackedScene characterMesh, float facingDegrees)
+    {
+        var body = characterMesh.Instantiate<Node3D>();
+        body.RotationDegrees = new Vector3(0, facingDegrees, 0);
+        visual.Root.AddChild(body);
+        visual.Body = body;
+
+        if (body.FindChild("Skeleton3D", recursive: true, owned: false) is not Skeleton3D skeleton)
+        {
+            return;
+        }
+        var anim = new AnimationPlayer();
+        anim.AddAnimationLibrary(AnimLibName, BattleAnimations);
+        visual.Root.AddChild(anim);
+        // The clips' tracks address the rig as "Skeleton3D/...", so the
+        // animation root must be the node that directly contains the skeleton
+        // (same arrangement as Npc.AddCharacterMesh).
+        anim.RootNode = anim.GetPathTo(skeleton.GetParent());
+        anim.Play($"{AnimLibName}/{IdleAnim}");
+        visual.Anim = anim;
+    }
+
+    private static void AddCapsuleBody(CombatantVisual visual, Color color)
+    {
+        visual.Body = new MeshInstance3D
+        {
+            Mesh = new CapsuleMesh { Radius = 0.4f, Height = 1.6f },
+            Position = new Vector3(0, 0.9f, 0),
+            MaterialOverride = new StandardMaterial3D { AlbedoColor = color },
+        };
+        visual.Root.AddChild(visual.Body);
+    }
+
+    private static AnimationLibrary battleAnimations;
+
+    // Idle/death clips shared by every rigged battle visual. Clips are
+    // duplicated before tweaking loop modes so the cached resources other
+    // scenes load stay untouched.
+    private static AnimationLibrary BattleAnimations
+    {
+        get
+        {
+            if (battleAnimations == null)
+            {
+                battleAnimations = new AnimationLibrary();
+                battleAnimations.AddAnimation(IdleAnim, LoadClip("Idle_A", Animation.LoopModeEnum.Linear));
+                battleAnimations.AddAnimation(DeathAnim, LoadClip("Death_A", Animation.LoopModeEnum.None));
+            }
+            return battleAnimations;
+        }
+    }
+
+    private static Animation LoadClip(string name, Animation.LoopModeEnum loopMode)
+    {
+        var clip = (Animation)GD.Load<Animation>($"{AnimationDirectory}/{name}.res").Duplicate();
+        clip.LoopMode = loopMode;
+        return clip;
+    }
+
     private void RefreshCombatantVisual(BattleCombatant combatant)
     {
-        if (combatant == null || !labels.TryGetValue(combatant, out var label))
+        if (combatant == null || !visuals.TryGetValue(combatant, out var visual))
         {
             return;
         }
-        label.Text = $"{combatant.Name}\nHP {combatant.HealthPoints}/{combatant.MaxHealthPoints}";
+        visual.Label.Text = $"{combatant.Name}\nHP {combatant.HealthPoints}/{combatant.MaxHealthPoints}";
 
-        // Downed fighters keel over instead of despawning so the lineup stays
-        // readable; revived ones stand back up.
-        var root = visuals[combatant];
-        if (root.GetChildOrNull<MeshInstance3D>(0) is not { } mesh)
+        // Downed fighters go down but stay on the field so the lineup stays
+        // readable; revived ones stand back up. Only act on transitions so
+        // the death animation doesn't restart on every refresh.
+        if (combatant.IsDown == visual.IsDown)
         {
             return;
         }
-        if (combatant.IsDown)
+        visual.IsDown = combatant.IsDown;
+
+        if (visual.Anim != null)
         {
-            mesh.RotationDegrees = new Vector3(90, 0, 0);
-            mesh.Position = new Vector3(0, 0.4f, 0);
+            // Rigged bodies play the death animation and hold its final pose.
+            visual.Anim.Play($"{AnimLibName}/{(combatant.IsDown ? DeathAnim : IdleAnim)}");
+        }
+        else if (combatant.IsDown)
+        {
+            visual.Body.RotationDegrees = new Vector3(90, 0, 0);
+            visual.Body.Position = new Vector3(0, 0.4f, 0);
         }
         else
         {
-            mesh.RotationDegrees = Vector3.Zero;
-            mesh.Position = new Vector3(0, 0.9f, 0);
+            visual.Body.RotationDegrees = Vector3.Zero;
+            visual.Body.Position = new Vector3(0, 0.9f, 0);
         }
     }
 

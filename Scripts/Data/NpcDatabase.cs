@@ -32,6 +32,12 @@ public static class NpcDatabase
 
     public static NpcDefinition Get(string npcId) => Index.Get(npcId);
 
+    // The definition wearing this display name, or null. Battle visuals use
+    // it to map recruited party members — which persist only a name — back to
+    // their NPC's CharacterMesh.
+    public static NpcDefinition FindByDisplayName(string displayName) =>
+        Index.FindByDisplayName(displayName);
+
     // NPCs of one chunk of a chunked level; ChunkManager spawns these as
     // children of the chunk node.
     public static IReadOnlyList<NpcDefinition> ForChunk(string scenePath, Vector2I chunkCoords) =>
