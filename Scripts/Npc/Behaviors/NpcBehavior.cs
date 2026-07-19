@@ -90,9 +90,10 @@ public abstract partial class NpcBehavior : Node
 
 	private void FaceToward(Vector3 direction, double delta)
 	{
-		// The whole body turns (visual forward is +Z), same as FacePlayer.
+		// The whole body turns; its visual forward is -Z (CharacterRig
+		// convention), same as FacePlayer, so aim -Z along the walk direction.
 		var rotation = Body.Rotation;
-		var targetYaw = Mathf.Atan2(direction.X, direction.Z);
+		var targetYaw = Mathf.Atan2(-direction.X, -direction.Z);
 		rotation.Y = Mathf.LerpAngle(rotation.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * (float)delta));
 		Body.Rotation = rotation;
 	}

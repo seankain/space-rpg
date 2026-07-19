@@ -232,7 +232,8 @@ public partial class Npc : CharacterBody3D
 	}
 
 	// Swaps the placeholder capsule for the definition's rig wrapper, which
-	// arrives forward-flipped and animation-wired (CharacterRig).
+	// arrives facing the body's -Z forward and animation-wired
+	// (CharacterRig).
 	private void AddRig(PackedScene rigScene)
 	{
 		rig = rigScene.Instantiate<CharacterRig>();
@@ -255,10 +256,11 @@ public partial class Npc : CharacterBody3D
 		{
 			return;
 		}
-		// Capsule placeholders have no visual forward yet, but turning the
-		// body keeps this correct once real models replace them.
+		// A rig's visual forward is the body's -Z (CharacterRig convention),
+		// so aim -Z at the player. Capsule placeholders have no visual
+		// forward and turn harmlessly.
 		var rotation = Rotation;
-		rotation.Y = Mathf.Atan2(toPlayer.X, toPlayer.Z);
+		rotation.Y = Mathf.Atan2(-toPlayer.X, -toPlayer.Z);
 		Rotation = rotation;
 	}
 }

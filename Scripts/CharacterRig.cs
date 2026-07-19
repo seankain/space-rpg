@@ -7,9 +7,14 @@ using Godot;
 // of re-doing forward flips and skeleton retargeting at runtime.
 //
 // Conventions every wrapper scene follows:
-// - The wrapper root's visual forward is +Z: the KayKit model's 180° flip is
-//   baked into the Model child, matching Player.tscn's Knight, so rotating
-//   the rig (FacePlayer, TurnMeshToward, battle lines) behaves uniformly.
+// - The wrapper root's visual forward is -Z, Godot's forward
+//   (Vector3.Forward): the raw KayKit scenes face +Z, and the 180° flip
+//   baked into the Model child turns them around to match the root's
+//   forward vector. Consumers that rotate the rig (FacePlayer,
+//   TurnMeshToward, battle lines) must therefore aim the root's -Z at
+//   whatever the character should look at. (Player.tscn is different: it
+//   rotates its Knight model node directly, which replaces the baked flip,
+//   so its visual forward stays the raw model's +Z.)
 // - The AnimationPlayer's root is the Model child, because the shared
 //   library's clips address the skeleton as "Rig_Medium/Skeleton3D/...".
 public partial class CharacterRig : Node3D
