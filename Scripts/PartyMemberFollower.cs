@@ -1,10 +1,12 @@
 using Godot;
 
 // A recruited party member walking behind the leader (party plan Phase 2):
-// the same Knight body and animations as Player.tscn but AI-driven. Simple
-// direct pursuit with per-member spacing stands in for navmesh pathing until
-// a level actually needs it, and a catch-up teleport self-heals whatever
-// pursuit can't solve (stale saved positions, geometry snags, falls).
+// the same body/animation arrangement as Player.tscn but AI-driven, wearing
+// the member's own NPC mesh where one resolves (the scene's Knight is the
+// fallback). Simple direct pursuit with per-member spacing stands in for
+// navmesh pathing until a level actually needs it, and a catch-up teleport
+// self-heals whatever pursuit can't solve (stale saved positions, geometry
+// snags, falls).
 public partial class PartyMemberFollower : CharacterBody3D
 {
 	public const string GroupName = "PartyFollower";
@@ -30,6 +32,11 @@ public partial class PartyMemberFollower : CharacterBody3D
 	// and menus find the follower again.
 	public ulong MemberId { get; set; }
 
+	// Display name of the member; shown on the label and used to resolve the
+	// member's NPC definition (and with it their mesh). Must be set before
+	// the node enters the tree.
+	public string MemberName { get; set; } = "";
+
 	// Position in the follow line (1 = first behind the leader). Staggers
 	// stop distances so followers queue up instead of shoving one another.
 	public int FollowIndex { get; set; } = 1;
@@ -42,17 +49,43 @@ public partial class PartyMemberFollower : CharacterBody3D
 	{
 		var follower = GD.Load<PackedScene>(ScenePath).Instantiate<PartyMemberFollower>();
 		follower.MemberId = member.Id;
+		follower.MemberName = member.Name;
 		follower.FollowIndex = followIndex;
 		parent.AddChild(follower);
 		follower.GlobalPosition = position;
-		follower.nameLabel.Text = member.Name;
 		return follower;
 	}
 
 	public override void _Ready()
 	{
 		AddToGroup(GroupName);
+		nameLabel.Text = MemberName;
+		ApplyNpcCharacterMesh();
 		anim.Play("player_animation_library/Idle_A");
+	}
+
+	// Recruited members were world NPCs; the definition matching their name
+	// (recruiting copies DisplayName onto the entity) supplies the rigged
+	// mesh — the same lookup battle visuals use. No match keeps the scene's
+	// Knight body.
+	private void ApplyNpcCharacterMesh()
+	{
+		if (NpcDatabase.FindByDisplayName(MemberName)?.CharacterMesh is not { } characterMesh)
+		{
+			return;
+		}
+		var mesh = characterMesh.Instantiate<Node3D>();
+		// Same 180° flip the scene bakes into its Knight (KayKit characters
+		// come in facing the other way; TurnMeshToward treats local +Z as
+		// visual forward).
+		mesh.RotateY(Mathf.Pi);
+		AddChild(mesh);
+		meshRoot.QueueFree();
+		meshRoot = mesh;
+		// player_animation_library clips address the rig as
+		// "Rig_Medium/Skeleton3D/...", so the animation root must be the
+		// character scene root, exactly where "../Knight" pointed.
+		anim.RootNode = anim.GetPathTo(mesh);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -100,7 +133,8 @@ public partial class PartyMemberFollower : CharacterBody3D
 
 	private void TurnMeshToward(Vector3 direction, float delta)
 	{
-		// Knight's visual forward is local +Z, same as Player.
+		// The body's visual forward is local +Z (the baked 180° flip), same
+		// as Player's Knight.
 		float targetYaw = Mathf.Atan2(direction.X, direction.Z);
 		Vector3 meshRotation = meshRoot.Rotation;
 		meshRotation.Y = Mathf.LerpAngle(meshRotation.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * delta));
