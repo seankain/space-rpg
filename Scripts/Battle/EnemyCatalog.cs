@@ -72,6 +72,33 @@ public static class EnemyCatalog
                         },
                     },
                 };
+            case "intro.dockmaster_hale":
+                // The Maguffin turn-in's refusal branch (QuestGiverRole):
+                // a sturdy one-on-one, tougher than Vex alone but without
+                // backup. He stays in the world afterward, so no despawn
+                // rides on this fight.
+                return new BattleEncounter
+                {
+                    IntroMessage = "Hale rolls up his sleeves. \"Station property, courier.\"",
+                    Enemies = new List<EnemyDefinition>
+                    {
+                        new EnemyDefinition
+                        {
+                            Name = "Dockmaster Hale",
+                            NpcId = "intro.dockmaster_hale",
+                            MaxHealthPoints = 16,
+                            MaxPowerPoints = 4,
+                            Stats = new CharacterStats
+                            {
+                                Strength = 7, Intelligence = 4, Constitution = 6,
+                                Dexterity = 4, Wisdom = 5, Charisma = 5,
+                            },
+                            PowerIds = new List<uint> { PowerCatalog.PlasmaSurgeId },
+                            XpReward = 14,
+                            BodyColor = new Color(0.25f, 0.5f, 0.95f),
+                        },
+                    },
+                };
             default:
                 // Unknown challengers still produce a playable fight instead
                 // of a crash — a lone generic brawler wearing their name.

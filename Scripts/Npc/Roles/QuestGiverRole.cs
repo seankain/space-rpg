@@ -75,12 +75,74 @@ public partial class QuestGiverRole : NpcRole
 		};
 	}
 
+	// The turn-in is a demand the player can refuse — at swordpoint (the
+	// composition plan's Phase 3 battle-branch proof: a quest conversation
+	// starting a fight through the shared DialogueActions, no ChallengerRole
+	// involved).
 	private DialogueLine TurnInLine(Npc npc, GameState state)
 	{
 		return new DialogueLine
 		{
 			Speaker = npc.DisplayName,
-			Text = "That hum — you found it! Hand it over... yes, that's the one. You have my thanks, courier.",
+			Text = "That hum — you found it! Hand it over, courier.",
+			Choices = new List<DialogueChoice>
+			{
+				new DialogueChoice
+				{
+					Label = "Hand it over",
+					Next = CompleteLine(npc, state),
+				},
+				new DialogueChoice
+				{
+					Label = "I'm keeping it",
+					Next = RefusalLine(npc, state),
+				},
+			},
+		};
+	}
+
+	private DialogueLine RefusalLine(Npc npc, GameState state)
+	{
+		// He's already been put on the deck plates over this cube once; the
+		// second refusal just sticks. The defeat flag persists in saves, so
+		// this holds across reloads too.
+		if (state.IsNpcDefeated(npc.NpcId))
+		{
+			return new DialogueLine
+			{
+				Speaker = npc.DisplayName,
+				Text = "Then it walks off with you. I'm not testing that arm twice.",
+			};
+		}
+		return new DialogueLine
+		{
+			Speaker = npc.DisplayName,
+			Text = "That cube is station property, courier. Last chance — hand it over, or I take it.",
+			Choices = new List<DialogueChoice>
+			{
+				new DialogueChoice
+				{
+					Label = "Try and take it",
+					// No Next: the conversation ends and the battle takes
+					// over. No despawn on defeat — Hale picks himself up,
+					// and the quest line keeps working either way.
+					Action = () => DialogueActions.StartBattle(npc),
+				},
+				new DialogueChoice
+				{
+					Label = "Fine, take it",
+					Next = CompleteLine(npc, state),
+				},
+			},
+		};
+	}
+
+	private DialogueLine CompleteLine(Npc npc, GameState state)
+	{
+		return new DialogueLine
+		{
+			Speaker = npc.DisplayName,
+			Text = "Yes, that's the one. You have my thanks, courier.",
 			OnShown = () =>
 			{
 				if (!state.Inventory.Remove(ItemCatalog.MaguffinCubeId))

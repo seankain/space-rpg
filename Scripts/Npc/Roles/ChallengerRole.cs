@@ -41,8 +41,15 @@ public partial class ChallengerRole : NpcRole
 				{
 					Label = "Settle it",
 					// No Next: the conversation ends and the deferred battle
-					// takes over the frame after.
-					Action = () => BattleManager.StartBattle(npc.NpcId, npc.DisplayName, () => OnBattleWon(npc)),
+					// takes over the frame after. The shared action records
+					// the defeat; this role only adds the despawn policy.
+					Action = () => DialogueActions.StartBattle(npc, () =>
+					{
+						if (DespawnOnDefeat && IsInstanceValid(npc) && !npc.IsQueuedForDeletion())
+						{
+							npc.QueueFree();
+						}
+					}),
 				},
 				new DialogueChoice
 				{
@@ -55,14 +62,5 @@ public partial class ChallengerRole : NpcRole
 				},
 			},
 		};
-	}
-
-	private void OnBattleWon(Npc npc)
-	{
-		SaveManager.Instance?.CurrentState?.MarkNpcDefeated(npc.NpcId);
-		if (DespawnOnDefeat && GodotObject.IsInstanceValid(npc) && !npc.IsQueuedForDeletion())
-		{
-			npc.QueueFree();
-		}
 	}
 }

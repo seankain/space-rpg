@@ -103,10 +103,10 @@ Concrete roles port the existing subclasses 1:1 — `QuestGiverRole`, `BountyGiv
 
 **Done when:** the intro station plays identically to today — talk, quest, bounty, recruit, shop, battle; defeated/recruited NPCs stay gone across chunk reloads and saves — with one NPC scene and zero role subclasses.
 
-## Phase 3 — Mixed-role content proof
+## Phase 3 — Mixed-role content proof *(implemented)*
 
-1. Give one intro NPC two roles: quest giver + recruit, the recruit gated on the quest's `Success` (e.g. Chief Marlow joins once the Maguffin is returned).
-2. Author a battle branch inside a quest conversation via the shared `StartBattle` action (a demand the player can refuse at swordpoint), with `DespawnOnDefeat` false so the quest line survives the fight.
+1. Chief Marlow carries two roles: his `BountyGiverRole` plus a `RecruitRole` gated on "Clear the Deck" hitting `Success` (`RequiredQuestId` in the `.tres`, pure data). Once the bounty pays out, talking to him opens the multi-role menu and he can join the party (member id 3); recruiting despawns him as usual, and dismissing him puts him back at his post.
+2. `DialogueActions.StartBattle(npc, onWon)` extracted as the shared battle verb — it records the defeat in `DefeatedNpcs` itself, and `ChallengerRole` shrank to the challenge lines plus its despawn policy. Hale's Maguffin turn-in became a demand the player can refuse at swordpoint: refusing twice starts a battle straight from the quest conversation (no `ChallengerRole`, no despawn — Hale picks himself up, remembers the beating via the defeat flag, and stops pressing the point, while turn-in keeps working). `EnemyCatalog` gained an authored `intro.dockmaster_hale` encounter.
 
 **Done when:** the same NPC gives a quest and later joins the party; a quest dialogue choice starts a battle whose outcome persists, and the NPC's remaining roles still function afterward.
 
