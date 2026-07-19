@@ -1,9 +1,13 @@
 using Godot;
+using System.Collections.Generic;
+using System.Linq;
 
-// Base script for Scenes/Npc.tscn: a friendly, stationary NPC the player can
-// talk to (docs/plans/npc-system.md Phase 1). Builds its own interaction zone
-// and "[E] Talk" prompt in code so scene instances only need a script + a few
-// exported properties. Subclasses override OnInteract to start their dialogue.
+// The one NPC script (docs/plans/npc-composition.md Phase 2): a friendly,
+// stationary character the player can talk to. Builds its own interaction
+// zone and "[E] Talk" prompt in code, and composes its conversation from the
+// definition's NpcRole resources at interact time — no available roles gets
+// a wave-off line, one role plays its dialogue directly, several roles offer
+// a choice menu. Role subclasses and per-role scene variants are gone.
 //
 // NPCs are spawned from NpcDefinition resources (NpcSpawner.Spawn calls
 // Initialize before the node enters the tree); the exports remain as
@@ -36,10 +40,17 @@ public partial class Npc : CharacterBody3D
 	private bool playerInRange;
 	private Node3D player;
 	private InteractionPrompt prompt;
+	private bool despawnWhenDialogueEnds;
 
-	// Called by the spawner before this node enters the tree, so _Ready
-	// overrides (defeated/recruited checks, the shopkeeper's Merchant) can
-	// already rely on the definition.
+	// Mutable per-NPC state the shared role resources can't hold themselves
+	// (a shopkeeper's Merchant), keyed by the role that created it.
+	private readonly Dictionary<NpcRole, object> roleStates = new();
+
+	private IEnumerable<NpcRole> Roles =>
+		(Definition?.Roles ?? System.Array.Empty<NpcRole>()).Where(r => r != null);
+
+	// Called by the spawner before this node enters the tree, so role
+	// runtime state built in _Ready can already rely on the definition.
 	public void Initialize(NpcDefinition definition)
 	{
 		Definition = definition;
@@ -63,6 +74,14 @@ public partial class Npc : CharacterBody3D
 		else if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } mesh)
 		{
 			mesh.MaterialOverride = new StandardMaterial3D { AlbedoColor = BodyColor };
+		}
+
+		foreach (var role in Roles)
+		{
+			if (role.CreateRuntimeState(this) is { } state)
+			{
+				roleStates[role] = state;
+			}
 		}
 
 		prompt = new InteractionPrompt
@@ -109,24 +128,78 @@ public partial class Npc : CharacterBody3D
 			GetViewport().SetInputAsHandled();
 			FacePlayer();
 			prompt.Visible = false;
-			OnInteract();
+			DialogueManager.Instance.Start(ComposeDialogue(), OnDialogueEnded);
 		}
 	}
 
-	// Default is a wave-off line; concrete NPCs override this with their
-	// actual conversation.
-	protected virtual void OnInteract()
+	// The runtime state a role created for this NPC in _Ready, or null.
+	public object GetRoleState(NpcRole role) => roleStates.GetValueOrDefault(role);
+
+	// Roles whose actions remove the NPC from the world (a recruit joining)
+	// call this so the body lingers until the conversation closes.
+	public void DespawnWhenDialogueEnds() => despawnWhenDialogueEnds = true;
+
+	// The merge rules from the composition plan: zero available roles is a
+	// wave-off, one plays directly (every pre-composition conversation is
+	// preserved verbatim), several get a choice menu.
+	private DialogueLine ComposeDialogue()
 	{
-		DialogueManager.Instance.Start(new DialogueLine
+		var state = SaveManager.Instance?.CurrentState;
+		var available = new List<NpcRole>();
+		if (state != null)
+		{
+			available.AddRange(Roles.Where(r => r.IsAvailable(this, state)));
+		}
+		else if (Roles.Any())
+		{
+			GD.PushWarning($"Npc '{DisplayName}' has roles but no game state; falling back to small talk.");
+		}
+		if (available.Count == 1)
+		{
+			return available[0].BuildDialogue(this, state);
+		}
+		if (available.Count > 1)
+		{
+			var choices = available
+				.Select(role => new DialogueChoice
+				{
+					Label = role.MenuLabel,
+					Next = role.BuildDialogue(this, state),
+				})
+				.ToList();
+			// No Next: picking it just closes the conversation.
+			choices.Add(new DialogueChoice { Label = "Never mind" });
+			return new DialogueLine
+			{
+				Speaker = DisplayName,
+				Text = "What can I do for you?",
+				Choices = choices,
+			};
+		}
+		return new DialogueLine
 		{
 			Speaker = DisplayName,
 			Text = "Hello there.",
-		}, ShowPromptIfPlayerInRange);
+		};
 	}
 
-	// Pass as the DialogueManager onEnded callback so the talk hint returns
-	// when the conversation closes with the player still nearby.
-	protected void ShowPromptIfPlayerInRange()
+	private void OnDialogueEnded()
+	{
+		if (despawnWhenDialogueEnds)
+		{
+			if (!IsQueuedForDeletion())
+			{
+				QueueFree();
+			}
+			return;
+		}
+		ShowPromptIfPlayerInRange();
+	}
+
+	// Returns the talk hint when a conversation (or the shop it opened)
+	// closes with the player still nearby. Public so role actions can hand
+	// it to other UIs as their on-closed callback.
+	public void ShowPromptIfPlayerInRange()
 	{
 		if (playerInRange && !IsQueuedForDeletion())
 		{

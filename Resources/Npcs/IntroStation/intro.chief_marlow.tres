@@ -1,8 +1,13 @@
-[gd_resource type="Resource" script_class="NpcDefinition" load_steps=4 format=3 uid="uid://bnpcmarlow3in"]
+[gd_resource type="Resource" script_class="NpcDefinition" load_steps=6 format=3 uid="uid://bnpcmarlow3in"]
 
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
-[ext_resource type="PackedScene" uid="uid://bnpcbounty7d4" path="res://Scenes/Npc/BountyGiverNpc.tscn" id="2_role"]
-[ext_resource type="PackedScene" uid="uid://crigknight1d4" path="res://Scenes/Characters/Rigs/Knight.tscn" id="3_mesh"]
+[ext_resource type="Script" uid="uid://c8role0base2a" path="res://Scripts/Npc/Roles/NpcRole.cs" id="2_rolebase"]
+[ext_resource type="Script" uid="uid://c8roleb0unt2c" path="res://Scripts/Npc/Roles/BountyGiverRole.cs" id="3_role"]
+[ext_resource type="PackedScene" uid="uid://crigknight1d4" path="res://Scenes/Characters/Rigs/Knight.tscn" id="4_rig"]
+
+[sub_resource type="Resource" id="Resource_bountygiver"]
+script = ExtResource("3_role")
+TargetNpcId = "intro.vex"
 
 [resource]
 script = ExtResource("1_def")
@@ -12,7 +17,7 @@ SpawnScenePath = "res://Scenes/Levels/Intro.tscn"
 ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(8, 0.55, -9)
 RotationDegreesY = 0.0
-NpcScene = ExtResource("2_role")
-Rig = ExtResource("3_mesh")
+Roles = Array[ExtResource("2_rolebase")]([SubResource("Resource_bountygiver")])
+Rig = ExtResource("4_rig")
 BodyColor = Color(0.95, 0.65, 0.15, 1)
 Credits = 0

@@ -6,7 +6,7 @@ using System.Linq;
 // switch: pauses the scene tree, hides the running level, spawns a
 // BattleScene (arena themed by the current world area) far above the field,
 // and swaps the camera. The static StartBattle entry point is what dialogue
-// (BattleNpc) calls.
+// (ChallengerRole) calls.
 //
 // Victory hands control straight back to the field with battle results
 // written onto the party. Defeat is a game over: the level is torn down and

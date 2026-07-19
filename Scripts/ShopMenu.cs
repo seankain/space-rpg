@@ -6,7 +6,7 @@ using System.Collections.Generic;
 // merchant's stock, the Sell tab the party inventory; selecting a row shows
 // its details and price, and the action button executes the Trade. All
 // controls are declared in the scene and wired here through exports, like
-// InventoryMenu. Opened by ShopkeeperNpc via Open().
+// InventoryMenu. Opened by an NPC's ShopkeeperRole via Open().
 public partial class ShopMenu : Control
 {
 	// The open shop menu, if any. Gameplay input (Player movement, Npc /
@@ -14,7 +14,7 @@ public partial class ShopMenu : Control
 	private static ShopMenu current;
 	public static bool IsShopOpen => current != null;
 
-	// How ShopkeeperNpc finds the hosting scene's menu at interact time —
+	// How ShopkeeperRole finds the hosting scene's menu at interact time —
 	// NPCs spawned from NpcDefinitions carry no NodePath wiring.
 	public const string GroupName = "ShopMenu";
 

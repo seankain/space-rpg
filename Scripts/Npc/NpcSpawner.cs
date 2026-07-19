@@ -7,6 +7,8 @@ using Godot;
 // Spawn directly so NPCs live and die with their chunk.
 public partial class NpcSpawner : Node3D
 {
+	private const string NpcScenePath = "res://Scenes/Npc.tscn";
+
 	public override void _Ready()
 	{
 		var root = Owner ?? GetParent();
@@ -32,23 +34,22 @@ public partial class NpcSpawner : Node3D
 		}).CallDeferred();
 	}
 
-	// Instantiates a definition's role scene, primes it with the definition
-	// (before _Ready, so state checks like "already defeated" see it), and
-	// parents it at the definition's local position and facing.
+	// Instantiates the shared Npc scene for a definition — unless one of its
+	// roles vetoes spawning (already recruited, defeated-and-stays-down) —
+	// primes it with the definition (before _Ready, so role runtime state
+	// can rely on it), and parents it at the definition's local position and
+	// facing.
 	public static Npc Spawn(NpcDefinition definition, Node parent)
 	{
-		if (definition.NpcScene == null)
+		var state = SaveManager.Instance?.CurrentState;
+		foreach (var role in definition.Roles ?? System.Array.Empty<NpcRole>())
 		{
-			GD.PushError($"NPC '{definition.NpcId}' has no NpcScene to instantiate.");
-			return null;
+			if (role != null && !role.ShouldSpawn(definition, state))
+			{
+				return null;
+			}
 		}
-		var node = definition.NpcScene.Instantiate();
-		if (node is not Npc npc)
-		{
-			GD.PushError($"NPC '{definition.NpcId}': NpcScene root is a {node.GetType().Name}, not an Npc.");
-			node.Free();
-			return null;
-		}
+		var npc = GD.Load<PackedScene>(NpcScenePath).Instantiate<Npc>();
 		npc.Initialize(definition);
 		npc.Position = definition.LocalPosition;
 		npc.RotationDegrees = new Vector3(0f, definition.RotationDegreesY, 0f);

@@ -38,11 +38,12 @@ public partial class NpcDefinition : Resource, INpcDefinition
 	[Export]
 	public float RotationDegreesY { get; set; }
 
-	// Role variant to instantiate: RecruitNpc.tscn, ShopkeeperNpc.tscn, ...
-	// (thin inherited scenes of Npc.tscn under Scenes/Npc carrying the role
-	// script).
+	// Composable interaction roles (docs/plans/npc-composition.md): each
+	// contributes a conversation plus world actions, and Npc merges them at
+	// interact time. Order sets the multi-role choice-menu order. Every NPC
+	// instantiates the same Scenes/Npc.tscn.
 	[Export]
-	public PackedScene NpcScene { get; set; }
+	public NpcRole[] Roles { get; set; } = System.Array.Empty<NpcRole>();
 
 	// Rig wrapper scene (Scenes/Characters/Rigs/*.tscn): the character model
 	// with its AnimationPlayer pre-wired, root script CharacterRig. Null

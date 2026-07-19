@@ -40,7 +40,7 @@ public partial class PartyMemberFollower : CharacterBody3D
 	private float StopDistance => 2.0f + 1.5f * (FollowIndex - 1);
 
 	// Instances the follower scene for a party member. Used by Level when a
-	// level loads/restores and by RecruitNpc when someone joins mid-play.
+	// level loads/restores and by RecruitRole when someone joins mid-play.
 	public static PartyMemberFollower Spawn(Node parent, CharacterEntity member, int followIndex, Vector3 position)
 	{
 		var follower = GD.Load<PackedScene>(ScenePath).Instantiate<PartyMemberFollower>();

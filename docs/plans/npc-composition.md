@@ -94,12 +94,12 @@ Concrete roles port the existing subclasses 1:1 — `QuestGiverRole`, `BountyGiv
 
 **Done when:** every intro NPC, follower, and battle combatant renders through a rig wrapper, idle/battle animations play, and no runtime `RootNode` retargeting remains.
 
-## Phase 2 — Role resources replace subclasses
+## Phase 2 — Role resources replace subclasses *(implemented)*
 
-1. `NpcRole` base + the five concrete roles, porting each subclass's dialogue and state logic.
-2. `Npc.cs` composes dialogue per the merge rules; spawn suppression moves into the spawner's `ShouldSpawn` check.
-3. Re-author the five `.tres` definitions with `Roles` arrays; delete `Scenes/Npc/*.tscn` and the five subclass scripts.
-4. Update the `Tests/` coverage that touches definitions (`NpcIndexTests`) for the schema change.
+1. `NpcRole` base + the five concrete roles (`Scripts/Npc/Roles/`), porting each subclass's dialogue and state logic. Deviations from the sketch above: `RequiredQuestId` is a `uint` (quest ids are `uint`, not slugs); the base class is concrete-with-virtuals rather than abstract (safer with Godot's `[GlobalClass]` tooling, and a bare `NpcRole` in data degrades to small talk); roles that remove their NPC mid-play signal `npc.DespawnWhenDialogueEnds()` so the body lingers until the conversation closes.
+2. `Npc.cs` composes dialogue per the merge rules; spawn suppression runs in `NpcSpawner.Spawn` *before* instantiation (cleaner than the old instantiate-then-`QueueFree` in `_Ready`), and `Npc.tscn` now carries the script itself.
+3. The five `.tres` definitions re-authored with `Roles` arrays; `Scenes/Npc/*.tscn` and the five subclass scripts deleted.
+4. `Tests/` needed no changes — the engine-free `INpcDefinition` surface never included `NpcScene`.
 
 **Done when:** the intro station plays identically to today — talk, quest, bounty, recruit, shop, battle; defeated/recruited NPCs stay gone across chunk reloads and saves — with one NPC scene and zero role subclasses.
 
