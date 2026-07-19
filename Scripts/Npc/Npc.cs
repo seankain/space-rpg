@@ -41,6 +41,7 @@ public partial class Npc : CharacterBody3D
 	private Node3D player;
 	private InteractionPrompt prompt;
 	private bool despawnWhenDialogueEnds;
+	private CharacterRig rig;
 
 	// Mutable per-NPC state the shared role resources can't hold themselves
 	// (a shopkeeper's Merchant), keyed by the role that created it.
@@ -82,6 +83,19 @@ public partial class Npc : CharacterBody3D
 			{
 				roleStates[role] = state;
 			}
+		}
+
+		switch (Definition?.Behavior)
+		{
+			case NpcBehaviorMode.Wander:
+				AddChild(new WanderBehavior { Radius = Definition.WanderRadius });
+				break;
+			case NpcBehaviorMode.Patrol:
+				AddChild(new PatrolBehavior
+				{
+					LocalPoints = Definition.PatrolPoints ?? System.Array.Empty<Vector3>(),
+				});
+				break;
 		}
 
 		prompt = new InteractionPrompt
@@ -134,6 +148,16 @@ public partial class Npc : CharacterBody3D
 
 	// The runtime state a role created for this NPC in _Ready, or null.
 	public object GetRoleState(NpcRole role) => roleStates.GetValueOrDefault(role);
+
+	// Behaviors move the body only while nobody is engaging the NPC:
+	// halting when the player is in range keeps the talk prompt catchable,
+	// and any open dialogue freezes ambient walkers.
+	public bool CanBehaviorMove => !playerInRange && !DialogueManager.IsDialogueActive;
+
+	// Locomotion animation for behaviors; capsule NPCs have no rig and
+	// simply slide.
+	public void PlayLocomotion(bool moving) =>
+		rig?.Play(moving ? CharacterRig.WalkClip : CharacterRig.IdleClip);
 
 	// Roles whose actions remove the NPC from the world (a recruit joining)
 	// call this so the body lingers until the conversation closes.
@@ -211,7 +235,7 @@ public partial class Npc : CharacterBody3D
 	// arrives forward-flipped and animation-wired (CharacterRig).
 	private void AddRig(PackedScene rigScene)
 	{
-		var rig = rigScene.Instantiate<CharacterRig>();
+		rig = rigScene.Instantiate<CharacterRig>();
 		AddChild(rig);
 		if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } capsule)
 		{

@@ -17,6 +17,7 @@ public partial class CharacterRig : Node3D
 	public const string LibraryName = "player_animation_library";
 	public const string IdleClip = "Idle_A";
 	public const string RunClip = "Running_A";
+	public const string WalkClip = "Walking_A";
 
 	[Export]
 	public AnimationPlayer Anim;

@@ -110,9 +110,14 @@ Concrete roles port the existing subclasses 1:1 — `QuestGiverRole`, `BountyGiv
 
 **Done when:** the same NPC gives a quest and later joins the party; a quest dialogue choice starts a battle whose outcome persists, and the NPC's remaining roles still function afterward.
 
-## Phase 4 — Behaviors stay nodes (future)
+## Phase 4 — Behaviors stay nodes *(implemented)*
 
-Wander/patrol from npc-system Phase 3 arrive as **child nodes**, not roles — the split to preserve: *roles are interaction verbs* (data-authorable resources, no per-frame work); *behaviors are continuous processing* (nodes with `_PhysicsProcess`). The single-scene model makes attaching them uniform.
+Wander/patrol from npc-system Phase 3 arrived as **child nodes**, not roles — the split preserved: *roles are interaction verbs* (data-authorable resources, no per-frame work); *behaviors are continuous processing* (nodes with `_PhysicsProcess`). As built:
+
+- `Scripts/Npc/Behaviors/`: `NpcBehavior` base (halt-while-engaged, direct-pursuit movement with gravity, walk animation via the rig, and a per-target timeout so a snagged NPC gives up instead of marching into a wall), with `WanderBehavior` (random points within a radius of the spawn, with linger pauses) and `PatrolBehavior` (waypoint loop, authored chunk-local like `LocalPosition`).
+- Authoring is data: `NpcDefinition.Behavior` (`Stationary`/`Wander`/`Patrol`) plus `WanderRadius`/`PatrolPoints`; `Npc._Ready` attaches the matching node. Rig wanders the docks, Vex patrols his stretch of deck.
+- Interaction pauses behavior: the body halts while the player is in range (keeping the talk prompt catchable) or any dialogue is open, and `FacePlayer` still turns it on interact.
+- Deferred, unchanged from npc-system: navmesh pathing (direct movement is the same stand-in the party followers use), wanderer-position persistence, and the schedule hook.
 
 ## Decisions to settle early
 

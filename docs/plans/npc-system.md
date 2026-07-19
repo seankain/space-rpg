@@ -29,6 +29,8 @@ Goal: non-player characters that populate levels, can be interacted with (feedin
 
 ## Phase 3 — Behavior
 
+> Landed via [npc-composition.md](npc-composition.md) Phase 4: `Stationary`/`Wander`/`Patrol` on the definition, attached as behavior child nodes, with interaction pausing movement. Direct pursuit stands in for the navmesh (same as party followers); the schedule hook remains future.
+
 1. **Behavior modes** per NPC (exported enum): `Stationary`, `Wander` (random point within a radius via `NavigationAgent3D`), `Patrol` (waypoint loop). Requires a navmesh bake in levels — coordinate with the party plan's follower work, which needs the same.
 2. Interaction pauses behavior (stop, face player) and resumes after.
 3. Simple schedule hook (optional): time-of-day posts, only if/when a day cycle exists — design the mode enum so it can grow.

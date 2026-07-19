@@ -1,6 +1,15 @@
 using Godot;
 using System.Collections.Generic;
 
+// How an NPC moves when nobody is engaging it (npc-system plan Phase 3's
+// modes, attached as behavior child nodes per the npc-composition plan).
+public enum NpcBehaviorMode
+{
+	Stationary,
+	Wander,
+	Patrol,
+}
+
 // One NPC, fully described by data (docs/plans/npc-resource-files.md): who
 // they are, where they spawn, and what they start with. Authored as one
 // .tres per NPC under Resources/Npcs and loaded by NpcDatabase. Definitions
@@ -44,6 +53,21 @@ public partial class NpcDefinition : Resource, INpcDefinition
 	// instantiates the same Scenes/Npc.tscn.
 	[Export]
 	public NpcRole[] Roles { get; set; } = System.Array.Empty<NpcRole>();
+
+	// Ambient movement (npc-composition plan Phase 4): Npc attaches the
+	// matching behavior child node — behaviors are nodes with per-frame
+	// work, roles stay interaction-only.
+	[Export]
+	public NpcBehaviorMode Behavior { get; set; } = NpcBehaviorMode.Stationary;
+
+	// Wander only: how far from the spawn point the NPC roams.
+	[Export]
+	public float WanderRadius { get; set; } = 4f;
+
+	// Patrol only: waypoints in the same local space as LocalPosition
+	// (chunk-local / interior-local), walked as a loop.
+	[Export]
+	public Vector3[] PatrolPoints { get; set; } = System.Array.Empty<Vector3>();
 
 	// Rig wrapper scene (Scenes/Characters/Rigs/*.tscn): the character model
 	// with its AnimationPlayer pre-wired, root script CharacterRig. Null
