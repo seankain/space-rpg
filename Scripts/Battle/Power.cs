@@ -21,6 +21,8 @@ public class Power
     // Base magnitude before stat scaling (Intelligence for damage, Wisdom
     // for healing; see BattleScene damage math).
     public uint Amount { get; set; }
+    // Effect played on the target when the power lands (VfxLibrary.Spawn).
+    public VfxId Vfx { get; set; }
 }
 
 // All power definitions, keyed by Power.Id. Same registry pattern as
@@ -42,6 +44,7 @@ public static class PowerCatalog
             PowerPointCost = 2,
             Effect = PowerEffect.Damage,
             Amount = 4,
+            Vfx = VfxId.PlasmaBurst,
         });
         Register(new Power
         {
@@ -51,6 +54,7 @@ public static class PowerCatalog
             PowerPointCost = 2,
             Effect = PowerEffect.Heal,
             Amount = 5,
+            Vfx = VfxId.NanoMend,
         });
     }
 
