@@ -49,6 +49,7 @@ Goal: non-player characters that populate levels, can be interacted with (feedin
 - **Quests:** quest givers are just NPCs whose dialogue runs quest commands (quest plan Phase 3).
 - **Recruitment:** party plan's recruit flow triggers from NPC dialogue.
 - **Combat:** hostile NPCs / encounter triggers deferred to the combat design — keep `Npc.cs` friendly-only for now rather than speculatively generalizing.
+- **Roles:** the one-subclass-per-role shape this plan produced (quest giver, recruit, shopkeeper, challenger) is being replaced by composable role resources on the definition — see [npc-composition.md](npc-composition.md).
 
 ## Decisions to settle early
 
