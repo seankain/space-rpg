@@ -190,8 +190,9 @@ public partial class PartyMenu : Control
 	}
 
 	// Roster changes reshuffle who is a follower and in what order, so drop
-	// every follower body and respawn the line behind the player. All party
-	// members share the same body today, so a leader change is seamless.
+	// every follower body and respawn the line behind the player. Followers
+	// respawn wearing their own NPC mesh; the leader always wears the
+	// player's Knight body.
 	private void RebuildFollowers()
 	{
 		var tree = GetTree();
