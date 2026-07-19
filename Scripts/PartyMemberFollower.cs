@@ -112,9 +112,9 @@ public partial class PartyMemberFollower : CharacterBody3D
 
 	private void TurnMeshToward(Vector3 direction, float delta)
 	{
-		// A rig's visual forward is local +Z (CharacterRig convention), same
-		// as Player's Knight.
-		float targetYaw = Mathf.Atan2(direction.X, direction.Z);
+		// A rig's visual forward is local -Z (CharacterRig convention), so
+		// aim -Z along the walk direction.
+		float targetYaw = Mathf.Atan2(-direction.X, -direction.Z);
 		Vector3 rigRotation = rig.Rotation;
 		rigRotation.Y = Mathf.LerpAngle(rigRotation.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * delta));
 		rig.Rotation = rigRotation;

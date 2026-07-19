@@ -322,10 +322,10 @@ public partial class BattleScene : Node3D
         // the party. Fighters wear their NPC definition's rig where one
         // resolves; capsules (party blue / definition tint) fill in for the
         // rest.
-        PlaceLine(party, SideOffset, facingDegrees: 180,
+        PlaceLine(party, SideOffset, facingDegrees: 0,
             i => PartyMemberRig(party[i]),
             i => new Color(0.3f, 0.55f, 0.95f));
-        PlaceLine(enemies, -SideOffset, facingDegrees: 0,
+        PlaceLine(enemies, -SideOffset, facingDegrees: 180,
             i => NpcDatabase.Get(encounter.Enemies[i].NpcId)?.Rig,
             i => encounter.Enemies[i].BodyColor);
     }
@@ -378,9 +378,9 @@ public partial class BattleScene : Node3D
     }
 
     // Instantiates a rig wrapper and hands it the battle animation library.
-    // A rig's visual forward is +Z (CharacterRig convention), so the party
+    // A rig's visual forward is -Z (CharacterRig convention), so the party
     // line (which must look down -Z, Godot's forward, toward the enemies)
-    // takes a 180° turn while the enemy line spawns unrotated to face the
+    // spawns unrotated while the enemy line takes a 180° turn to face the
     // party.
     private static void AddCharacterBody(CombatantVisual visual, PackedScene rigScene, float facingDegrees)
     {
