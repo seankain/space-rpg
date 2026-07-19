@@ -1,6 +1,6 @@
 # Current Progress
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-19_
 
 space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs with stub dialogue (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), a party system (roster rules, followers walking behind the leader, a management tab), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), and a set of stubbed data classes exist.
 
@@ -92,6 +92,7 @@ Phase 1 of the [battle plan](plans/battle-system.md) — a playable JRPG-style c
 - `Power`/`PowerCatalog` — powers cost power points (the `MagicPoints` field on `CharacterEntity`, shown as PP): Plasma Surge (damage) and Nano Mend (heal), known by every party member for now.
 - `EnemyCatalog` — encounters keyed by the challenging NPC's display name ("Vex" → Vex + a Dock Drone); unknown names get a generic one-enemy fight. Duplicate enemy names are disambiguated (A/B/...).
 - `BattleCombatant`/`BattleAction` — runtime battle state; party combatants wrap their `CharacterEntity` and write HP/PP/XP back on victory (downed members revive at 1 HP). Items used in battle are consumables from the shared party inventory and are consumed on use.
+- Action VFX (`Scripts/Vfx/`) — every battle action plays a one-shot particle effect on its target: melee spark burst, Plasma Surge's plasma detonation, Nano Mend's rising repair motes, and an item-use shimmer. `VfxLibrary` is scene-agnostic (`Spawn(VfxId, parent, position)` attaches a self-freeing `OneShotVfx` to any `Node3D`, battle or field) with effects built in code; powers pick their effect via `Power.Vfx`, and the engine-free `VfxId` enum keeps the data layer testable. Packaged effect scenes can later replace the code-built ones per id.
 
 ### Inventory basis (`Scripts/Pickup.cs`, `Scripts/InventoryMenu.cs`, `Scenes/Items/MaguffinCube.tscn`)
 

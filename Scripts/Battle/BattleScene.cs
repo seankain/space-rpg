@@ -162,6 +162,7 @@ public partial class BattleScene : Node3D
             {
                 var damage = AttackDamage(action.Actor, action.Target);
                 action.Target.TakeDamage(damage);
+                PlayVfx(VfxId.MeleeImpact, action.Target);
                 Announce($"{action.Actor.Name} attacks {action.Target.Name} for {damage} damage.", action.Target);
                 break;
             }
@@ -170,6 +171,7 @@ public partial class BattleScene : Node3D
                 action.Actor.PowerPoints -= action.Power.PowerPointCost;
                 var damage = PowerDamage(action.Actor, action.Power, action.Target);
                 action.Target.TakeDamage(damage);
+                PlayVfx(action.Power.Vfx, action.Target);
                 Announce($"{action.Actor.Name} unleashes {action.Power.Name} on {action.Target.Name} for {damage} damage.", action.Target);
                 break;
             }
@@ -178,6 +180,7 @@ public partial class BattleScene : Node3D
                 action.Actor.PowerPoints -= action.Power.PowerPointCost;
                 var healed = HealAmount(action.Actor, action.Power);
                 action.Target.Heal(healed);
+                PlayVfx(action.Power.Vfx, action.Target);
                 Announce($"{action.Actor.Name}'s {action.Power.Name} restores {healed} HP to {action.Target.Name}.", action.Target);
                 break;
             }
@@ -190,6 +193,7 @@ public partial class BattleScene : Node3D
                     break;
                 }
                 action.Target.Heal(item.HealAmount);
+                PlayVfx(VfxId.ItemSparkle, action.Target);
                 Announce($"{action.Actor.Name} uses a {item.Name} on {action.Target.Name}, restoring {item.HealAmount} HP.", action.Target);
                 break;
             }
@@ -199,6 +203,18 @@ public partial class BattleScene : Node3D
         RefreshCombatantVisual(action.Target);
         hud.UpdateParty(party);
         await Delay(1.2);
+    }
+
+    // Plays a one-shot effect centered on a combatant's torso (the same
+    // height works for the rigged characters and the placeholder capsules).
+    // The effect rides the visual root, so it stays with the arena and is
+    // freed with it if the battle tears down mid-effect.
+    private void PlayVfx(VfxId id, BattleCombatant combatant)
+    {
+        if (combatant != null && visuals.TryGetValue(combatant, out var visual))
+        {
+            VfxLibrary.Spawn(id, visual.Root, new Vector3(0, 1.1f, 0));
+        }
     }
 
     private void Announce(string message, BattleCombatant target)
