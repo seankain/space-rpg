@@ -1,0 +1,131 @@
+# NPC Scene Composition — Implementation Plan
+
+Goal: collapse the per-role NPC scene variants into a single `Npc.tscn`, move the mesh + `AnimationPlayer` into resource-specified **rig subscenes**, and replace the role subclass hierarchy with **composable role resources** — so one NPC can mix roles: a quest giver whose dialogue can branch into a battle, or a quest giver who becomes recruitable once their quest is complete.
+
+## Where we are
+
+- **Five scene variants that differ only by script.** `Scenes/Npc/{BattleNpc,BountyGiverNpc,QuestGiverNpc,RecruitNpc,ShopkeeperNpc}.tscn` are thin inherited scenes of `Scenes/Npc.tscn` whose entire content is a script override (plus one exported value on two of them). The scenes carry no structure of their own.
+- **One role per NPC, enforced by inheritance.** Each role is a `Npc` subclass overriding `OnInteract` (its dialogue tree) and sometimes `_Ready` (a spawn-suppression check: `BattleNpc` stays gone when defeated, `RecruitNpc` when recruited). Mixing roles — quest giver who fights, quest giver who joins — means writing a new subclass per combination.
+- **The mesh pipeline is runtime surgery, three times over.** `Npc.AddCharacterMesh`, `PartyMemberFollower.ApplyNpcCharacterMesh`, and `BattleScene`'s combatant setup each instantiate the raw KayKit `.glb`, apply the 180° forward flip, hunt for the `Skeleton3D`, and retarget an `AnimationPlayer`'s `RootNode` at it. Worse, the two animation libraries address the rig differently (`NpcAnimLib` tracks start at `Skeleton3D/…`, `player_animation_library` at `Rig_Medium/Skeleton3D/…`), so each site must pick a different root — exactly the kind of fragility a subscene that owns its own `AnimationPlayer` eliminates.
+- **NPC data is already resource-driven** (npc-resource-files plan, shipped): one `NpcDefinition` `.tres` per NPC selects a role via `NpcScene` and a mesh via `CharacterMesh`; `NpcSpawner`/`ChunkManager` spawn from data. Definitions are cached and shared — immutable at runtime.
+- Dialogue is C#-built `DialogueLine`/`DialogueChoice` trees; `DialogueChoice.Action` already takes arbitrary callbacks (that is how `BattleNpc` starts fights and `ShopkeeperNpc` opens the shop). The Yarn plan (npc-dialogue-yarn.md) intends to move dialogue *text and branching* to data eventually.
+
+## Is composition tenable?
+
+**Yes — and the codebase is most of the way there structurally.** The inherited scenes are already contentless; the spawner already instantiates from data; definitions are already resources. What inheritance actually encodes per role is: a dialogue tree, a spawn-suppression check, and a couple of config values. None of that needs a scene *or* a subclass — it needs data plus a small behavior contract. Specific findings:
+
+- **All five roles are dialogue-shaped.** Each reduces to "contribute a conversation + perform actions on `GameState`". Since `DialogueChoice.Action` is an arbitrary callback, a battle branch inside a quest conversation is *already expressible* — the current design just provides no authoring seam for it because each role owns the whole `OnInteract`. Composition is that seam.
+- **Godot supports the authoring model.** `[GlobalClass]` `Resource` subclasses export polymorphically: an `NpcRole[]` array on `NpcDefinition` renders as an inspector list where each element can be any concrete role, and serializes cleanly in `.tres` — the same mechanism `NpcItemStack[]` uses today.
+- **The shared-resource constraint is real but solvable.** Definitions (and therefore role resources) come from Godot's resource cache and must stay immutable — yet `ShopkeeperNpc` owns a per-node `Merchant` and `RecruitNpc` a `joined` flag. So roles must be stateless templates; per-NPC runtime state is created by the role but owned by the `Npc` node (design below). This is a design rule to enforce, not a blocker.
+- **Despawn semantics stop being obvious once roles mix.** Today "defeated → despawn" and "recruited → despawn" are role behaviors. A quest giver you can fight should probably *stay* after losing (their quest line still matters), while a recruited NPC always despawns (their follower replaces them). Policy has to move from the role to the definition — covered below.
+- **Interplay with the Yarn plan is a shaping constraint, not a conflict.** Yarn will eventually own dialogue text and branching. Roles should therefore be built as **capability providers** — availability checks + world actions (`recruit`, `start battle`, `open shop`, quest transitions) + *interim* C# dialogue. When Yarn lands, its `<<recruit>>`/`<<start_quest>>` commands call the same role/manager APIs and the interim C# trees retire; the composition model survives intact. What would fight Yarn is baking multi-role *branching logic* deep into C# — keep the merge rules simple (below) and let Yarn take over interleaving later.
+- **Cost is moderate and save-safe:** re-author five `.tres` files, delete five scenes and five subclass scripts, build ~4 rig wrapper scenes, standardize animation track addressing once. `NpcId`, `GameState.DefeatedNpcs`, and quest states are untouched — no `SaveVersion` bump.
+
+## Design
+
+### Rig subscenes — mesh + AnimationPlayer as one resource-specified unit
+
+A wrapper scene per character model under `Scenes/Characters/Rigs/`:
+
+```
+Rogue.tscn
+└─ RigRoot (Node3D, CharacterRig.cs — 180° forward flip baked into the transform)
+   ├─ <KayKit Rogue_Hooded.glb instance>
+   └─ AnimationPlayer (libraries assigned, RootNode wired at author time)
+```
+
+- `CharacterRig.cs`: a tiny script exposing the `AnimationPlayer` (exported reference) and a `Play(name)` convenience. Convention: visual forward is local **+Z** after the baked flip, matching `Npc.FacePlayer` and `PartyMemberFollower.TurnMeshToward`.
+- `NpcDefinition.CharacterMesh` becomes `Rig` (a `PackedScene` of a wrapper). `Npc._Ready` instantiates it, drops the capsule, and calls `Play("Idle_Talking")` — the `RootNode` retargeting hack is deleted, along with the base scene's own `AnimationPlayer`.
+- `PartyMemberFollower` and `BattleScene` consume the same wrappers, deleting the other two copies of the surgery. This also fixes their `FindByDisplayName` mesh lookups wholesale, since the rig arrives ready to play.
+- **Track addressing (resolved during Phase 1):** inspecting the clips showed `Idle_Talking.res` doesn't just address the rig differently — it targets the *UAL2 skeleton* (`DEF-*` bones), which doesn't exist on KayKit characters, so the NPC idle was a silent no-op all along. Rather than retarget it, rigs carry the shared `player_animation_library` (whose `Rig_Medium/Skeleton3D/…` addressing is runtime-proven by `Player.tscn`) and NPCs idle with `Idle_A`; `NpcAnimLib` is deleted. The same root fix un-breaks the battle idle/death clips, which were rooted at the skeleton's parent where their `Rig_Medium/…` tracks couldn't resolve.
+- The tinted-capsule fallback stays for rig-less definitions, so nothing blocks on art.
+
+### Role resources
+
+```csharp
+[GlobalClass]
+public abstract partial class NpcRole : Resource
+{
+    // Availability gate, usable by any role: e.g. a RecruitRole offered
+    // only once a quest has succeeded. Empty = always available.
+    [Export] public string RequiredQuestId { get; set; } = "";
+    [Export] public QUESTSUCCESSSTATE RequiredQuestState { get; set; }
+
+    // Veto spawning entirely (recruited members, despawn-on-defeat).
+    public virtual bool ShouldSpawn(NpcDefinition def, GameState state) => true;
+
+    public virtual bool IsAvailable(Npc npc, GameState state) => /* quest gate */;
+
+    // Per-NPC mutable state (a shop's Merchant); owned by the Npc node,
+    // never written back to this shared resource.
+    public virtual object CreateRuntimeState(Npc npc) => null;
+
+    // Choice label when this role shares the NPC with others.
+    public abstract string MenuLabel { get; }
+    public abstract DialogueLine BuildDialogue(Npc npc, GameState state);
+}
+```
+
+Concrete roles port the existing subclasses 1:1 — `QuestGiverRole`, `BountyGiverRole` (`TargetNpcId` export), `ShopkeeperRole`, `RecruitRole` (`PartyCharacterId` export), `ChallengerRole` (`DespawnOnDefeat` export). `Npc` holds the spawned runtime state in a per-role slot and passes itself to `BuildDialogue`; roles read `GameState` through the same `SaveManager` path the subclasses use today.
+
+`NpcDefinition` changes: **remove** `NpcScene`, **add** `[Export] NpcRole[] Roles`, rename `CharacterMesh` → `Rig`. `NpcSpawner`/`ChunkManager` always instantiate the single `Npc.tscn`; spawn suppression moves from `_Ready` overrides into a pre-instantiation check over `Roles` (cleaner than instantiate-then-`QueueFree`, and `NpcSpawner.Spawn` already runs before `_Ready`).
+
+### Dialogue composition rules
+
+- **No available roles** → the base "Hello there." wave-off.
+- **One available role** → its dialogue plays directly. Every current NPC has exactly one role, so the intro station's conversations are preserved verbatim.
+- **Two or more** → a greeting line with one choice per role (`MenuLabel`: "About that cube…", "Let's trade", "Can I join you?") plus "Never mind". Simple, predictable; richer interleaving is deliberately deferred to Yarn.
+- **Cross-role flexibility comes from two mechanisms, not role-to-role coupling:**
+  - *Gating*: `RequiredQuestId`/`RequiredQuestState` on any role — "recruitable after their quest succeeds" is pure data.
+  - *Shared dialogue actions*: extract `BattleNpc`'s challenge pattern into a helper (e.g. `DialogueActions.StartBattle(npc, onWon)`) that **any** role's authored choices can use — a quest giver whose "hand it over" refusal starts a fight needs no `ChallengerRole` at all.
+
+### Despawn and persistence policy
+
+- **Recruited** → always despawn (`RecruitRole.ShouldSpawn` is false once the member is in the party; the follower replaces them). Unchanged.
+- **Defeated** → always recorded in `GameState.DefeatedNpcs`, but despawn only when `ChallengerRole.DespawnOnDefeat` is true (the default, matching today's Vex). Multi-role NPCs set it false: they stay standing, the challenger role goes unavailable ("We settled that already"), and their other roles keep working.
+- No save schema changes; `NpcId`, defeat flags, and quest states carry over untouched.
+
+---
+
+## Phase 1 — Rig subscenes *(implemented)*
+
+1. `CharacterRig.cs` + wrapper scenes for the characters in use (`Scenes/Characters/Rigs/`: RogueHooded, Barbarian, Ranger, Knight, Mage), each carrying `player_animation_library` with its root pre-wired (see the track-addressing note above).
+2. `NpcDefinition.Rig` (renamed from `CharacterMesh`, `.tres` files re-pointed at wrappers); `Npc`, `PartyMemberFollower`, and `BattleScene` instantiate wrappers; all three retarget code paths deleted, along with `Npc.tscn`'s `AnimationPlayer` and the follower scene's baked-in Knight (the Knight *rig* is now its runtime fallback, and the battle player mesh — sharing that rig — moved from the FBX to the GLB Knight import).
+
+**Done when:** every intro NPC, follower, and battle combatant renders through a rig wrapper, idle/battle animations play, and no runtime `RootNode` retargeting remains.
+
+## Phase 2 — Role resources replace subclasses *(implemented)*
+
+1. `NpcRole` base + the five concrete roles (`Scripts/Npc/Roles/`), porting each subclass's dialogue and state logic. Deviations from the sketch above: `RequiredQuestId` is a `uint` (quest ids are `uint`, not slugs); the base class is concrete-with-virtuals rather than abstract (safer with Godot's `[GlobalClass]` tooling, and a bare `NpcRole` in data degrades to small talk); roles that remove their NPC mid-play signal `npc.DespawnWhenDialogueEnds()` so the body lingers until the conversation closes.
+2. `Npc.cs` composes dialogue per the merge rules; spawn suppression runs in `NpcSpawner.Spawn` *before* instantiation (cleaner than the old instantiate-then-`QueueFree` in `_Ready`), and `Npc.tscn` now carries the script itself.
+3. The five `.tres` definitions re-authored with `Roles` arrays; `Scenes/Npc/*.tscn` and the five subclass scripts deleted.
+4. `Tests/` needed no changes — the engine-free `INpcDefinition` surface never included `NpcScene`.
+
+**Done when:** the intro station plays identically to today — talk, quest, bounty, recruit, shop, battle; defeated/recruited NPCs stay gone across chunk reloads and saves — with one NPC scene and zero role subclasses.
+
+## Phase 3 — Mixed-role content proof *(implemented)*
+
+1. Chief Marlow carries two roles: his `BountyGiverRole` plus a `RecruitRole` gated on "Clear the Deck" hitting `Success` (`RequiredQuestId` in the `.tres`, pure data). Once the bounty pays out, talking to him opens the multi-role menu and he can join the party (member id 3); recruiting despawns him as usual, and dismissing him puts him back at his post.
+2. `DialogueActions.StartBattle(npc, onWon)` extracted as the shared battle verb — it records the defeat in `DefeatedNpcs` itself, and `ChallengerRole` shrank to the challenge lines plus its despawn policy. Hale's Maguffin turn-in became a demand the player can refuse at swordpoint: refusing twice starts a battle straight from the quest conversation (no `ChallengerRole`, no despawn — Hale picks himself up, remembers the beating via the defeat flag, and stops pressing the point, while turn-in keeps working). `EnemyCatalog` gained an authored `intro.dockmaster_hale` encounter.
+
+**Done when:** the same NPC gives a quest and later joins the party; a quest dialogue choice starts a battle whose outcome persists, and the NPC's remaining roles still function afterward.
+
+## Phase 4 — Behaviors stay nodes *(implemented)*
+
+Wander/patrol from npc-system Phase 3 arrived as **child nodes**, not roles — the split preserved: *roles are interaction verbs* (data-authorable resources, no per-frame work); *behaviors are continuous processing* (nodes with `_PhysicsProcess`). As built:
+
+- `Scripts/Npc/Behaviors/`: `NpcBehavior` base (halt-while-engaged, direct-pursuit movement with gravity, walk animation via the rig, and a per-target timeout so a snagged NPC gives up instead of marching into a wall), with `WanderBehavior` (random points within a radius of the spawn, with linger pauses) and `PatrolBehavior` (waypoint loop, authored chunk-local like `LocalPosition`).
+- Authoring is data: `NpcDefinition.Behavior` (`Stationary`/`Wander`/`Patrol`) plus `WanderRadius`/`PatrolPoints`; `Npc._Ready` attaches the matching node. Rig wanders the docks, Vex patrols his stretch of deck.
+- Interaction pauses behavior: the body halts while the player is in range (keeping the talk prompt catchable) or any dialogue is open, and `FacePlayer` still turns it on interact.
+- Deferred, unchanged from npc-system: navmesh pathing (direct movement is the same stand-in the party followers use), wanderer-position persistence, and the schedule hook.
+
+## Decisions to settle early
+
+| Decision | Recommendation |
+|----------|----------------|
+| Roles as resources vs child nodes | **Resources** — authorable inside the existing `.tres` files with zero scene assembly, and they compose in data. Reserve nodes for ticking behaviors (Phase 4). |
+| Merge `BountyGiverRole` into `QuestGiverRole`? | Keep separate classes for now (their dialogue is bespoke C#); they collapse into one data-driven quest role naturally when Yarn takes over the text. |
+| Where dialogue text lives | In role C# until the Yarn plan's Phase 2+ — then roles keep availability + actions and Yarn takes the words. Don't build a parallel text-in-resource system in the interim. |
+| Multi-role presentation | Choice menu under a greeting. Interleaved/contextual weaving is a Yarn-era concern; don't encode it in C# merge logic. |
+| Rename `CharacterMesh` → `Rig` now? | Yes — Phase 2 re-authors every `.tres` anyway, so the rename is free there. |
+| Runtime state ownership | Role resources stay immutable templates; `CreateRuntimeState` output lives on the `Npc` node and dies with it (merchant stock persistence remains future work, unchanged). |

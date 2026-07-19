@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="NpcDefinition" load_steps=8 format=3 uid="uid://cnpcmoss4intr"]
+[gd_resource type="Resource" script_class="NpcDefinition" load_steps=10 format=3 uid="uid://cnpcmoss4intr"]
 
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
 [ext_resource type="Script" path="res://Scripts/Data/NpcItemStack.cs" id="2_stack"]
-[ext_resource type="PackedScene" uid="uid://cnpcshopkp8e5" path="res://Scenes/Npc/ShopkeeperNpc.tscn" id="3_role"]
-[ext_resource type="PackedScene" uid="uid://pih4ood85ydw" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb" id="4_mesh"]
+[ext_resource type="Script" uid="uid://c8role0base2a" path="res://Scripts/Npc/Roles/NpcRole.cs" id="3_rolebase"]
+[ext_resource type="Script" uid="uid://c8roles4hop2d" path="res://Scripts/Npc/Roles/ShopkeeperRole.cs" id="4_role"]
+[ext_resource type="PackedScene" uid="uid://crigmage2e4f" path="res://Scenes/Characters/Rigs/Mage.tscn" id="5_rig"]
 
 [sub_resource type="Resource" id="Resource_cutter"]
 script = ExtResource("2_stack")
@@ -20,6 +21,9 @@ script = ExtResource("2_stack")
 ItemId = 4
 Quantity = 5
 
+[sub_resource type="Resource" id="Resource_shopkeeper"]
+script = ExtResource("4_role")
+
 [resource]
 script = ExtResource("1_def")
 NpcId = "intro.shopkeeper"
@@ -28,8 +32,8 @@ SpawnScenePath = "res://Scenes/Levels/ShopInterior.tscn"
 ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(0, 0.05, -3.2)
 RotationDegreesY = 180.0
-NpcScene = ExtResource("3_role")
-CharacterMesh = ExtResource("4_mesh")
+Roles = Array[ExtResource("3_rolebase")]([SubResource("Resource_shopkeeper")])
+Rig = ExtResource("5_rig")
 BodyColor = Color(0.85, 0.65, 0.2, 1)
 Credits = 400
 InitialItems = Array[ExtResource("2_stack")]([SubResource("Resource_cutter"), SubResource("Resource_plating"), SubResource("Resource_medkits")])

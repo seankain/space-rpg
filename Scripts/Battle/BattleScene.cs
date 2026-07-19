@@ -22,9 +22,8 @@ public partial class BattleScene : Node3D
     // party member who isn't a recruited NPC.
     private const ulong PlayerEntityId = 1;
 
-    // The same Knight body Player.tscn wears in the field.
-    private const string PlayerMeshPath =
-        "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/fbx/Knight.fbx";
+    // The same Knight body Player.tscn wears in the field, as a rig wrapper.
+    private const string PlayerRigPath = "res://Scenes/Characters/Rigs/Knight.tscn";
 
     private const string AnimationDirectory = "res://ThirdParty/AnimationLibrary";
     private const string AnimLibName = "BattleAnimLib";
@@ -320,24 +319,24 @@ public partial class BattleScene : Node3D
     private void SpawnCombatants()
     {
         // Party in a line facing -Z toward the enemy line; camera sits behind
-        // the party. Fighters wear their NPC definition's rigged mesh where
-        // one resolves; capsules (party blue / definition tint) fill in for
-        // the rest.
+        // the party. Fighters wear their NPC definition's rig where one
+        // resolves; capsules (party blue / definition tint) fill in for the
+        // rest.
         PlaceLine(party, SideOffset, facingDegrees: 180,
-            i => PartyMemberMesh(party[i]),
+            i => PartyMemberRig(party[i]),
             i => new Color(0.3f, 0.55f, 0.95f));
         PlaceLine(enemies, -SideOffset, facingDegrees: 0,
-            i => NpcDatabase.Get(encounter.Enemies[i].NpcId)?.CharacterMesh,
+            i => NpcDatabase.Get(encounter.Enemies[i].NpcId)?.Rig,
             i => encounter.Enemies[i].BodyColor);
     }
 
     // The player fights in the same Knight body Player.tscn wears; recruited
     // members were world NPCs, so the definition matching their name
-    // (recruiting copies DisplayName onto the entity) supplies the mesh.
-    private static PackedScene PartyMemberMesh(BattleCombatant member) =>
+    // (recruiting copies DisplayName onto the entity) supplies the rig.
+    private static PackedScene PartyMemberRig(BattleCombatant member) =>
         member.Entity?.Id == PlayerEntityId
-            ? GD.Load<PackedScene>(PlayerMeshPath)
-            : NpcDatabase.FindByDisplayName(member.Name)?.CharacterMesh;
+            ? GD.Load<PackedScene>(PlayerRigPath)
+            : NpcDatabase.FindByDisplayName(member.Name)?.Rig;
 
     private void PlaceLine(List<BattleCombatant> side, float z, float facingDegrees,
         Func<int, PackedScene> meshFor, Func<int, Color> colorFor)
@@ -351,9 +350,9 @@ public partial class BattleScene : Node3D
             AddChild(root);
             var visual = new CombatantVisual { Root = root };
 
-            if (meshFor(i) is { } characterMesh)
+            if (meshFor(i) is { } rigScene)
             {
-                AddCharacterBody(visual, characterMesh, facingDegrees);
+                AddCharacterBody(visual, rigScene, facingDegrees);
             }
             else
             {
@@ -378,31 +377,21 @@ public partial class BattleScene : Node3D
         }
     }
 
-    // Instantiates a rigged KayKit character and points the shared battle
-    // animations at its skeleton. The KayKit scenes come in facing +Z, so
-    // the party line (which must look down -Z, Godot's forward, toward the
-    // enemies) takes the same 180° flip Player.tscn bakes into its Knight,
-    // while the enemy line spawns unrotated to face the party.
-    private static void AddCharacterBody(CombatantVisual visual, PackedScene characterMesh, float facingDegrees)
+    // Instantiates a rig wrapper and hands it the battle animation library.
+    // A rig's visual forward is +Z (CharacterRig convention), so the party
+    // line (which must look down -Z, Godot's forward, toward the enemies)
+    // takes a 180° turn while the enemy line spawns unrotated to face the
+    // party.
+    private static void AddCharacterBody(CombatantVisual visual, PackedScene rigScene, float facingDegrees)
     {
-        var body = characterMesh.Instantiate<Node3D>();
-        body.RotationDegrees = new Vector3(0, facingDegrees, 0);
-        visual.Root.AddChild(body);
-        visual.Body = body;
+        var rig = rigScene.Instantiate<CharacterRig>();
+        rig.RotationDegrees = new Vector3(0, facingDegrees, 0);
+        visual.Root.AddChild(rig);
+        visual.Body = rig;
 
-        if (body.FindChild("Skeleton3D", recursive: true, owned: false) is not Skeleton3D skeleton)
-        {
-            return;
-        }
-        var anim = new AnimationPlayer();
-        anim.AddAnimationLibrary(AnimLibName, BattleAnimations);
-        visual.Root.AddChild(anim);
-        // The clips' tracks address the rig as "Skeleton3D/...", so the
-        // animation root must be the node that directly contains the skeleton
-        // (same arrangement as Npc.AddCharacterMesh).
-        anim.RootNode = anim.GetPathTo(skeleton.GetParent());
-        anim.Play($"{AnimLibName}/{IdleAnim}");
-        visual.Anim = anim;
+        rig.Anim.AddAnimationLibrary(AnimLibName, BattleAnimations);
+        rig.Anim.Play($"{AnimLibName}/{IdleAnim}");
+        visual.Anim = rig.Anim;
     }
 
     private static void AddCapsuleBody(CombatantVisual visual, Color color)

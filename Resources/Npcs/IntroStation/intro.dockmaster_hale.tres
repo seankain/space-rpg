@@ -1,8 +1,12 @@
-[gd_resource type="Resource" script_class="NpcDefinition" load_steps=4 format=3 uid="uid://cnpchale1intr"]
+[gd_resource type="Resource" script_class="NpcDefinition" load_steps=6 format=3 uid="uid://cnpchale1intr"]
 
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
-[ext_resource type="PackedScene" uid="uid://cnpcquest5v2b" path="res://Scenes/Npc/QuestGiverNpc.tscn" id="2_role"]
-[ext_resource type="PackedScene" uid="uid://cvci8fjjlryx0" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Ranger.glb" id="3_mesh"]
+[ext_resource type="Script" uid="uid://c8role0base2a" path="res://Scripts/Npc/Roles/NpcRole.cs" id="2_rolebase"]
+[ext_resource type="Script" uid="uid://c8roleq5est2b" path="res://Scripts/Npc/Roles/QuestGiverRole.cs" id="3_role"]
+[ext_resource type="PackedScene" uid="uid://crigranger1c4" path="res://Scenes/Characters/Rigs/Ranger.tscn" id="4_rig"]
+
+[sub_resource type="Resource" id="Resource_questgiver"]
+script = ExtResource("3_role")
 
 [resource]
 script = ExtResource("1_def")
@@ -12,7 +16,7 @@ SpawnScenePath = "res://Scenes/Levels/Intro.tscn"
 ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(0.5, 0.55, -7.5)
 RotationDegreesY = 0.0
-NpcScene = ExtResource("2_role")
-CharacterMesh = ExtResource("3_mesh")
+Roles = Array[ExtResource("2_rolebase")]([SubResource("Resource_questgiver")])
+Rig = ExtResource("4_rig")
 BodyColor = Color(0.25, 0.5, 0.95, 1)
 Credits = 0

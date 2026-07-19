@@ -184,8 +184,8 @@ public partial class PartyMenu : Control
 		RebuildFollowers();
 		selectedMemberId = null;
 		Refresh();
-		// A dismissed RecruitNpc stands at his spawn spot again next time the
-		// area loads, ready to be re-recruited.
+		// A dismissed recruit stands at his spawn spot again next time the
+		// area loads (RecruitRole.ShouldSpawn), ready to be re-recruited.
 		ActionResultLabel.Text = $"{member.Name} left the party.";
 	}
 

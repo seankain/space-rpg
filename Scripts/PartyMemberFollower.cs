@@ -1,12 +1,11 @@
 using Godot;
 
 // A recruited party member walking behind the leader (party plan Phase 2):
-// the same body/animation arrangement as Player.tscn but AI-driven, wearing
-// the member's own NPC mesh where one resolves (the scene's Knight is the
-// fallback). Simple direct pursuit with per-member spacing stands in for
-// navmesh pathing until a level actually needs it, and a catch-up teleport
-// self-heals whatever pursuit can't solve (stale saved positions, geometry
-// snags, falls).
+// AI-driven, wearing the member's own NPC rig where one resolves (the Knight
+// rig — the player's body — is the fallback). Simple direct pursuit with
+// per-member spacing stands in for navmesh pathing until a level actually
+// needs it, and a catch-up teleport self-heals whatever pursuit can't solve
+// (stale saved positions, geometry snags, falls).
 public partial class PartyMemberFollower : CharacterBody3D
 {
 	public const string GroupName = "PartyFollower";
@@ -18,15 +17,12 @@ public partial class PartyMemberFollower : CharacterBody3D
 	public const float CatchUpDistance = 16f;
 
 	private const string ScenePath = "res://Scenes/PartyMemberFollower.tscn";
-
-	[Export]
-	public AnimationPlayer anim;
-
-	[Export]
-	public Node3D meshRoot;
+	private const string FallbackRigPath = "res://Scenes/Characters/Rigs/Knight.tscn";
 
 	[Export]
 	public Label3D nameLabel;
+
+	private CharacterRig rig;
 
 	// CharacterEntity.Id of the party member this body represents; how saves
 	// and menus find the follower again.
@@ -44,7 +40,7 @@ public partial class PartyMemberFollower : CharacterBody3D
 	private float StopDistance => 2.0f + 1.5f * (FollowIndex - 1);
 
 	// Instances the follower scene for a party member. Used by Level when a
-	// level loads/restores and by RecruitNpc when someone joins mid-play.
+	// level loads/restores and by RecruitRole when someone joins mid-play.
 	public static PartyMemberFollower Spawn(Node parent, CharacterEntity member, int followIndex, Vector3 position)
 	{
 		var follower = GD.Load<PackedScene>(ScenePath).Instantiate<PartyMemberFollower>();
@@ -60,32 +56,15 @@ public partial class PartyMemberFollower : CharacterBody3D
 	{
 		AddToGroup(GroupName);
 		nameLabel.Text = MemberName;
-		ApplyNpcCharacterMesh();
-		anim.Play("player_animation_library/Idle_A");
-	}
-
-	// Recruited members were world NPCs; the definition matching their name
-	// (recruiting copies DisplayName onto the entity) supplies the rigged
-	// mesh — the same lookup battle visuals use. No match keeps the scene's
-	// Knight body.
-	private void ApplyNpcCharacterMesh()
-	{
-		if (NpcDatabase.FindByDisplayName(MemberName)?.CharacterMesh is not { } characterMesh)
-		{
-			return;
-		}
-		var mesh = characterMesh.Instantiate<Node3D>();
-		// Same 180° flip the scene bakes into its Knight (KayKit characters
-		// come in facing the other way; TurnMeshToward treats local +Z as
-		// visual forward).
-		mesh.RotateY(Mathf.Pi);
-		AddChild(mesh);
-		meshRoot.QueueFree();
-		meshRoot = mesh;
-		// player_animation_library clips address the rig as
-		// "Rig_Medium/Skeleton3D/...", so the animation root must be the
-		// character scene root, exactly where "../Knight" pointed.
-		anim.RootNode = anim.GetPathTo(mesh);
+		// Recruited members were world NPCs; the definition matching their
+		// name (recruiting copies DisplayName onto the entity) supplies the
+		// rig — the same lookup battle visuals use. No match wears the
+		// player's Knight rig.
+		var rigScene = NpcDatabase.FindByDisplayName(MemberName)?.Rig
+			?? GD.Load<PackedScene>(FallbackRigPath);
+		rig = rigScene.Instantiate<CharacterRig>();
+		AddChild(rig);
+		rig.Play(CharacterRig.IdleClip);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -124,20 +103,20 @@ public partial class PartyMemberFollower : CharacterBody3D
 		MoveAndSlide();
 
 		// Same placeholder two-state switch as Player until an AnimationTree.
-		anim.Play(new Vector2(Velocity.X, Velocity.Z).Length() > 0.1f
-			? "player_animation_library/Running_A"
-			: "player_animation_library/Idle_A");
+		rig.Play(new Vector2(Velocity.X, Velocity.Z).Length() > 0.1f
+			? CharacterRig.RunClip
+			: CharacterRig.IdleClip);
 	}
 
 	public static Vector3 BehindLeaderOffset(int followIndex) => new(0.6f * followIndex, 0, 1.5f * followIndex);
 
 	private void TurnMeshToward(Vector3 direction, float delta)
 	{
-		// The body's visual forward is local +Z (the baked 180° flip), same
+		// A rig's visual forward is local +Z (CharacterRig convention), same
 		// as Player's Knight.
 		float targetYaw = Mathf.Atan2(direction.X, direction.Z);
-		Vector3 meshRotation = meshRoot.Rotation;
-		meshRotation.Y = Mathf.LerpAngle(meshRotation.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * delta));
-		meshRoot.Rotation = meshRotation;
+		Vector3 rigRotation = rig.Rotation;
+		rigRotation.Y = Mathf.LerpAngle(rigRotation.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * delta));
+		rig.Rotation = rigRotation;
 	}
 }

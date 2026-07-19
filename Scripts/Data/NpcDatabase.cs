@@ -34,7 +34,7 @@ public static class NpcDatabase
 
     // The definition wearing this display name, or null. Battle visuals use
     // it to map recruited party members — which persist only a name — back to
-    // their NPC's CharacterMesh.
+    // their NPC's Rig.
     public static NpcDefinition FindByDisplayName(string displayName) =>
         Index.FindByDisplayName(displayName);
 

@@ -2,7 +2,7 @@ using Godot;
 
 // One stack in an NpcDefinition's starting inventory: a typed sub-resource
 // that renders as an editable list in the inspector, replacing the parallel
-// int[] exports ShopkeeperNpc used to need (Godot can't export a
+// int[] exports the old shopkeeper NPC used to need (Godot can't export a
 // Dictionary<uint, uint>).
 //
 // .tres files reference this script by path, so it must not move.
