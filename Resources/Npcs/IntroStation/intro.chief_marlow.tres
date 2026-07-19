@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
 [ext_resource type="PackedScene" uid="uid://bnpcbounty7d4" path="res://Scenes/Npc/BountyGiverNpc.tscn" id="2_role"]
-[ext_resource type="PackedScene" uid="uid://bkt46g68x3xmp" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb" id="3_mesh"]
+[ext_resource type="PackedScene" uid="uid://crigknight1d4" path="res://Scenes/Characters/Rigs/Knight.tscn" id="3_mesh"]
 
 [resource]
 script = ExtResource("1_def")
@@ -13,6 +13,6 @@ ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(8, 0.55, -9)
 RotationDegreesY = 0.0
 NpcScene = ExtResource("2_role")
-CharacterMesh = ExtResource("3_mesh")
+Rig = ExtResource("3_mesh")
 BodyColor = Color(0.95, 0.65, 0.15, 1)
 Credits = 0

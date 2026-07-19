@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
 [ext_resource type="Script" path="res://Scripts/Data/NpcItemStack.cs" id="2_stack"]
 [ext_resource type="PackedScene" uid="uid://cnpcshopkp8e5" path="res://Scenes/Npc/ShopkeeperNpc.tscn" id="3_role"]
-[ext_resource type="PackedScene" uid="uid://pih4ood85ydw" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb" id="4_mesh"]
+[ext_resource type="PackedScene" uid="uid://crigmage2e4f" path="res://Scenes/Characters/Rigs/Mage.tscn" id="4_mesh"]
 
 [sub_resource type="Resource" id="Resource_cutter"]
 script = ExtResource("2_stack")
@@ -29,7 +29,7 @@ ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(0, 0.05, -3.2)
 RotationDegreesY = 180.0
 NpcScene = ExtResource("3_role")
-CharacterMesh = ExtResource("4_mesh")
+Rig = ExtResource("4_mesh")
 BodyColor = Color(0.85, 0.65, 0.2, 1)
 Credits = 400
 InitialItems = Array[ExtResource("2_stack")]([SubResource("Resource_cutter"), SubResource("Resource_plating"), SubResource("Resource_medkits")])

@@ -44,10 +44,11 @@ public partial class NpcDefinition : Resource, INpcDefinition
 	[Export]
 	public PackedScene NpcScene { get; set; }
 
-	// Rigged character scene (KayKit gltf). Null keeps the placeholder
-	// capsule, tinted by BodyColor.
+	// Rig wrapper scene (Scenes/Characters/Rigs/*.tscn): the character model
+	// with its AnimationPlayer pre-wired, root script CharacterRig. Null
+	// keeps the placeholder capsule, tinted by BodyColor.
 	[Export]
-	public PackedScene CharacterMesh { get; set; }
+	public PackedScene Rig { get; set; }
 
 	[Export]
 	public Color BodyColor { get; set; } = Colors.White;

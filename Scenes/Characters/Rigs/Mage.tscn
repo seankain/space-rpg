@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://crigmage2e4f"]
+
+[ext_resource type="Script" uid="uid://c7rigchar5cs1" path="res://Scripts/CharacterRig.cs" id="1_rig"]
+[ext_resource type="PackedScene" uid="uid://pih4ood85ydw" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb" id="2_model"]
+[ext_resource type="AnimationLibrary" uid="uid://cgkt2fhrfo21d" path="res://ThirdParty/AnimationLibrary/player_animation_library.tres" id="3_anim"]
+
+[node name="MageRig" type="Node3D" node_paths=PackedStringArray("Anim")]
+script = ExtResource("1_rig")
+Anim = NodePath("AnimationPlayer")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+root_node = NodePath("../Model")
+libraries/player_animation_library = ExtResource("3_anim")

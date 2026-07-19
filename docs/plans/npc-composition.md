@@ -37,7 +37,7 @@ Rogue.tscn
 - `CharacterRig.cs`: a tiny script exposing the `AnimationPlayer` (exported reference) and a `Play(name)` convenience. Convention: visual forward is local **+Z** after the baked flip, matching `Npc.FacePlayer` and `PartyMemberFollower.TurnMeshToward`.
 - `NpcDefinition.CharacterMesh` becomes `Rig` (a `PackedScene` of a wrapper). `Npc._Ready` instantiates it, drops the capsule, and calls `Play("Idle_Talking")` — the `RootNode` retargeting hack is deleted, along with the base scene's own `AnimationPlayer`.
 - `PartyMemberFollower` and `BattleScene` consume the same wrappers, deleting the other two copies of the surgery. This also fixes their `FindByDisplayName` mesh lookups wholesale, since the rig arrives ready to play.
-- **Track addressing (one-time content fix):** pick the rig scene root as the canonical `AnimationPlayer` root and make `NpcAnimLib`'s clips address `Rig_Medium/Skeleton3D/…` like `player_animation_library` already does. One library convention, wired once, in one place.
+- **Track addressing (resolved during Phase 1):** inspecting the clips showed `Idle_Talking.res` doesn't just address the rig differently — it targets the *UAL2 skeleton* (`DEF-*` bones), which doesn't exist on KayKit characters, so the NPC idle was a silent no-op all along. Rather than retarget it, rigs carry the shared `player_animation_library` (whose `Rig_Medium/Skeleton3D/…` addressing is runtime-proven by `Player.tscn`) and NPCs idle with `Idle_A`; `NpcAnimLib` is deleted. The same root fix un-breaks the battle idle/death clips, which were rooted at the skeleton's parent where their `Rig_Medium/…` tracks couldn't resolve.
 - The tinted-capsule fallback stays for rig-less definitions, so nothing blocks on art.
 
 ### Role resources
@@ -87,10 +87,10 @@ Concrete roles port the existing subclasses 1:1 — `QuestGiverRole`, `BountyGiv
 
 ---
 
-## Phase 1 — Rig subscenes
+## Phase 1 — Rig subscenes *(implemented)*
 
-1. `CharacterRig.cs` + wrapper scenes for the characters in use (Rogue, Barbarian, Knight, Mage/others per the intro `.tres` files), with the track-addressing standardization.
-2. `NpcDefinition.Rig`; `Npc`, `PartyMemberFollower`, and `BattleScene` switch to instantiating wrappers; delete all three retarget code paths.
+1. `CharacterRig.cs` + wrapper scenes for the characters in use (`Scenes/Characters/Rigs/`: RogueHooded, Barbarian, Ranger, Knight, Mage), each carrying `player_animation_library` with its root pre-wired (see the track-addressing note above).
+2. `NpcDefinition.Rig` (renamed from `CharacterMesh`, `.tres` files re-pointed at wrappers); `Npc`, `PartyMemberFollower`, and `BattleScene` instantiate wrappers; all three retarget code paths deleted, along with `Npc.tscn`'s `AnimationPlayer` and the follower scene's baked-in Knight (the Knight *rig* is now its runtime fallback, and the battle player mesh — sharing that rig — moved from the FBX to the GLB Knight import).
 
 **Done when:** every intro NPC, follower, and battle combatant renders through a rig wrapper, idle/battle animations play, and no runtime `RootNode` retargeting remains.
 

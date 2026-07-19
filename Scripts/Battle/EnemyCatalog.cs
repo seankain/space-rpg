@@ -12,9 +12,9 @@ public class EnemyDefinition
     public List<uint> PowerIds { get; set; } = new();
     public uint XpReward { get; set; }
     // Stable id of the world NPC this enemy embodies (NpcDefinition.NpcId).
-    // The battle scene borrows that NPC's rigged CharacterMesh; empty for
-    // enemies without a world NPC (drones, summoned mooks), which fall back
-    // to the placeholder capsule.
+    // The battle scene borrows that NPC's Rig; empty for enemies without a
+    // world NPC (drones, summoned mooks), which fall back to the
+    // placeholder capsule.
     public string NpcId { get; set; } = "";
     // Placeholder capsule tint for enemies without a rigged mesh.
     public Color BodyColor { get; set; } = Colors.Red;

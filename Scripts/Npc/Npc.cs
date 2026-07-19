@@ -13,7 +13,7 @@ public partial class Npc : CharacterBody3D
 	[Export]
 	public string DisplayName = "NPC";
 
-	// Placeholder capsule tint for NPCs without a CharacterMesh.
+	// Placeholder capsule tint for NPCs without a Rig.
 	[Export]
 	public Color BodyColor = Colors.White;
 
@@ -56,9 +56,9 @@ public partial class Npc : CharacterBody3D
 
 	public override void _Ready()
 	{
-		if (Definition?.CharacterMesh is { } characterMesh)
+		if (Definition?.Rig is { } rigScene)
 		{
-			AddCharacterMesh(characterMesh);
+			AddRig(rigScene);
 		}
 		else if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } mesh)
 		{
@@ -134,29 +134,17 @@ public partial class Npc : CharacterBody3D
 		}
 	}
 
-	// Swaps the placeholder capsule for the definition's rigged character
-	// scene (a KayKit gltf) and points the idle animation at its skeleton.
-	private void AddCharacterMesh(PackedScene characterMesh)
+	// Swaps the placeholder capsule for the definition's rig wrapper, which
+	// arrives forward-flipped and animation-wired (CharacterRig).
+	private void AddRig(PackedScene rigScene)
 	{
-		var mesh = characterMesh.Instantiate<Node3D>();
-		// KayKit characters model forward as -Z; NPC bodies treat +Z as
-		// forward (FacePlayer), the same flip Player.tscn applies to its
-		// Knight.
-		mesh.RotateY(Mathf.Pi);
-		AddChild(mesh);
+		var rig = rigScene.Instantiate<CharacterRig>();
+		AddChild(rig);
 		if (GetNodeOrNull<MeshInstance3D>("MeshInstance3D") is { } capsule)
 		{
 			capsule.QueueFree();
 		}
-		// Idle_Talking's tracks address the rig as "Skeleton3D/...", so the
-		// animation root must be the node that directly contains the
-		// skeleton (Rig_Medium in the KayKit scenes).
-		if (GetNodeOrNull<AnimationPlayer>("AnimationPlayer") is { } anim
-			&& mesh.FindChild("Skeleton3D", recursive: true, owned: false) is Skeleton3D skeleton)
-		{
-			anim.RootNode = anim.GetPathTo(skeleton.GetParent());
-			anim.Play("NpcAnimLib/Idle_Talking");
-		}
+		rig.Play(CharacterRig.IdleClip);
 	}
 
 	private void FacePlayer()

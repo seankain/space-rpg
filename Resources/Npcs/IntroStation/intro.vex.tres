@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_def"]
 [ext_resource type="PackedScene" uid="uid://dnpcbattle6c3" path="res://Scenes/Npc/BattleNpc.tscn" id="2_role"]
-[ext_resource type="PackedScene" uid="uid://dwba76j37jo7q" path="res://ThirdParty/KayKit_Adventurers_2.0_FREE/Characters/gltf/Rogue_Hooded.glb" id="3_mesh"]
+[ext_resource type="PackedScene" uid="uid://crigrogueh1a4" path="res://Scenes/Characters/Rigs/RogueHooded.tscn" id="3_mesh"]
 
 [resource]
 script = ExtResource("1_def")
@@ -13,6 +13,6 @@ ChunkCoords = Vector2i(0, 0)
 LocalPosition = Vector3(4.5, 0.55, -5.5)
 RotationDegreesY = 0.0
 NpcScene = ExtResource("2_role")
-CharacterMesh = ExtResource("3_mesh")
+Rig = ExtResource("3_mesh")
 BodyColor = Color(0.9, 0.2, 0.2, 1)
 Credits = 0
