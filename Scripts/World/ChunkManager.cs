@@ -9,7 +9,9 @@ using System.Collections.Generic;
 // adjacent chunks tile seamlessly.
 public partial class ChunkManager : Node3D
 {
-    public const float ChunkSize = 64f;
+    // Aliased from MapProjection so the streaming grid and the world-map
+    // bake/UI can never disagree about chunk dimensions.
+    public const float ChunkSize = MapProjection.ChunkSize;
 
     [Export]
     public string ChunkDirectory = "res://Scenes/Levels/Chunks/IntroStation";
@@ -34,7 +36,10 @@ public partial class ChunkManager : Node3D
 
     public override void _Ready()
     {
-        DiscoverChunks();
+        foreach (var (coord, path) in DiscoverChunks(ChunkDirectory))
+        {
+            available[coord] = path;
+        }
         // The player is added by Level after this node readies, so the
         // starting neighborhood is loaded synchronously — the ground has to
         // exist before the player's first physics frame.
@@ -66,16 +71,18 @@ public partial class ChunkManager : Node3D
         UnloadFarChunks(center);
     }
 
-    // The chunk grid is discovered from the file names in ChunkDirectory, so
-    // authoring a new chunk is just saving Chunk_<x>_<z>.tscn there — no
-    // manifest to keep in sync.
-    private void DiscoverChunks()
+    // The chunk grid is discovered from the file names in a chunk directory,
+    // so authoring a new chunk is just saving Chunk_<x>_<z>.tscn there — no
+    // manifest to keep in sync. Static so the editor map baker walks the same
+    // grid the game streams.
+    public static Dictionary<Vector2I, string> DiscoverChunks(string chunkDirectory)
     {
-        using var dir = DirAccess.Open(ChunkDirectory);
+        var chunks = new Dictionary<Vector2I, string>();
+        using var dir = DirAccess.Open(chunkDirectory);
         if (dir == null)
         {
-            GD.PushError($"Chunk directory '{ChunkDirectory}' not found.");
-            return;
+            GD.PushError($"Chunk directory '{chunkDirectory}' not found.");
+            return chunks;
         }
         foreach (var file in dir.GetFiles())
         {
@@ -89,11 +96,12 @@ public partial class ChunkManager : Node3D
             if (parts.Length != 3 || parts[0] != "Chunk"
                 || !int.TryParse(parts[1], out var x) || !int.TryParse(parts[2], out var z))
             {
-                GD.PushWarning($"Ignoring '{ChunkDirectory}/{name}': chunk scenes must be named Chunk_<x>_<z>.tscn.");
+                GD.PushWarning($"Ignoring '{chunkDirectory}/{name}': chunk scenes must be named Chunk_<x>_<z>.tscn.");
                 continue;
             }
-            available[new Vector2I(x, z)] = $"{ChunkDirectory}/{name}";
+            chunks[new Vector2I(x, z)] = $"{chunkDirectory}/{name}";
         }
+        return chunks;
     }
 
     // Where the player is about to appear: the saved position when resuming a

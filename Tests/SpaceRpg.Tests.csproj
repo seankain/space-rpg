@@ -16,5 +16,9 @@
     <Compile Include="../Scripts/Data/**/*.cs" LinkBase="GameSource/Data"
              Exclude="../Scripts/Data/NpcDefinition.cs;../Scripts/Data/NpcItemStack.cs;../Scripts/Data/NpcDatabase.cs" />
     <Compile Include="../Scripts/Save/SaveRepository.cs" Link="GameSource/SaveRepository.cs" />
+    <!-- World-map core: pixel/world math and the baked landmarks format.
+         The Godot-facing baker (MapBaker) and streaming (ChunkManager) stay out. -->
+    <Compile Include="../Scripts/World/MapProjection.cs" Link="GameSource/MapProjection.cs" />
+    <Compile Include="../Scripts/World/MapLandmark.cs" Link="GameSource/MapLandmark.cs" />
   </ItemGroup>
 </Project>

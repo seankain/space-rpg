@@ -21,12 +21,12 @@ Goal: fill the empty **Map** tab in the in-game menu with a top-down map of the 
 
 ---
 
-## Phase 1 — Editor bake tool: top-down chunk capture
+## Phase 1 — Editor bake tool: top-down chunk capture *(done — this slice)*
 
-1. `Scripts/Editor/MapBaker.cs`: an `EditorScript` (run via File → Run, promoted to an `EditorPlugin` menu item in Phase 4) that iterates every area directory under `Scenes/Levels/Chunks/`.
-2. For each `Chunk_<x>_<z>.tscn`: instantiate it into an offscreen `SubViewport` (256×256, transparent clear color → filled with a dark "space" background color at save time), add a fixed `DirectionalLight3D` for consistent shading, and an orthographic `Camera3D` looking straight down (`size = 64`, positioned well above the tallest geometry, cull mask excluding the prompt/VFX layer).
-3. Wait the two frames Godot needs to draw a `SubViewport`, grab `GetViewport().GetTexture().GetImage()`, and save the PNG to `Resources/Maps/<AreaName>/`. All camera/light settings are constants so re-bakes are deterministic and diff cleanly.
-4. While each chunk is instantiated, walk its nodes and collect landmark entries (Phase 3 consumes these): every `Portal` (type `portal`, name from `TargetDisplayName`) and `Door` (type `door`), with positions converted to world space via the chunk's grid coordinate. Write `landmarks.json` per area.
+1. `Scripts/Editor/MapBaker.cs`: an `EditorScript` (run via File → Run, promoted to an `EditorPlugin` menu item in Phase 4) that iterates every area directory under `Scenes/Levels/Chunks/`, walking the grid through a now-static `ChunkManager.DiscoverChunks` so baker and streaming share one file-name convention.
+2. For each `Chunk_<x>_<z>.tscn`: instantiate it into an offscreen own-world `SubViewport` (256×256, dark "space" background color via the camera environment), with a fixed `DirectionalLight3D` plus ambient fill for consistent shading, and an orthographic `Camera3D` looking straight down (`size = 64`, image top = world −Z, cull mask excluding the reserved hidden-from-map layer 20).
+3. Force the renderer to draw (twice — once to upload freshly instanced meshes, once for the settled frame), grab the viewport image, and save the PNG to `Resources/Maps/<AreaName>/`. All camera/light settings are constants so re-bakes are deterministic and diff cleanly.
+4. While each chunk is instantiated, walk its nodes and collect landmark entries (Phase 3 consumes these): every `Portal` (type `portal`, name from `TargetDisplayName`) and entrance `Door` (type `door`), with positions converted to world space via the chunk's grid coordinate. Write `landmarks.json` per area (`MapLandmarksFile`, engine-free and unit-tested alongside `MapProjection`).
 
 **Done when:** running the bake produces a PNG per chunk for `IntroStation` and `World1` plus a `landmarks.json` per area, and re-running after editing a chunk scene visibly updates that chunk's image and nothing else.
 
