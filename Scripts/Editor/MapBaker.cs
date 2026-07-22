@@ -1,6 +1,7 @@
 #if TOOLS
 using Godot;
 using System.Linq;
+using System.Threading.Tasks;
 
 // Bakes the world map: one top-down PNG per level chunk, plus a landmarks
 // manifest per area, into Resources/Maps/<AreaName>/. Re-run it whenever
@@ -13,9 +14,12 @@ using System.Linq;
 //
 // Capture works by instantiating each Chunk_<x>_<z>.tscn under an offscreen
 // SubViewport with its own world, an orthographic camera looking straight
-// down (image top = world -Z, matching MapProjection), and forcing the
-// renderer to draw. Chunk scripts are not [Tool], so instancing here runs no
-// gameplay code — the bake never mutates chunk scenes.
+// down (image top = world -Z, matching MapProjection), then letting the
+// renderer draw a few real frames before reading the texture back. The wait
+// matters: a synchronous grab returns black because the viewport hasn't
+// drawn yet, and chunk floors are CSGBox3D whose meshes only cook during an
+// idle step, not on instantiation. Chunk scripts are not [Tool], so
+// instancing here runs no gameplay code — the bake never mutates chunk scenes.
 [Tool]
 public partial class MapBaker : EditorScript
 {
@@ -36,7 +40,15 @@ public partial class MapBaker : EditorScript
 
     private static readonly Color SpaceBackground = new(0.05f, 0.06f, 0.09f);
 
-    public override void _Run()
+    // Rendered frames to wait per chunk before reading the texture back.
+    // Covers CSG mesh cooking (a deferred idle step) plus GPU upload, then a
+    // settled frame to capture.
+    private const int SettleFrames = 3;
+
+    // async because capture waits on real rendered frames (see BakeArea).
+    // Godot keeps pumping frames while this coroutine is suspended, so the
+    // awaits resume as the editor draws.
+    public override async void _Run()
     {
         using var root = DirAccess.Open(ChunksRoot);
         if (root == null)
@@ -52,7 +64,7 @@ public partial class MapBaker : EditorScript
         {
             foreach (var areaName in root.GetDirectories())
             {
-                BakeArea(areaName, viewport);
+                await BakeArea(areaName, viewport);
             }
         }
         finally
@@ -61,9 +73,10 @@ public partial class MapBaker : EditorScript
         }
         // Pick up the new/updated PNGs so they import as textures right away.
         EditorInterface.Singleton.GetResourceFilesystem().Scan();
+        GD.Print("MapBaker: done.");
     }
 
-    private static void BakeArea(string areaName, SubViewport viewport)
+    private async Task BakeArea(string areaName, SubViewport viewport)
     {
         var chunks = ChunkManager.DiscoverChunks($"{ChunksRoot}/{areaName}");
         if (chunks.Count == 0)
@@ -78,10 +91,13 @@ public partial class MapBaker : EditorScript
         {
             var chunk = GD.Load<PackedScene>(scenePath).Instantiate<Node3D>();
             viewport.AddChild(chunk);
-            // Two forced draws: the first uploads freshly instanced meshes,
-            // the second is the settled frame we capture.
-            RenderingServer.ForceDraw();
-            RenderingServer.ForceDraw();
+            // Wait for real drawn frames before reading back: the first lets
+            // CSG floors cook and meshes upload, the rest settle the image.
+            // Reading immediately (or after ForceDraw) yields a black texture.
+            for (var frame = 0; frame < SettleFrames; frame++)
+            {
+                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+            }
             var image = viewport.GetTexture().GetImage();
             var pngPath = $"{areaDir}/Chunk_{coord.X}_{coord.Y}.png";
             var error = image.SavePng(pngPath);
@@ -150,7 +166,8 @@ public partial class MapBaker : EditorScript
             Name = "MapBakeViewport",
             Size = new Vector2I(MapProjection.ChunkPixels, MapProjection.ChunkPixels),
             OwnWorld3D = true,
-            Msaa3D = Viewport.Msaa.Msaa4X,
+            // No MSAA: on the Compatibility renderer, reading back a
+            // multisampled 3D target is a known source of black images.
             RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
         };
         var camera = new Camera3D
