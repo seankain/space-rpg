@@ -49,13 +49,13 @@ Goal: fill the empty **Map** tab in the in-game menu with a top-down map of the 
 
 **Done when:** the intro station map shows a store icon at the shopkeeper and a portal icon at the portal, each in the correct map position at any zoom, with a readable name on hover.
 
-## Phase 4 — One-click regeneration in the editor
+## Phase 4 — One-click regeneration in the editor *(done — this slice)*
 
-1. Promote `MapBaker` to a proper `EditorPlugin` (`addons/map_baker/`): a **Project → Tools → Bake World Maps** menu item that re-bakes everything, and a per-area option when that's ever slow.
-2. Staleness detection instead of silent drift: the bake writes each source scene's file hash into a small `bake_manifest.json` per area. A unit test in `Tests/` walks every `Chunk_*.tscn`, and fails with "map image missing or stale — run Bake World Maps" when a chunk has no image or its recorded hash doesn't match. This makes CI the reminder, without needing the editor in CI.
-3. Optional convenience: hook the editor's `resource_saved` signal in the plugin to auto-rebake just the saved chunk scene, so the common author-loop (edit chunk → save → check map) needs zero clicks.
+1. `addons/map_baker/` is a proper `EditorPlugin` (`MapBakerPlugin`) adding a **Project → Tools → Bake World Maps** menu item, enabled in `project.godot`. The bake logic moved into a shared `MapBakeJob` that both the plugin and the `MapBaker` File → Run script call; `MapBakeJob.BakeAreaAsync` re-bakes a single area.
+2. Staleness detection instead of silent drift: each bake writes a `bake_manifest.json` per area mapping every chunk scene file to a content hash (`MapBakeManifest`, engine-free and shared with the test so both hash identically, with newline normalization so CRLF checkouts don't read as drift). `WorldMapBakeFreshnessTests` walks every committed area map and fails with "run Project → Tools → Bake World Maps" when a chunk has no image, is missing from the manifest, has a changed hash, or the manifest names a deleted chunk. An area with no committed bake yet is left alone (this catches drift, not "not baked"), so the suite stays green until the workflow is adopted.
+3. Auto-rebake: `MapBakerPlugin` connects the editor's `scene_saved` signal and, when a saved scene is a `Chunks/<Area>/Chunk_<x>_<z>.tscn`, re-bakes just that area — the author loop (edit chunk → save → check map) needs zero clicks. A `baking` guard prevents a manual bake and a save-triggered bake from racing for the capture viewport.
 
-**Done when:** after editing a chunk, either saving auto-refreshes its map image or the test suite fails until the menu item is run; a fresh clone with stale bakes cannot pass CI unnoticed.
+**Done when:** after editing a chunk, saving auto-refreshes that area's map images, and a committed map that goes stale fails the test suite until re-baked. *(Bake output — `Resources/Maps/**` — must be committed for the freshness test to guard an area.)*
 
 ## Phase 5 — Polish and stretch
 

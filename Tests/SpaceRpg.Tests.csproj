@@ -20,5 +20,6 @@
          The Godot-facing baker (MapBaker) and streaming (ChunkManager) stay out. -->
     <Compile Include="../Scripts/World/MapProjection.cs" Link="GameSource/MapProjection.cs" />
     <Compile Include="../Scripts/World/MapLandmark.cs" Link="GameSource/MapLandmark.cs" />
+    <Compile Include="../Scripts/World/MapBakeManifest.cs" Link="GameSource/MapBakeManifest.cs" />
   </ItemGroup>
 </Project>
