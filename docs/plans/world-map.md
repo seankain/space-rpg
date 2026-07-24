@@ -39,13 +39,13 @@ Goal: fill the empty **Map** tab in the in-game menu with a top-down map of the 
 
 **Done when:** opening the Map tab in the intro station shows the four chunk images seamlessly tiled, with the player arrow at the right spot and heading, live-updating; pan and zoom work; opening it inside an interior shows the fallback message instead of erroring.
 
-## Phase 3 — Landmark icons
+## Phase 3 — Landmark icons *(done — this slice)*
 
-1. Icon assets: two new small PNGs in `Icons/` (portal swirl, store tag), plus the arrow from Phase 2. Simple flat glyphs at ~32 px, drawn to read at map scale.
+1. Icons are drawn in code (`Scripts/MapLandmarkIcon.cs`, a `Control` with `_Draw`), not committed PNGs — the same choice as the Phase 2 player arrow: no binary assets to theme, and being a `Control` each icon gets a hover tooltip for free. Three glyphs: a portal ring, a doorway, and a store bag.
 2. `MapMenu` merges two landmark sources on open:
-   - **Baked:** parse the area's `landmarks.json` for portals and doors.
-   - **Live data:** query `NpcDatabase` for the current level's definitions whose `Roles` contain a `ShopkeeperRole`; world position is `ChunkCoords·64 + LocalPosition`.
-3. Each landmark becomes an icon `TextureRect` overlaid at its `MapProjection` position, scaling its *position* with zoom but keeping constant on-screen icon size. Hovering (or focusing, for controller) shows the display name — "Travel to World 1", "Shopkeeper".
+   - **Baked:** `AddBakedLandmarks` parses the area's `landmarks.json` (portals and doors) if it exists — a missing manifest (un-baked area) is silently empty.
+   - **Live data:** `AddShopkeeperLandmarks` walks the chunk grid via `NpcDatabase.ForChunk(levelScenePath, coord)` and keeps definitions whose `Roles` contain a `ShopkeeperRole`; world position is `ChunkCoords·64 + LocalPosition` through `MapProjection`. (In IntroStation the shop is an *interior* reached by a `Door`, so the store shows up as the baked door landmark; the shopkeeper path yields icons only where a keeper stands in an open-world chunk.)
+3. Each landmark is a `MapLandmarkIcon` on the same `world` layer, centered on its `MapProjection` pixel and counter-scaled against zoom so its position tracks the map but its on-screen size stays constant. Hovering shows the display name (the portal/door `TargetDisplayName`, or the shopkeeper's name) as a tooltip.
 
 **Done when:** the intro station map shows a store icon at the shopkeeper and a portal icon at the portal, each in the correct map position at any zoom, with a readable name on hover.
 

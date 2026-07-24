@@ -29,6 +29,10 @@ public partial class MapMenu : Control
     private Label fallback;
     private Polygon2D playerMarker;
 
+    // Landmark icons on the world layer, kept so their counter-scale can track
+    // the zoom (they stay a constant on-screen size).
+    private readonly List<Control> landmarkIcons = new();
+
     private float zoom = 1f;
     private bool dragging;
 
@@ -138,6 +142,7 @@ public partial class MapMenu : Control
             child.QueueFree();
         }
         playerMarker = null;
+        landmarkIcons.Clear();
         hasMap = false;
 
         var chunkManager = FindChunkManager(LevelManager.Instance?.LevelRoot);
@@ -173,6 +178,7 @@ public partial class MapMenu : Control
             (maxChunkZ - minChunkZ + 1) * MapProjection.ChunkPixels);
 
         BuildChunkTiles(grid.Keys, areaName);
+        BuildLandmarks(areaName, grid.Keys, chunkManager);
         BuildPlayerMarker();
 
         fallback.Visible = false;
@@ -207,6 +213,93 @@ public partial class MapMenu : Control
             world.AddChild(tile);
         }
     }
+
+    // Two landmark sources, by design (see docs/plans/world-map.md): portals
+    // and doors are scene-authored and baked into landmarks.json; stores are
+    // NPC data, read live from NpcDatabase so moving a shopkeeper's .tres
+    // never leaves a stale manifest.
+    private void BuildLandmarks(string areaName, IEnumerable<Vector2I> coords, ChunkManager chunkManager)
+    {
+        AddBakedLandmarks(areaName);
+        AddShopkeeperLandmarks(coords, LevelScenePathOf(chunkManager));
+    }
+
+    private void AddBakedLandmarks(string areaName)
+    {
+        var path = $"{MapsRoot}/{areaName}/landmarks.json";
+        if (!FileAccess.FileExists(path))
+        {
+            // No bake yet, or an area with no scene-authored landmarks.
+            return;
+        }
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (file == null)
+        {
+            GD.PushWarning($"MapMenu: could not read '{path}': {FileAccess.GetOpenError()}");
+            return;
+        }
+        foreach (var landmark in MapLandmarksFile.FromJson(file.GetAsText()).Landmarks)
+        {
+            AddLandmarkIcon(MapLandmarkIcon.KindFromType(landmark.Type), landmark.Name, landmark.X, landmark.Z);
+        }
+    }
+
+    private void AddShopkeeperLandmarks(IEnumerable<Vector2I> coords, string levelScenePath)
+    {
+        if (string.IsNullOrEmpty(levelScenePath))
+        {
+            return;
+        }
+        foreach (var coord in coords)
+        {
+            foreach (var npc in NpcDatabase.ForChunk(levelScenePath, coord))
+            {
+                if (!HasShopkeeperRole(npc))
+                {
+                    continue;
+                }
+                var worldX = MapProjection.ChunkToWorldX(npc.ChunkCoords.X, npc.LocalPosition.X);
+                var worldZ = MapProjection.ChunkToWorldZ(npc.ChunkCoords.Y, npc.LocalPosition.Z);
+                AddLandmarkIcon(MapLandmarkIcon.LandmarkKind.Store, npc.DisplayName, worldX, worldZ);
+            }
+        }
+    }
+
+    private static bool HasShopkeeperRole(NpcDefinition npc)
+    {
+        foreach (var role in npc.Roles)
+        {
+            if (role is ShopkeeperRole)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void AddLandmarkIcon(MapLandmarkIcon.LandmarkKind kind, string name, float worldX, float worldZ)
+    {
+        const float half = MapLandmarkIcon.Diameter / 2f;
+        var pixel = new Vector2(
+            MapProjection.WorldToPixelX(worldX, minChunkX),
+            MapProjection.WorldToPixelY(worldZ, minChunkZ));
+        var icon = new MapLandmarkIcon
+        {
+            Kind = kind,
+            // Position places the top-left; the icon's pivot is its center, so
+            // the glyph and its counter-scale stay centered on `pixel`.
+            Position = pixel - new Vector2(half, half),
+            Scale = Vector2.One / zoom,
+            TooltipText = name,
+        };
+        world.AddChild(icon);
+        landmarkIcons.Add(icon);
+    }
+
+    // Where the level's NPCs are keyed (same rule ChunkManager spawns by): the
+    // level scene root that owns the ChunkManager.
+    private static string LevelScenePathOf(ChunkManager chunkManager) =>
+        chunkManager.Owner?.SceneFilePath ?? chunkManager.GetParent()?.SceneFilePath ?? "";
 
     private void BuildPlayerMarker()
     {
@@ -298,6 +391,13 @@ public partial class MapMenu : Control
         zoom = newZoom;
         world.Scale = new Vector2(zoom, zoom);
         world.Position = pivot - localBefore * zoom;
+        // Landmarks live on the scaled world layer; counter-scale them so they
+        // keep a constant on-screen size (the player marker does the same in
+        // UpdatePlayerMarker).
+        foreach (var icon in landmarkIcons)
+        {
+            icon.Scale = Vector2.One / zoom;
+        }
     }
 
     private static ChunkManager FindChunkManager(Node node)
