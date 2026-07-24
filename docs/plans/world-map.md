@@ -30,12 +30,12 @@ Goal: fill the empty **Map** tab in the in-game menu with a top-down map of the 
 
 **Done when:** running the bake produces a PNG per chunk for `IntroStation` and `World1` plus a `landmarks.json` per area, and re-running after editing a chunk scene visibly updates that chunk's image and nothing else.
 
-## Phase 2 — Map tab renders the stitched area map
+## Phase 2 — Map tab renders the stitched area map *(done — this slice)*
 
-1. `Scripts/MapMenu.cs` on the `Map` tab control, following the pattern of the sibling tab scripts (`QuestLogMenu`, `InventoryMenu`).
-2. On tab open, resolve the current area: find the running level's `ChunkManager` and take the basename of its `ChunkDirectory` (falls back to a "no map available" label in interiors and unchunked scenes).
-3. Discover `Resources/Maps/<AreaName>/Chunk_*.png` by file name, and place one `TextureRect` per chunk at its grid position inside a container that supports pan (drag) and zoom (wheel / +/− buttons). Chunks with no baked image render as an empty grid cell, not an error.
-4. Player marker: an arrow icon positioned via `MapProjection` from the player's `GlobalPosition` and rotated by the player's Y heading, refreshed each frame while the tab is visible. Add an area-name header (`GameState.LocationName`).
+1. `Scripts/MapMenu.cs` on the `Map` tab control (wired in `InGameMenu.tscn`), refreshing on `VisibilityChanged` like the sibling tab scripts and building its children in code (the tab was an empty `Control`).
+2. On tab open, resolve the current area by walking the running level (`LevelManager.Instance.LevelRoot`) for a `ChunkManager` and taking the basename of its `ChunkDirectory`; interiors and unchunked scenes have no `ChunkManager` and show a "No map available" label.
+3. The chunk grid comes from `ChunkManager.DiscoverChunks` (same discovery the game streams with), and each chunk's `Resources/Maps/<AreaName>/Chunk_<x>_<z>.png` is placed as a `TextureRect` at its grid pixel position on a pannable/zoomable `world` layer inside a clipped window; drag pans, wheel and +/− zoom (wheel zooms toward the cursor), and Recenter frames the player. Chunks with no baked image are skipped (empty cell), not errors.
+4. Player marker: a drawn arrow (no texture asset needed) positioned via `MapProjection` from the player's `GlobalPosition`, rotated to the player's `meshRoot` yaw (north = world −Z), counter-scaled so it stays constant on-screen, and refreshed each frame while the tab is visible. An area-name header shows `GameState.LocationName`.
 
 **Done when:** opening the Map tab in the intro station shows the four chunk images seamlessly tiled, with the player arrow at the right spot and heading, live-updating; pan and zoom work; opening it inside an interior shows the fallback message instead of erroring.
 
