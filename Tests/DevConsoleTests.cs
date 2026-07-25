@@ -129,6 +129,23 @@ public class DevConsoleTests
         Assert.Contains("teleport", registry.Dispatch("help").Message);
     }
 
+    // Release-gate smoke test (in-game-editor plan Phase 6): a release build
+    // never calls RegisterBuiltins, so the registry stays empty and every
+    // mutating verb is rejected. This documents that registration is the gate.
+    [Theory]
+    [InlineData("give 4 2")]
+    [InlineData("place guard.01 Guard here")]
+    [InlineData("savenpc")]
+    [InlineData("quest start 1")]
+    [InlineData("credits 9999")]
+    [InlineData("editor")]
+    public void EmptyRegistryExecutesNoCommand(string line)
+    {
+        var result = new CommandRegistry().Dispatch(line);
+        Assert.False(result.Success);
+        Assert.Contains("Unknown command", result.Message);
+    }
+
     private sealed class StubCommand : IConsoleCommand
     {
         private readonly string message;

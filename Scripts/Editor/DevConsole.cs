@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 // Autoload (registered in project.godot). The in-game developer console
@@ -33,6 +36,12 @@ public partial class DevConsole : CanvasLayer
     private static readonly Color EchoColor = new(0.6f, 0.75f, 0.95f);
     private static readonly Color OkColor = new(0.8f, 0.85f, 0.78f);
     private static readonly Color ErrorColor = new(1f, 0.5f, 0.45f);
+    private static readonly Color HintColor = new(0.6f, 0.62f, 0.66f);
+
+    // Submitted commands, oldest first, walked with Up/Down. historyIndex points
+    // at the entry shown; history.Count means the (empty) live draft.
+    private readonly List<string> history = new();
+    private int historyIndex;
 
     // Editor tooling must never reach a shipped build; when false the toggle is
     // inert and the panel never shows.
@@ -98,6 +107,10 @@ public partial class DevConsole : CanvasLayer
         // Phase 5: quests.
         registry.Register(new QuestCommand());
         registry.Register(new QuestsCommand());
+        // Phase 6: convenience.
+        registry.Register(new SaveCommand());
+        registry.Register(new GotoCommand(this));
+        registry.Register(new ExecCommand(this));
         Print("Developer console. Type 'help' for commands.", OkColor);
     }
 
@@ -154,14 +167,88 @@ public partial class DevConsole : CanvasLayer
 
     public override void _Input(InputEvent @event)
     {
-        if (!enabled || !@event.IsActionPressed("ToggleConsole"))
+        if (!enabled)
         {
             return;
         }
-        // Handle the toggle in _Input (ahead of GUI input) so the tilde
-        // keystroke never leaks into the LineEdit as a stray character.
-        Toggle();
-        GetViewport().SetInputAsHandled();
+        if (@event.IsActionPressed("ToggleConsole"))
+        {
+            // Handle the toggle in _Input (ahead of GUI input) so the tilde
+            // keystroke never leaks into the LineEdit as a stray character.
+            Toggle();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+        if (!Visible || @event is not InputEventKey { Pressed: true, Echo: false } key)
+        {
+            return;
+        }
+        // While open, own Tab (completion) and Up/Down (history) ahead of GUI
+        // input so the LineEdit doesn't traverse focus or the Inventory action
+        // doesn't fire. A single-line LineEdit ignores Up/Down anyway.
+        if (Matches(key, Key.Tab))
+        {
+            CompleteInput();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(key, Key.Up))
+        {
+            NavigateHistory(-1);
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(key, Key.Down))
+        {
+            NavigateHistory(1);
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private static bool Matches(InputEventKey key, Key which) =>
+        key.Keycode == which || key.PhysicalKeycode == which;
+
+    private void NavigateHistory(int direction)
+    {
+        if (history.Count == 0)
+        {
+            return;
+        }
+        historyIndex = Math.Clamp(historyIndex + direction, 0, history.Count);
+        input.Text = historyIndex < history.Count ? history[historyIndex] : "";
+        input.CaretColumn = input.Text.Length;
+    }
+
+    private void CompleteInput()
+    {
+        var completion = CommandCompleter.CompleteLine(input.Text, CompletionCandidates(input.Text));
+        input.Text = completion.Line;
+        input.CaretColumn = input.Text.Length;
+        if (completion.Matches.Count > 1)
+        {
+            Print("  " + string.Join("   ", completion.Matches), HintColor);
+        }
+    }
+
+    // Candidates for the token currently being typed: command names for the
+    // first token, then per-command ids (items, quests, npcs) for known verbs.
+    private IReadOnlyList<string> CompletionCandidates(string line)
+    {
+        var tokens = CommandTokenizer.Tokenize(line);
+        var trailingSpace = line.Length > 0 && char.IsWhiteSpace(line[^1]);
+        var index = trailingSpace ? tokens.Count : Math.Max(0, tokens.Count - 1);
+        if (index == 0)
+        {
+            return registry.All.Select(c => c.Name).ToList();
+        }
+        var command = tokens.Count > 0 ? tokens[0].ToLowerInvariant() : "";
+        return command switch
+        {
+            "give" or "takeitem" when index == 1 => ItemCatalog.All.Select(i => i.Id.ToString()).ToList(),
+            "quest" when index == 1 => new List<string> { "start", "set", "stage", "advance" },
+            "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
+            "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
+            "list" when index == 1 => new List<string> { "npcs" },
+            _ => new List<string>(),
+        };
     }
 
     private void Toggle()
@@ -188,8 +275,24 @@ public partial class DevConsole : CanvasLayer
         {
             return;
         }
-        Print($"] {text}", EchoColor);
-        var result = registry.Dispatch(text);
+        if (history.Count == 0 || history[^1] != text)
+        {
+            history.Add(text);
+        }
+        historyIndex = history.Count;
+        ExecuteLine(text);
+    }
+
+    // Echo a command, dispatch it, and print the result. Shared by interactive
+    // submission and exec scripts.
+    public void ExecuteLine(string line)
+    {
+        if (!enabled || string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+        Print($"] {line}", EchoColor);
+        var result = registry.Dispatch(line);
         if (result.ClearOutput)
         {
             output.Clear();
@@ -199,6 +302,24 @@ public partial class DevConsole : CanvasLayer
         {
             Print(result.Message, result.Success ? OkColor : ErrorColor);
         }
+    }
+
+    // Runs a newline-delimited script: blank lines and #-comments are skipped.
+    // Returns how many commands ran (the ExecCommand reports the count).
+    public int ExecuteScript(string text)
+    {
+        var count = 0;
+        foreach (var raw in (text ?? "").Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line[0] == '#')
+            {
+                continue;
+            }
+            ExecuteLine(line);
+            count++;
+        }
+        return count;
     }
 
     private void Print(string text, Color color)
