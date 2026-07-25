@@ -23,10 +23,14 @@ public partial class DevConsole : CanvasLayer
     // the console being open.
     public static bool IsEditorActive => Instance is { enabled: true, editorActive: true };
 
+    // True while the read-only dialogue viewer (Phase 3) is showing.
+    public static bool IsDialogueViewerOpen => Instance?.dialogueViewer is { Visible: true };
+
     // The single flag gameplay checks to freeze normal play — true while the
-    // console is open or editor mode is active. Guarded cooperatively, the same
-    // way Player/Pickup/Npc check DialogueManager.IsDialogueActive.
-    public static bool BlocksGameplay => IsOpen || IsEditorActive;
+    // console is open, editor mode is active, or the dialogue viewer is up.
+    // Guarded cooperatively, the same way Player/Pickup/Npc check
+    // DialogueManager.IsDialogueActive.
+    public static bool BlocksGameplay => IsOpen || IsEditorActive || IsDialogueViewerOpen;
 
     // The world point the placement marker sits on, or null when editor mode is
     // off or the ray misses. The `here` token (Phase 3) resolves to this.
@@ -58,6 +62,10 @@ public partial class DevConsole : CanvasLayer
     private bool editorActive;
     private EditorCursor cursor;
     private Label editorHud;
+
+    // The read-only dialogue viewer (Phase 3), created on first `dialogue open`
+    // and reused after; null until then, hidden when closed.
+    private DialogueEditorPanel dialogueViewer;
 
     public override void _Ready()
     {
@@ -111,7 +119,51 @@ public partial class DevConsole : CanvasLayer
         registry.Register(new SaveCommand());
         registry.Register(new GotoCommand(this));
         registry.Register(new ExecCommand(this));
+        // Dialogue editor (dialogue-editor plan): read-only viewer.
+        registry.Register(new DialogueCommand(this));
         Print("Developer console. Type 'help' for commands.", OkColor);
+    }
+
+    // Opens the read-only dialogue viewer on a graph by id (Phase 3), creating
+    // the panel on first use. Called by DialogueCommand; returns a result the
+    // console prints.
+    public CommandResult OpenDialogueViewer(string id)
+    {
+        if (!enabled)
+        {
+            return CommandResult.Fail("Editor tooling is disabled in this build.");
+        }
+        var graph = DialogueCatalog.Get(id);
+        if (graph == null)
+        {
+            return CommandResult.Fail($"No dialogue '{id}'. Try 'dialogue list'.");
+        }
+        if (dialogueViewer == null)
+        {
+            dialogueViewer = new DialogueEditorPanel { Closed = () => CloseDialogueViewer() };
+            AddChild(dialogueViewer);
+        }
+        dialogueViewer.ShowGraph(graph);
+        dialogueViewer.Visible = true;
+        // Keep the pointer free so the node list and links are clickable, even
+        // after the console is toggled shut to see the panel in full.
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        return CommandResult.Ok(
+            $"Opened '{id}'. Toggle the console (~) to browse; Esc, Close, or 'dialogue close' to exit.");
+    }
+
+    // Hides the dialogue viewer and restores the pointer (visible if the
+    // console is still open, captured back to gameplay otherwise). Returns
+    // whether it was open.
+    public bool CloseDialogueViewer()
+    {
+        if (dialogueViewer is not { Visible: true })
+        {
+            return false;
+        }
+        dialogueViewer.Visible = false;
+        Input.MouseMode = Visible ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        return true;
     }
 
     // Flips editor mode and returns the new state; called by EditorModeCommand.
@@ -247,6 +299,8 @@ public partial class DevConsole : CanvasLayer
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "list" when index == 1 => new List<string> { "npcs" },
+            "dialogue" when index == 1 => new List<string> { "list", "open", "close" },
+            "dialogue" when index == 2 => DialogueCatalog.Ids.ToList(),
             _ => new List<string>(),
         };
     }
@@ -262,7 +316,10 @@ public partial class DevConsole : CanvasLayer
         }
         else
         {
-            Input.MouseMode = Input.MouseModeEnum.Captured;
+            // Don't recapture the pointer out from under an open viewer panel.
+            Input.MouseMode = IsDialogueViewerOpen
+                ? Input.MouseModeEnum.Visible
+                : Input.MouseModeEnum.Captured;
         }
     }
 
