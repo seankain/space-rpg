@@ -95,6 +95,9 @@ public partial class DevConsole : CanvasLayer
         registry.Register(new TakeItemCommand());
         registry.Register(new CreditsCommand());
         registry.Register(new ItemsCommand());
+        // Phase 5: quests.
+        registry.Register(new QuestCommand());
+        registry.Register(new QuestsCommand());
         Print("Developer console. Type 'help' for commands.", OkColor);
     }
 
