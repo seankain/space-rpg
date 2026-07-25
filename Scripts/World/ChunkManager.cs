@@ -34,6 +34,11 @@ public partial class ChunkManager : Node3D
         Mathf.RoundToInt(worldPosition.X / ChunkSize),
         Mathf.RoundToInt(worldPosition.Z / ChunkSize));
 
+    // The loaded chunk node at a coordinate, or null if it isn't streamed in.
+    // The in-game editor parents a placement preview into the live chunk so it
+    // runs like any streamed NPC (in-game-editor plan Phase 3).
+    public Node3D GetLoadedChunk(Vector2I coord) => loaded.GetValueOrDefault(coord);
+
     public override void _Ready()
     {
         foreach (var (coord, path) in DiscoverChunks(ChunkDirectory))

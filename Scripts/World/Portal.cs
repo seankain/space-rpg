@@ -95,7 +95,7 @@ public partial class Portal : Node3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (playerInRange && !DialogueManager.IsDialogueActive && !ShopMenu.IsShopOpen
-			&& @event.IsActionPressed("Interact"))
+			&& !DevConsole.BlocksGameplay && @event.IsActionPressed("Interact"))
 		{
 			GetViewport().SetInputAsHandled();
 			// Live check, not the state the prompt was drawn with: the item

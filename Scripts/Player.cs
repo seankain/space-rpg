@@ -59,10 +59,12 @@ public partial class Player : CharacterBody3D
 			velocity += GetGravity() * (float)delta;
 		}
 
-		// Conversations and open shop menus lock movement; polled input would
-		// otherwise still fire (e.g. Space both confirms a dialogue choice
-		// and jumps).
-		bool inputLocked = DialogueManager.IsDialogueActive || ShopMenu.IsShopOpen;
+		// Conversations, open shop menus, and the dev console/editor mode lock
+		// movement; polled input would otherwise still fire (e.g. Space both
+		// confirms a dialogue choice and jumps, or WASD typed into the console
+		// walks the player).
+		bool inputLocked = DialogueManager.IsDialogueActive || ShopMenu.IsShopOpen
+			|| DevConsole.BlocksGameplay;
 
 		// Handle Jump.
 		if (!inputLocked && Input.IsActionJustPressed("Jump") && IsOnFloor())

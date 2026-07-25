@@ -38,7 +38,9 @@ public class GameState
     public QUESTSUCCESSSTATE GetQuestState(uint questId) =>
         Quests.FirstOrDefault(q => q.QuestId == questId)?.State ?? QUESTSUCCESSSTATE.Unstarted;
 
-    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
+    // Get-or-create the progress record for a quest, so state changes and stage
+    // edits (the in-game editor's quest commands) share one creation path.
+    public QuestProgress GetOrAddQuestProgress(uint questId)
     {
         var progress = Quests.FirstOrDefault(q => q.QuestId == questId);
         if (progress == null)
@@ -46,8 +48,11 @@ public class GameState
             progress = new QuestProgress { QuestId = questId };
             Quests.Add(progress);
         }
-        progress.State = state;
+        return progress;
     }
+
+    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state) =>
+        GetOrAddQuestProgress(questId).State = state;
 
     public bool IsNpcDefeated(string npcId) => DefeatedNpcs.Contains(npcId);
 

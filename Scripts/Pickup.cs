@@ -63,7 +63,7 @@ public partial class Pickup : Area3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (playerInRange && !DialogueManager.IsDialogueActive && !ShopMenu.IsShopOpen
-			&& @event.IsActionPressed("Interact"))
+			&& !DevConsole.BlocksGameplay && @event.IsActionPressed("Interact"))
 		{
 			GetViewport().SetInputAsHandled();
 			Collect();
