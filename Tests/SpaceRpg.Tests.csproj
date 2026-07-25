@@ -21,5 +21,8 @@
     <Compile Include="../Scripts/World/MapProjection.cs" Link="GameSource/MapProjection.cs" />
     <Compile Include="../Scripts/World/MapLandmark.cs" Link="GameSource/MapLandmark.cs" />
     <Compile Include="../Scripts/World/MapBakeManifest.cs" Link="GameSource/MapBakeManifest.cs" />
+    <!-- In-game editor console: the engine-free command registry, tokenizer,
+         and builtin commands. The DevConsole node itself is Godot-facing. -->
+    <Compile Include="../Scripts/Editor/Commands/**/*.cs" LinkBase="GameSource/Editor/Commands" />
   </ItemGroup>
 </Project>
