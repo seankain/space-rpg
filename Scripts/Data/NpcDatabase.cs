@@ -32,6 +32,12 @@ public static class NpcDatabase
 
     public static NpcDefinition Get(string npcId) => Index.Get(npcId);
 
+    // Drops the cached index so the next access rescans the directory. The
+    // in-game editor calls this after saving a new NpcDefinition .tres
+    // (in-game-editor plan Phase 3) so the freshly authored NPC becomes
+    // discoverable without restarting the game.
+    public static void Invalidate() => index = null;
+
     // The definition wearing this display name, or null. Battle visuals use
     // it to map recruited party members — which persist only a name — back to
     // their NPC's Rig.

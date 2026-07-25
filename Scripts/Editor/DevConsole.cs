@@ -81,6 +81,14 @@ public partial class DevConsole : CanvasLayer
         registry.Register(new EchoCommand());
         registry.Register(new EditorModeCommand(this));
         registry.Register(new EditorModeCommand(this, "edit"));
+        // Phase 3: NPC placement and authoring.
+        registry.Register(new SpawnCommand());
+        registry.Register(new PlaceCommand());
+        registry.Register(new SaveNpcCommand());
+        registry.Register(new NudgeCommand());
+        registry.Register(new RotateCommand());
+        registry.Register(new CancelPlaceCommand());
+        registry.Register(new ListCommand());
         Print("Developer console. Type 'help' for commands.", OkColor);
     }
 
