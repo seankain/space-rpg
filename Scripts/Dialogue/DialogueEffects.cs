@@ -51,7 +51,10 @@ public static class DialogueEffects
                 Recruit(effect, context);
                 break;
             case "start_battle":
-                RequireHost(context, effect)?.StartBattle();
+                // start_battle:despawn removes the loser on the player's win
+                // (a lone challenger); plain start_battle leaves them standing
+                // (a quest-giver whose demand ends in a fight).
+                RequireHost(context, effect)?.StartBattle(effect.Arg(0) == "despawn");
                 break;
             case "open_shop":
                 RequireHost(context, effect)?.OpenShop();

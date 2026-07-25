@@ -13,7 +13,7 @@
         },
         {
           "Label": "Here, take this cube off my hands",
-          "Effect": "take_item:1",
+          "Effects": ["take_item:1"],
           "Visible": "has_item:1",
           "NextNodeId": "thanks"
         },
@@ -27,7 +27,7 @@
       "Id": "medbay",
       "Speaker": "$npc",
       "Text": "Two decks down, follow the green stripe. Here, a medkit for the road.",
-      "OnShownEffect": "give_item:4:1",
+      "OnShownEffects": ["give_item:4:1"],
       "NextNodeId": "farewell"
     },
     {

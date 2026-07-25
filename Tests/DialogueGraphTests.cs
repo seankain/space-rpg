@@ -15,7 +15,14 @@ public class DialogueGraphTests
         public int Shops;
         public readonly List<ulong> Recruited = new();
 
-        public void StartBattle() => Battles++;
+        public bool LastBattleDespawned;
+
+        public void StartBattle(bool despawnOnDefeat)
+        {
+            Battles++;
+            LastBattleDespawned = despawnOnDefeat;
+        }
+
         public void OpenShop() => Shops++;
         public void Recruit(ulong partyCharacterId) => Recruited.Add(partyCharacterId);
     }
@@ -63,13 +70,13 @@ public class DialogueGraphTests
                         new()
                         {
                             Label = "I'll find it",
-                            Effect = EffectRef.Parse("set_quest:1:InProgress"),
+                            Effects = new List<EffectRef> { EffectRef.Parse("set_quest:1:InProgress") },
                             NextNodeId = "thanks",
                         },
                         new()
                         {
                             Label = "Turn it in",
-                            Effect = EffectRef.Parse("take_item:1"),
+                            Effects = new List<EffectRef> { EffectRef.Parse("take_item:1") },
                             Visible = ConditionRef.Parse("has_item:1"),
                             NextNodeId = "done",
                         },
@@ -81,14 +88,18 @@ public class DialogueGraphTests
                     Id = "done",
                     Speaker = DialogueGraph.SpeakerToken,
                     Text = "You have my thanks.",
-                    OnShownEffect = EffectRef.Parse("set_quest:1:Success"),
+                    OnShownEffects = new List<EffectRef>
+                    {
+                        EffectRef.Parse("take_item:1"),
+                        EffectRef.Parse("set_quest:1:Success"),
+                    },
                 },
             },
         };
 
         var json = DialogueSerialization.ToJson(graph);
-        // Effects/conditions serialize as the compact colon token, not a nested
-        // object, so authored files stay terse.
+        // Effects/conditions serialize as the compact colon token (in a JSON
+        // array for the effect lists), not a nested object, so files stay terse.
         Assert.Contains("set_quest:1:Success", json);
         Assert.Contains("has_item:1", json);
 
@@ -99,10 +110,13 @@ public class DialogueGraphTests
 
         var offer = restored.GetNode("offer");
         Assert.Equal(2, offer.Choices.Count);
-        Assert.Equal("set_quest", offer.Choices[0].Effect.Id);
-        Assert.Equal(new[] { "1", "InProgress" }, offer.Choices[0].Effect.Args);
+        Assert.Equal("set_quest", offer.Choices[0].Effects[0].Id);
+        Assert.Equal(new[] { "1", "InProgress" }, offer.Choices[0].Effects[0].Args);
         Assert.Equal("has_item", offer.Choices[1].Visible.Id);
-        Assert.Equal("set_quest:1:Success", restored.GetNode("done").OnShownEffect.ToToken());
+        var done = restored.GetNode("done");
+        Assert.Equal(2, done.OnShownEffects.Count);
+        Assert.Equal("take_item:1", done.OnShownEffects[0].ToToken());
+        Assert.Equal("set_quest:1:Success", done.OnShownEffects[1].ToToken());
     }
 
     // --- Link resolution -----------------------------------------------------
@@ -279,7 +293,7 @@ public class DialogueGraphTests
                     Id = "a",
                     Speaker = DialogueGraph.SpeakerToken,
                     Text = "Done.",
-                    OnShownEffect = EffectRef.Parse("set_quest:1:Success"),
+                    OnShownEffects = new List<EffectRef> { EffectRef.Parse("set_quest:1:Success") },
                 },
             },
         };
@@ -343,13 +357,18 @@ public class DialogueGraphTests
         var host = new FakeHost();
         var context = Context(new GameState(), out _, host);
 
-        DialogueEffects.Run(EffectRef.Parse("start_battle"), context);
+        DialogueEffects.Run(EffectRef.Parse("start_battle:despawn"), context);
         DialogueEffects.Run(EffectRef.Parse("open_shop"), context);
         DialogueEffects.Run(EffectRef.Parse("recruit:2"), context);
 
         Assert.Equal(1, host.Battles);
+        Assert.True(host.LastBattleDespawned);
         Assert.Equal(1, host.Shops);
         Assert.Equal(new List<ulong> { 2ul }, host.Recruited);
+
+        // Plain start_battle leaves the loser standing.
+        DialogueEffects.Run(EffectRef.Parse("start_battle"), context);
+        Assert.False(host.LastBattleDespawned);
     }
 
     // --- Robustness ----------------------------------------------------------
@@ -392,5 +411,117 @@ public class DialogueGraphTests
         DialogueEffects.Run(EffectRef.Parse("start_battle"), context);
 
         Assert.Contains(warnings, w => w.Contains("start_battle"));
+    }
+
+    // --- Routers (Phase 2 state-based branching) -----------------------------
+
+    // A chain of single-condition routers, the shape every migrated greeting
+    // uses: quest done -> done line; in progress + holding item -> turn-in;
+    // in progress -> reminder; otherwise -> offer.
+    private static DialogueGraph GreetingGraph() => new()
+    {
+        Id = "greet",
+        EntryNodeId = "entry",
+        Nodes = new List<DialogueNode>
+        {
+            new()
+            {
+                Id = "entry",
+                Branches = new List<DialogueBranch>
+                {
+                    new() { When = ConditionRef.Parse("quest_state:1:Success"), ToNodeId = "done" },
+                    new() { When = ConditionRef.Parse("quest_state:1:InProgress"), ToNodeId = "inprogress" },
+                    new() { ToNodeId = "offer" },
+                },
+            },
+            new()
+            {
+                Id = "inprogress",
+                Branches = new List<DialogueBranch>
+                {
+                    new() { When = ConditionRef.Parse("has_item:1"), ToNodeId = "turnin" },
+                    new() { ToNodeId = "reminder" },
+                },
+            },
+            Line("done", "All done."),
+            Line("turnin", "Hand it over."),
+            Line("reminder", "Any luck?"),
+            Line("offer", "Care to help?"),
+        },
+    };
+
+    [Fact]
+    public void RouterPicksFirstMatchingBranch()
+    {
+        var graph = GreetingGraph();
+
+        var offer = DialogueRuntime.Compile(graph, Context(new GameState(), out _));
+        Assert.Equal("Care to help?", offer.Text);
+
+        var inProgress = new GameState();
+        inProgress.SetQuestState(1, QUESTSUCCESSSTATE.InProgress);
+        Assert.Equal("Any luck?", DialogueRuntime.Compile(graph, Context(inProgress, out _)).Text);
+
+        var holding = new GameState();
+        holding.SetQuestState(1, QUESTSUCCESSSTATE.InProgress);
+        holding.Inventory.Add(ItemCatalog.MaguffinCubeId);
+        Assert.Equal("Hand it over.", DialogueRuntime.Compile(graph, Context(holding, out _)).Text);
+
+        var done = new GameState();
+        done.SetQuestState(1, QUESTSUCCESSSTATE.Success);
+        Assert.Equal("All done.", DialogueRuntime.Compile(graph, Context(done, out _)).Text);
+    }
+
+    [Fact]
+    public void RouterCycleIsReportedNotHung()
+    {
+        var graph = new DialogueGraph
+        {
+            Id = "spin",
+            EntryNodeId = "a",
+            Nodes = new List<DialogueNode>
+            {
+                new() { Id = "a", Branches = new List<DialogueBranch> { new() { ToNodeId = "b" } } },
+                new() { Id = "b", Branches = new List<DialogueBranch> { new() { ToNodeId = "a" } } },
+            },
+        };
+
+        var context = Context(new GameState(), out var warnings);
+        var root = DialogueRuntime.Compile(graph, context);
+
+        Assert.Null(root);
+        Assert.Contains(warnings, w => w.Contains("cycle"));
+    }
+
+    [Fact]
+    public void OnShownRunsEveryEffectInOrder()
+    {
+        var state = new GameState();
+        state.Inventory.Add(ItemCatalog.MaguffinCubeId);
+        var graph = new DialogueGraph
+        {
+            Id = "turnin",
+            EntryNodeId = "complete",
+            Nodes = new List<DialogueNode>
+            {
+                new()
+                {
+                    Id = "complete",
+                    Speaker = DialogueGraph.SpeakerToken,
+                    Text = "Thanks.",
+                    OnShownEffects = new List<EffectRef>
+                    {
+                        EffectRef.Parse($"take_item:{ItemCatalog.MaguffinCubeId}"),
+                        EffectRef.Parse("set_quest:1:Success"),
+                    },
+                },
+            },
+        };
+
+        var root = DialogueRuntime.Compile(graph, Context(state, out _));
+        root.OnShown();
+
+        Assert.Equal(0u, state.Inventory.CountOf(ItemCatalog.MaguffinCubeId));
+        Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(1));
     }
 }

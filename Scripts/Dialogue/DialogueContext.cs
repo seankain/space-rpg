@@ -34,9 +34,11 @@ public class DialogueContext
 // named vocabulary is fixed, so authored data can only ever pick from it.
 public interface IDialogueEffectHost
 {
-    // start_battle: begins a turn-based fight with the speaking NPC once the
-    // conversation closes (DialogueActions.StartBattle today).
-    void StartBattle();
+    // start_battle[:despawn]: begins a turn-based fight with the speaking NPC
+    // once the conversation closes (DialogueActions.StartBattle today).
+    // despawnOnDefeat removes the loser from the world on the player's win,
+    // reproducing ChallengerRole's despawn policy from data.
+    void StartBattle(bool despawnOnDefeat);
 
     // open_shop: opens the trading screen for a shopkeeper NPC.
     void OpenShop();

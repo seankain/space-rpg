@@ -16,6 +16,14 @@ using Godot;
 [GlobalClass]
 public partial class NpcRole : Resource
 {
+	// The conversation this role plays, by DialogueGraph id (the file stem
+	// under Resources/Dialogue). Dialogue is data now (dialogue-editor plan
+	// Phase 2): the role names a graph, DialogueCatalog loads it, and
+	// DialogueRuntime compiles it into the runtime tree — no C# tree building.
+	// Empty falls back to small talk.
+	[Export]
+	public string DialogueId { get; set; } = "";
+
 	// Availability gate usable by any role: when RequiredQuestId is a real
 	// quest (non-zero), the role only joins the conversation while that
 	// quest sits in RequiredQuestState — e.g. a recruit offer that appears
@@ -34,15 +42,34 @@ public partial class NpcRole : Resource
 	public virtual bool IsAvailable(Npc npc, GameState state) =>
 		RequiredQuestId == 0 || state.GetQuestState(RequiredQuestId) == RequiredQuestState;
 
-	// Per-NPC mutable state, created on the Npc's _Ready and fetched back in
-	// BuildDialogue via npc.GetRoleState. Null for stateless roles.
+	// Per-NPC mutable state, created on the Npc's _Ready and fetched back at
+	// play time via npc.GetRoleState (a shopkeeper's Merchant, read by the
+	// open_shop effect host). Null for stateless roles.
 	public virtual object CreateRuntimeState(Npc npc) => null;
 
 	// Choice label when this role shares the NPC with other available roles;
 	// a lone role skips the menu and plays its dialogue directly.
 	public virtual string MenuLabel => "Just talking";
 
-	// The role's conversation. state is never null (Npc checks first).
-	public virtual DialogueLine BuildDialogue(Npc npc, GameState state) =>
+	// The role's conversation, compiled from its DialogueId graph against the
+	// live NPC and game state. state is never null (Npc checks first). Roles no
+	// longer build DialogueLines in code; the branching, side effects, and
+	// gating all live in the graph's routers, effects, and conditions.
+	public virtual DialogueLine BuildDialogue(Npc npc, GameState state)
+	{
+		if (string.IsNullOrEmpty(DialogueId))
+		{
+			return SmallTalk(npc);
+		}
+		var graph = DialogueCatalog.Get(DialogueId);
+		if (graph == null)
+		{
+			GD.PushWarning($"Role on '{npc.DisplayName}' names unknown dialogue '{DialogueId}'.");
+			return SmallTalk(npc);
+		}
+		return DialogueRuntime.Compile(graph, npc.CreateDialogueContext(state));
+	}
+
+	private static DialogueLine SmallTalk(Npc npc) =>
 		new DialogueLine { Speaker = npc.DisplayName, Text = "Hello there." };
 }

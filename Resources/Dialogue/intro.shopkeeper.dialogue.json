@@ -1,0 +1,26 @@
+{
+  "Id": "intro.shopkeeper",
+  "EntryNodeId": "greet",
+  "Nodes": [
+    {
+      "Id": "greet",
+      "Speaker": "$npc",
+      "Text": "Welcome in. Best prices on the station — care to see my stock?",
+      "Choices": [
+        {
+          "Label": "Let's trade",
+          "Effects": ["open_shop"]
+        },
+        {
+          "Label": "Just looking",
+          "NextNodeId": "just_looking"
+        }
+      ]
+    },
+    {
+      "Id": "just_looking",
+      "Speaker": "$npc",
+      "Text": "Take your time. Mind the merchandise."
+    }
+  ]
+}

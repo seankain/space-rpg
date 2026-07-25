@@ -1,0 +1,44 @@
+{
+  "Id": "intro.chief_marlow_recruit",
+  "EntryNodeId": "entry",
+  "Nodes": [
+    {
+      "Id": "entry",
+      "Branches": [
+        { "When": "party_has_room", "ToNodeId": "offer" },
+        { "ToNodeId": "full" }
+      ]
+    },
+    {
+      "Id": "full",
+      "Speaker": "$npc",
+      "Text": "Looks like you're already running a full crew. Come find me if a spot opens up."
+    },
+    {
+      "Id": "offer",
+      "Speaker": "$npc",
+      "Text": "Hey! You look like you're headed somewhere more interesting than this dock. Can I join up with you?",
+      "Choices": [
+        {
+          "Label": "Yes",
+          "Effects": ["recruit:3"],
+          "NextNodeId": "joined"
+        },
+        {
+          "Label": "No",
+          "NextNodeId": "declined"
+        }
+      ]
+    },
+    {
+      "Id": "joined",
+      "Speaker": "$npc",
+      "Text": "You won't regret it. Lead the way, boss!"
+    },
+    {
+      "Id": "declined",
+      "Speaker": "$npc",
+      "Text": "Suit yourself. I'll be right here if you change your mind."
+    }
+  ]
+}

@@ -1,12 +1,11 @@
 using Godot;
-using System.Collections.Generic;
 
-// The pick-a-fight conversation (ported from the old BattleNpc subclass):
-// dialogue that can start a turn-based battle via BattleManager, which swaps
-// the game into battle mode once the conversation closes. Winning records
-// the defeat in GameState.DefeatedNpcs (so the challenger stays down across
-// saves and reloads, and quests can check for it); losing is a game over
-// handled entirely by BattleManager.
+// The pick-a-fight role. The conversation now lives in
+// Resources/Dialogue/intro.vex.dialogue.json (dialogue-editor plan Phase 2);
+// its "Settle it" choice runs the start_battle:despawn effect, which hands off
+// to BattleManager and removes the loser on the player's win (the despawn body
+// is in NpcDialogueHost). This class keeps the spawn/availability gating that
+// keeps a beaten challenger down, and the composition menu label.
 //
 // .tres files reference this script by path, so it must not move.
 [GlobalClass]
@@ -14,8 +13,9 @@ public partial class ChallengerRole : NpcRole
 {
 	// Whether winning removes the NPC from the world for good (the lone-
 	// role default, matching the old BattleNpc). Multi-role NPCs set this
-	// false so their other roles keep working after the fight; the
-	// challenge itself goes unavailable either way once they're beaten.
+	// false so their other roles keep working after the fight; the graph's
+	// start_battle effect carries the matching :despawn arg. The challenge
+	// itself goes unavailable either way once they're beaten.
 	[Export]
 	public bool DespawnOnDefeat { get; set; } = true;
 
@@ -28,39 +28,4 @@ public partial class ChallengerRole : NpcRole
 
 	public override bool IsAvailable(Npc npc, GameState state) =>
 		base.IsAvailable(npc, state) && !state.IsNpcDefeated(npc.NpcId);
-
-	public override DialogueLine BuildDialogue(Npc npc, GameState state)
-	{
-		return new DialogueLine
-		{
-			Speaker = npc.DisplayName,
-			Text = "This is my stretch of deck, groundsider. Turn around, or we settle it right here.",
-			Choices = new List<DialogueChoice>
-			{
-				new DialogueChoice
-				{
-					Label = "Settle it",
-					// No Next: the conversation ends and the deferred battle
-					// takes over the frame after. The shared action records
-					// the defeat; this role only adds the despawn policy.
-					Action = () => DialogueActions.StartBattle(npc, () =>
-					{
-						if (DespawnOnDefeat && IsInstanceValid(npc) && !npc.IsQueuedForDeletion())
-						{
-							npc.QueueFree();
-						}
-					}),
-				},
-				new DialogueChoice
-				{
-					Label = "Walk away",
-					Next = new DialogueLine
-					{
-						Speaker = npc.DisplayName,
-						Text = "Smart. Keep walking.",
-					},
-				},
-			},
-		};
-	}
 }

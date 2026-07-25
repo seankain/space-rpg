@@ -149,6 +149,22 @@ public partial class Npc : CharacterBody3D
 	// The runtime state a role created for this NPC in _Ready, or null.
 	public object GetRoleState(NpcRole role) => roleStates.GetValueOrDefault(role);
 
+	// The first role runtime state of type T, or null — how a dialogue effect
+	// finds this NPC's Merchant without knowing which role made it.
+	public T GetRoleState<T>() where T : class => roleStates.Values.OfType<T>().FirstOrDefault();
+
+	// Builds the play context a role's dialogue graph compiles against: this
+	// NPC's name for the "$npc" speaker token, the effect host that bridges
+	// scene actions (battle, shop, recruit) to the live node, and a warning
+	// sink. State is the caller's game state (never null here).
+	public DialogueContext CreateDialogueContext(GameState state) => new DialogueContext
+	{
+		State = state,
+		SpeakerName = DisplayName,
+		Host = new NpcDialogueHost(this, state),
+		LogWarning = message => GD.PushWarning(message),
+	};
+
 	// Behaviors move the body only while nobody is engaging the NPC:
 	// halting when the player is in range keeps the talk prompt catchable,
 	// any open dialogue freezes ambient walkers, and editor mode holds the

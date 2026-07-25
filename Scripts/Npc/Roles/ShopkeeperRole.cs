@@ -1,12 +1,15 @@
 using Godot;
-using System.Collections.Generic;
 
-// The merchant conversation (ported from the old ShopkeeperNpc subclass):
-// talking offers to open the shop trading screen. The shop's opening stock
-// and bankroll come from the NpcDefinition (Credits + InitialItems); the
-// Merchant built from them is per-NPC runtime state, living only as long as
-// the NPC node, so stock resets when the interior reloads (persisting
-// merchant state into saves is future work).
+// The merchant role: talking offers to open the shop trading screen. The
+// conversation lives in Resources/Dialogue/intro.shopkeeper.dialogue.json
+// (dialogue-editor plan Phase 2); its "Let's trade" choice runs the open_shop
+// effect, which finds this NPC's Merchant and the ShopMenu (NpcDialogueHost).
+// This class keeps the per-NPC Merchant runtime state and the menu label.
+//
+// The shop's opening stock and bankroll come from the NpcDefinition (Credits +
+// InitialItems); the Merchant built from them is per-NPC runtime state, living
+// only as long as the NPC node, so stock resets when the interior reloads
+// (persisting merchant state into saves is future work).
 //
 // .tres files reference this script by path, so it must not move.
 [GlobalClass]
@@ -39,43 +42,5 @@ public partial class ShopkeeperRole : NpcRole
 			merchant.Stock.Add(stack.ItemId, stack.Quantity == 0 ? 1 : stack.Quantity);
 		}
 		return merchant;
-	}
-
-	public override DialogueLine BuildDialogue(Npc npc, GameState state)
-	{
-		// Resolved at interact time: a data-spawned NPC can't carry a
-		// NodePath export, and the menu (the hosting scene's UI layer) is
-		// guaranteed ready long before anyone can talk to the keeper.
-		if (npc.GetTree().GetFirstNodeInGroup(ShopMenu.GroupName) is not ShopMenu shopMenu
-			|| npc.GetRoleState(this) is not Merchant merchant)
-		{
-			GD.PushWarning($"Shopkeeper '{npc.DisplayName}' found no ShopMenu or Merchant.");
-			return base.BuildDialogue(npc, state);
-		}
-		return new DialogueLine
-		{
-			Speaker = npc.DisplayName,
-			Text = "Welcome in. Best prices on the station — care to see my stock?",
-			Choices = new List<DialogueChoice>
-			{
-				new DialogueChoice
-				{
-					Label = "Let's trade",
-					// DialogueManager.End() recaptures the mouse after this
-					// action runs, so open the menu a frame later to win
-					// that race.
-					Action = () => Callable.From(() => shopMenu.Open(merchant, npc.ShowPromptIfPlayerInRange)).CallDeferred(),
-				},
-				new DialogueChoice
-				{
-					Label = "Just looking",
-					Next = new DialogueLine
-					{
-						Speaker = npc.DisplayName,
-						Text = "Take your time. Mind the merchandise.",
-					},
-				},
-			},
-		};
 	}
 }

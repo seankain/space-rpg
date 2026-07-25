@@ -46,34 +46,55 @@ public class DialogueGraph
     }
 }
 
-// One screen of dialogue: a speaker + line, an optional on-shown side effect,
-// and either an ordered list of choices or a NextNodeId to continue to (choices
-// win when both are present, matching DialogueManager). Links are node ids.
+// One screen of dialogue: a speaker + line, on-shown side effects, and either
+// an ordered list of choices or a NextNodeId to continue to (choices win when
+// both are present, matching DialogueManager). Links are node ids.
+//
+// A node carrying Branches instead is a *router*: it shows nothing and the
+// runtime resolves it to the first branch whose condition holds (see
+// DialogueBranch). Chaining single-condition routers is how the migrated
+// conversations reproduce the roles' state-based greeting (quest done vs.
+// in-progress vs. offer) without embedding code — an editor rewires the
+// branches, not a C# switch.
 public class DialogueNode
 {
     public string Id { get; set; }
     public string Speaker { get; set; }
     public string Text { get; set; }
-    // Side effect that fires as the line is shown (take an item, complete a
-    // quest). Null for a plain line.
-    public EffectRef OnShownEffect { get; set; }
+    // Side effects that fire, in order, as the line is shown (take an item and
+    // complete a quest on the same turn-in line). Null/empty for a plain line.
+    public List<EffectRef> OnShownEffects { get; set; }
     // When set, the line ends in a choice menu instead of a continue prompt.
     public List<DialogueChoiceData> Choices { get; set; }
     // Next node when there are no (visible) choices; null/unknown ends the
-    // conversation.
+    // conversation. For a router node, the fallback target when no branch
+    // matches.
     public string NextNodeId { get; set; }
+    // Non-empty makes this a router: an ordered list of conditional gotos
+    // evaluated at conversation start (matching when the role code decided the
+    // branch). The runtime redirects through it without displaying the node.
+    public List<DialogueBranch> Branches { get; set; }
 }
 
 public class DialogueChoiceData
 {
     public string Label { get; set; }
-    // Side effect fired when the choice is picked, before its target shows.
-    public EffectRef Effect { get; set; }
+    // Side effects fired when the choice is picked, in order, before its target
+    // shows. Null/empty for a plain navigation choice.
+    public List<EffectRef> Effects { get; set; }
     // Node shown after picking; null/unknown ends the conversation.
     public string NextNodeId { get; set; }
     // Gate: when set, the choice only appears if the condition holds against
     // the current GameState. Null means always visible.
     public ConditionRef Visible { get; set; }
+}
+
+// One conditional goto in a router node. A null/empty When always matches, so
+// it serves as the unconditional fallback and must come last.
+public class DialogueBranch
+{
+    public ConditionRef When { get; set; }
+    public string ToNodeId { get; set; }
 }
 
 // Base of the "named verb + string args" references the data uses instead of

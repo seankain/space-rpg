@@ -1,0 +1,86 @@
+{
+  "Id": "intro.chief_marlow",
+  "EntryNodeId": "entry",
+  "Nodes": [
+    {
+      "Id": "entry",
+      "Branches": [
+        { "When": "quest_state:2:Success", "ToNodeId": "already_done" },
+        { "When": "quest_state:2:InProgress", "ToNodeId": "inprogress" },
+        { "ToNodeId": "offer" }
+      ]
+    },
+    {
+      "Id": "inprogress",
+      "Branches": [
+        { "When": "npc_defeated:intro.vex", "ToNodeId": "turnin" },
+        { "ToNodeId": "inprogress_waiting" }
+      ]
+    },
+    {
+      "Id": "offer",
+      "Branches": [
+        { "When": "npc_defeated:intro.vex", "ToNodeId": "offer_downed" },
+        { "ToNodeId": "offer_pending" }
+      ]
+    },
+    {
+      "Id": "already_done",
+      "Speaker": "$npc",
+      "Text": "Deck's been quiet since you put Vex on the plates. Keep that keycard handy — it opens more doors than you'd think."
+    },
+    {
+      "Id": "inprogress_waiting",
+      "Speaker": "$npc",
+      "Text": "Vex is still strutting around the plaza like he owns it. The keycard's yours the moment that changes."
+    },
+    {
+      "Id": "offer_pending",
+      "Speaker": "$npc",
+      "Text": "See that red-suited thug by the plaza? Vex. He's been shaking down every courier on this deck and my hands are tied. Put him down a peg and there's a maintenance keycard in it for you.",
+      "Choices": [
+        {
+          "Label": "I'll handle Vex",
+          "Effects": ["set_quest:2:InProgress"],
+          "NextNodeId": "accepted"
+        },
+        {
+          "Label": "Not my problem",
+          "NextNodeId": "declined"
+        }
+      ]
+    },
+    {
+      "Id": "offer_downed",
+      "Speaker": "$npc",
+      "Text": "Word is somebody already put Vex on the deck plates. That was you, wasn't it? I was about to post a bounty on him — say the word and it's yours.",
+      "Choices": [
+        {
+          "Label": "That was me",
+          "Effects": ["set_quest:2:InProgress"],
+          "NextNodeId": "turnin"
+        },
+        {
+          "Label": "Not my problem",
+          "NextNodeId": "declined"
+        }
+      ]
+    },
+    {
+      "Id": "accepted",
+      "Speaker": "$npc",
+      "Text": "Watch yourself — he doesn't fight fair, and he keeps a drone at his back. Come see me when it's done."
+    },
+    {
+      "Id": "declined",
+      "Speaker": "$npc",
+      "Text": "Then keep your credits out of his reach, and don't say I didn't warn you."
+    },
+    {
+      "Id": "turnin",
+      "Speaker": "$npc",
+      "Text": "So the deck finally goes quiet. A deal's a deal — here's the maintenance keycard. It'll open doors most people never get to see.",
+      "OnShownEffects": ["give_item:5", "set_quest:2:Success"]
+    }
+  ]
+}

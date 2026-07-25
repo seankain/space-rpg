@@ -23,6 +23,7 @@ Quantity = 5
 
 [sub_resource type="Resource" id="Resource_shopkeeper"]
 script = ExtResource("4_role")
+DialogueId = "intro.shopkeeper"
 
 [resource]
 script = ExtResource("1_def")
