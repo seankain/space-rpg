@@ -137,7 +137,7 @@ public partial class Npc : CharacterBody3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (playerInRange && !DialogueManager.IsDialogueActive && !ShopMenu.IsShopOpen
-			&& @event.IsActionPressed("Interact"))
+			&& !DevConsole.BlocksGameplay && @event.IsActionPressed("Interact"))
 		{
 			GetViewport().SetInputAsHandled();
 			FacePlayer();
@@ -151,8 +151,10 @@ public partial class Npc : CharacterBody3D
 
 	// Behaviors move the body only while nobody is engaging the NPC:
 	// halting when the player is in range keeps the talk prompt catchable,
-	// and any open dialogue freezes ambient walkers.
-	public bool CanBehaviorMove => !playerInRange && !DialogueManager.IsDialogueActive;
+	// any open dialogue freezes ambient walkers, and editor mode holds the
+	// world still so placement targets don't wander off.
+	public bool CanBehaviorMove =>
+		!playerInRange && !DialogueManager.IsDialogueActive && !DevConsole.IsEditorActive;
 
 	// Locomotion animation for behaviors; capsule NPCs have no rig and
 	// simply slide.

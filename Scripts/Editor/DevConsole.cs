@@ -13,10 +13,22 @@ public partial class DevConsole : CanvasLayer
 {
     public static DevConsole Instance { get; private set; }
 
-    // True while the console panel is showing. Exposed for Phase 2 (editor
-    // mode) to suppress gameplay input the way DialogueManager.IsDialogueActive
-    // does; nothing consumes it yet.
+    // True while the console panel is showing.
     public static bool IsOpen => Instance is { enabled: true, Visible: true };
+
+    // True while editor mode is active (the `editor` command). Orthogonal to
+    // the console being open.
+    public static bool IsEditorActive => Instance is { enabled: true, editorActive: true };
+
+    // The single flag gameplay checks to freeze normal play — true while the
+    // console is open or editor mode is active. Guarded cooperatively, the same
+    // way Player/Pickup/Npc check DialogueManager.IsDialogueActive.
+    public static bool BlocksGameplay => IsOpen || IsEditorActive;
+
+    // The world point the placement marker sits on, or null when editor mode is
+    // off or the ray misses. The `here` token (Phase 3) resolves to this.
+    public static Vector3? PlacementCursorPosition =>
+        IsEditorActive ? Instance.cursor?.WorldPosition : null;
 
     private static readonly Color EchoColor = new(0.6f, 0.75f, 0.95f);
     private static readonly Color OkColor = new(0.8f, 0.85f, 0.78f);
@@ -30,6 +42,13 @@ public partial class DevConsole : CanvasLayer
 
     private RichTextLabel output;
     private LineEdit input;
+
+    // Editor-mode state: a translucent placement marker parented under the
+    // scene root and a bottom-left HUD strip, both alive only while editor mode
+    // is on.
+    private bool editorActive;
+    private EditorCursor cursor;
+    private Label editorHud;
 
     public override void _Ready()
     {
@@ -60,7 +79,60 @@ public partial class DevConsole : CanvasLayer
         registry.Register(new HelpCommand(registry));
         registry.Register(new ClearCommand());
         registry.Register(new EchoCommand());
+        registry.Register(new EditorModeCommand(this));
+        registry.Register(new EditorModeCommand(this, "edit"));
         Print("Developer console. Type 'help' for commands.", OkColor);
+    }
+
+    // Flips editor mode and returns the new state; called by EditorModeCommand.
+    public bool ToggleEditorMode()
+    {
+        if (!enabled)
+        {
+            return false;
+        }
+        SetEditorMode(!editorActive);
+        return editorActive;
+    }
+
+    private void SetEditorMode(bool active)
+    {
+        if (active == editorActive)
+        {
+            return;
+        }
+        editorActive = active;
+        editorHud.Visible = active;
+        if (active)
+        {
+            // Parent the marker under the scene root so it lives in the main
+            // 3D world and survives level changes; freed when editor mode ends.
+            cursor = new EditorCursor();
+            GetTree().Root.AddChild(cursor);
+        }
+        else
+        {
+            cursor?.QueueFree();
+            cursor = null;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!editorActive)
+        {
+            return;
+        }
+        if (cursor?.WorldPosition is { } p)
+        {
+            var chunk = ChunkManager.ToChunkCoord(p);
+            editorHud.Text =
+                $"EDITOR MODE\ncursor  ({p.X:0.0}, {p.Y:0.0}, {p.Z:0.0})   chunk ({chunk.X}, {chunk.Y})";
+        }
+        else
+        {
+            editorHud.Text = "EDITOR MODE\ncursor  (no target)";
+        }
     }
 
     public override void _Input(InputEvent @event)
@@ -161,5 +233,28 @@ public partial class DevConsole : CanvasLayer
         };
         input.TextSubmitted += OnCommandSubmitted;
         column.AddChild(input);
+
+        // Editor-mode HUD strip, anchored bottom-left so it clears the console
+        // panel (top) and the dialogue box (bottom-center). Outlined for
+        // readability over arbitrary 3D backgrounds; hidden until editor mode.
+        editorHud = new Label
+        {
+            Text = "EDITOR MODE",
+            Visible = false,
+            AnchorLeft = 0f,
+            AnchorRight = 0f,
+            AnchorTop = 1f,
+            AnchorBottom = 1f,
+            OffsetLeft = 16,
+            OffsetRight = 460,
+            OffsetTop = -84,
+            OffsetBottom = -36,
+            GrowVertical = Control.GrowDirection.Begin,
+        };
+        editorHud.AddThemeColorOverride("font_color", new Color(0.4f, 1f, 0.6f));
+        editorHud.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.85f));
+        editorHud.AddThemeConstantOverride("outline_size", 4);
+        editorHud.AddThemeFontSizeOverride("font_size", 16);
+        AddChild(editorHud);
     }
 }
