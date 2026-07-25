@@ -14,6 +14,8 @@ A 3rd-person adventure RPG built in Godot, with turn-based combat encounters and
 | [plans/npc-composition.md](plans/npc-composition.md) | NPC composition: one NPC scene, rig subscenes (mesh + AnimationPlayer), and role resources replacing the role subclass/scene variants |
 | [plans/npc-dialogue-yarn.md](plans/npc-dialogue-yarn.md) | NPC dialogue authored in Yarn: plugin integration, dialogue UI, game-state bridge, commands |
 | [plans/quest-system.md](plans/quest-system.md) | Quests: definitions/progress split, QuestManager, journal UI, rewards |
+| [plans/in-game-editor.md](plans/in-game-editor.md) | In-game editor: tilde console + editor mode, NPC placement saved as loadable `.tres`, and item/quest console commands |
+| [plans/dialogue-editor.md](plans/dialogue-editor.md) | Dialogue editor: move dialogue from code to serializable graph data, then edit and save conversation trees in-game |
 
 ## Suggested build order
 
