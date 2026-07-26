@@ -1,0 +1,112 @@
+{
+  "Id": "intro.dockmaster_hale",
+  "EntryNodeId": "entry",
+  "Nodes": [
+    {
+      "Id": "entry",
+      "Branches": [
+        { "When": "quest_state:1:Success", "ToNodeId": "already_done" },
+        { "When": "quest_state:1:InProgress", "ToNodeId": "inprogress" },
+        { "ToNodeId": "offer" }
+      ]
+    },
+    {
+      "Id": "inprogress",
+      "Branches": [
+        { "When": "has_item:1", "ToNodeId": "turnin" },
+        { "ToNodeId": "reminder" }
+      ]
+    },
+    {
+      "Id": "already_done",
+      "Speaker": "$npc",
+      "Text": "The cube's back under lock and key, thanks to you. The station owes you one."
+    },
+    {
+      "Id": "reminder",
+      "Speaker": "$npc",
+      "Text": "Any sign of my Maguffin Cube? Small, purple, hums like a bad capacitor. It's around here somewhere."
+    },
+    {
+      "Id": "offer",
+      "Speaker": "$npc",
+      "Text": "A courier fumbled my Maguffin Cube somewhere on this deck and I can't leave my post. Would you track it down for me?",
+      "Choices": [
+        {
+          "Label": "I'll find it",
+          "Effects": ["set_quest:1:InProgress"],
+          "NextNodeId": "offer_accept"
+        },
+        {
+          "Label": "Not now",
+          "NextNodeId": "offer_declined"
+        }
+      ]
+    },
+    {
+      "Id": "offer_accept",
+      "Branches": [
+        { "When": "has_item:1", "ToNodeId": "turnin" },
+        { "ToNodeId": "offer_much_obliged" }
+      ]
+    },
+    {
+      "Id": "offer_much_obliged",
+      "Speaker": "$npc",
+      "Text": "Much obliged. It's a small purple cube with a hum you can feel in your teeth — you can't miss it."
+    },
+    {
+      "Id": "offer_declined",
+      "Speaker": "$npc",
+      "Text": "Hmph. It won't walk back on its own."
+    },
+    {
+      "Id": "turnin",
+      "Speaker": "$npc",
+      "Text": "That hum — you found it! Hand it over, courier.",
+      "Choices": [
+        {
+          "Label": "Hand it over",
+          "NextNodeId": "complete"
+        },
+        {
+          "Label": "I'm keeping it",
+          "NextNodeId": "refusal"
+        }
+      ]
+    },
+    {
+      "Id": "refusal",
+      "Branches": [
+        { "When": "npc_defeated:intro.dockmaster_hale", "ToNodeId": "refusal_gaveup" },
+        { "ToNodeId": "refusal_demand" }
+      ]
+    },
+    {
+      "Id": "refusal_gaveup",
+      "Speaker": "$npc",
+      "Text": "Then it walks off with you. I'm not testing that arm twice."
+    },
+    {
+      "Id": "refusal_demand",
+      "Speaker": "$npc",
+      "Text": "That cube is station property, courier. Last chance — hand it over, or I take it.",
+      "Choices": [
+        {
+          "Label": "Try and take it",
+          "Effects": ["start_battle"]
+        },
+        {
+          "Label": "Fine, take it",
+          "NextNodeId": "complete"
+        }
+      ]
+    },
+    {
+      "Id": "complete",
+      "Speaker": "$npc",
+      "Text": "Yes, that's the one. You have my thanks, courier.",
+      "OnShownEffects": ["take_item:1", "set_quest:1:Success"]
+    }
+  ]
+}

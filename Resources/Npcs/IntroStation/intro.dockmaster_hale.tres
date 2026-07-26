@@ -7,6 +7,7 @@
 
 [sub_resource type="Resource" id="Resource_questgiver"]
 script = ExtResource("3_role")
+DialogueId = "intro.dockmaster_hale"
 
 [resource]
 script = ExtResource("1_def")

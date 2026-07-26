@@ -1,0 +1,26 @@
+{
+  "Id": "intro.vex",
+  "EntryNodeId": "greet",
+  "Nodes": [
+    {
+      "Id": "greet",
+      "Speaker": "$npc",
+      "Text": "This is my stretch of deck, groundsider. Turn around, or we settle it right here.",
+      "Choices": [
+        {
+          "Label": "Settle it",
+          "Effects": ["start_battle:despawn"]
+        },
+        {
+          "Label": "Walk away",
+          "NextNodeId": "walk_away"
+        }
+      ]
+    },
+    {
+      "Id": "walk_away",
+      "Speaker": "$npc",
+      "Text": "Smart. Keep walking."
+    }
+  ]
+}

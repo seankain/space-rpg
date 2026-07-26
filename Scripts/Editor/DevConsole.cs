@@ -23,10 +23,14 @@ public partial class DevConsole : CanvasLayer
     // the console being open.
     public static bool IsEditorActive => Instance is { enabled: true, editorActive: true };
 
+    // True while the read-only dialogue viewer (Phase 3) is showing.
+    public static bool IsDialogueViewerOpen => Instance?.dialogueViewer is { Visible: true };
+
     // The single flag gameplay checks to freeze normal play — true while the
-    // console is open or editor mode is active. Guarded cooperatively, the same
-    // way Player/Pickup/Npc check DialogueManager.IsDialogueActive.
-    public static bool BlocksGameplay => IsOpen || IsEditorActive;
+    // console is open, editor mode is active, or the dialogue viewer is up.
+    // Guarded cooperatively, the same way Player/Pickup/Npc check
+    // DialogueManager.IsDialogueActive.
+    public static bool BlocksGameplay => IsOpen || IsEditorActive || IsDialogueViewerOpen;
 
     // The world point the placement marker sits on, or null when editor mode is
     // off or the ray misses. The `here` token (Phase 3) resolves to this.
@@ -58,6 +62,10 @@ public partial class DevConsole : CanvasLayer
     private bool editorActive;
     private EditorCursor cursor;
     private Label editorHud;
+
+    // The read-only dialogue viewer (Phase 3), created on first `dialogue open`
+    // and reused after; null until then, hidden when closed.
+    private DialogueEditorPanel dialogueViewer;
 
     public override void _Ready()
     {
@@ -111,7 +119,185 @@ public partial class DevConsole : CanvasLayer
         registry.Register(new SaveCommand());
         registry.Register(new GotoCommand(this));
         registry.Register(new ExecCommand(this));
+        // Dialogue editor (dialogue-editor plan): read-only viewer.
+        registry.Register(new DialogueCommand(this));
         Print("Developer console. Type 'help' for commands.", OkColor);
+    }
+
+    // Opens the dialogue editor on a graph by id (Phase 3-4), editing a working
+    // clone so edits don't touch the cached catalog graph until save. Called by
+    // DialogueCommand; returns a result the console prints.
+    public CommandResult OpenDialogueViewer(string id)
+    {
+        if (!enabled)
+        {
+            return CommandResult.Fail("Editor tooling is disabled in this build.");
+        }
+        var graph = DialogueCatalog.Get(id);
+        if (graph == null)
+        {
+            return CommandResult.Fail($"No dialogue '{id}'. Try 'dialogue list'.");
+        }
+        ShowDialogueViewer(DialogueGraphEditing.Clone(graph));
+        return CommandResult.Ok(
+            $"Editing '{id}'. Toggle the console (~) to see the panel; Save writes it; Esc or 'dialogue close' exits.");
+    }
+
+    // Seeds a fresh single-node conversation and opens it for editing (Phase 4).
+    public CommandResult NewDialogue(string id)
+    {
+        if (!enabled)
+        {
+            return CommandResult.Fail("Editor tooling is disabled in this build.");
+        }
+        if (string.IsNullOrEmpty(id))
+        {
+            return CommandResult.Fail("Usage: dialogue new <id>");
+        }
+        if (DialogueCatalog.Get(id) != null)
+        {
+            return CommandResult.Fail($"'{id}' already exists. Open it with 'dialogue open {id}'.");
+        }
+        ShowDialogueViewer(DialogueGraphEditing.NewEmpty(id));
+        return CommandResult.Ok($"New dialogue '{id}'. Edit it, then 'dialogue save' (or the Save button) to write it.");
+    }
+
+    // Validates and writes the editor's working graph (Phase 4). An optional id
+    // renames it (a "save as" to a new file).
+    public CommandResult SaveDialogue(string idOverride)
+    {
+        if (dialogueViewer?.WorkingGraph == null)
+        {
+            return CommandResult.Fail("No dialogue open. Use 'dialogue open <id>' or 'dialogue new <id>' first.");
+        }
+        var graph = dialogueViewer.WorkingGraph;
+        if (!string.IsNullOrEmpty(idOverride))
+        {
+            graph.Id = idOverride;
+        }
+        var result = DialogueEditing.Save(graph);
+        if (result.Success)
+        {
+            // Reflect a possible rename and the now-cataloged id, keeping the
+            // author's current node selection.
+            dialogueViewer.OnSaved();
+            // Persist the graph-canvas layout beside it, if the author used the
+            // canvas (best-effort — never fails the graph save).
+            if (dialogueViewer.CaptureLayout() is { } layout)
+            {
+                DialogueEditing.SaveLayout(layout);
+            }
+        }
+        dialogueViewer.SetStatus(result.Message, result.Success);
+        return result;
+    }
+
+    private void ShowDialogueViewer(DialogueGraph workingGraph)
+    {
+        EnsureDialogueViewer();
+        dialogueViewer.ShowGraph(workingGraph);
+        dialogueViewer.Visible = true;
+        // Keep the pointer free so the editor stays usable even after the
+        // console is toggled shut to see the panel in full.
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    private void EnsureDialogueViewer()
+    {
+        if (dialogueViewer != null)
+        {
+            return;
+        }
+        dialogueViewer = new DialogueEditorPanel
+        {
+            Closed = () => CloseDialogueViewer(),
+            OpenRequested = id =>
+            {
+                var result = OpenDialogueViewer(id);
+                if (!result.Success)
+                {
+                    dialogueViewer.SetStatus(result.Message, false);
+                }
+            },
+            SaveRequested = () =>
+            {
+                var result = SaveDialogue(null);
+                Print(result.Message, result.Success ? OkColor : ErrorColor);
+            },
+            PlayRequested = startNodeId =>
+            {
+                var result = PlayDialoguePreview(startNodeId);
+                if (!result.Success)
+                {
+                    dialogueViewer.SetStatus(result.Message, false);
+                }
+            },
+        };
+        AddChild(dialogueViewer);
+    }
+
+    // "Play from here" (Phase 5): compiles the editor's working (unsaved) graph
+    // from a node and plays it through DialogueManager against the running
+    // GameState. Pure effects fire against that live state; scene effects are
+    // logged, not executed (DialoguePreviewHost). The editor UI hides while the
+    // dialogue box plays and returns when it ends.
+    public CommandResult PlayDialoguePreview(string startNodeId)
+    {
+        if (dialogueViewer?.WorkingGraph == null)
+        {
+            return CommandResult.Fail("No dialogue open. Use 'dialogue open <id>' or 'dialogue new <id>' first.");
+        }
+        var state = SaveManager.Instance?.CurrentState;
+        if (state == null)
+        {
+            return CommandResult.Fail("Preview needs a running game — load or start one first.");
+        }
+        if (DialogueManager.Instance == null || DialogueManager.IsDialogueActive)
+        {
+            return CommandResult.Fail("A conversation is already playing.");
+        }
+        var graph = dialogueViewer.WorkingGraph;
+        startNodeId ??= dialogueViewer.SelectedNodeId;
+        var context = new DialogueContext
+        {
+            State = state,
+            SpeakerName = graph.Id,
+            Host = new DialoguePreviewHost(message => Print(message, HintColor)),
+            LogWarning = message => Print(message, ErrorColor),
+        };
+        var line = DialogueRuntime.Compile(graph, context, startNodeId);
+        if (line == null)
+        {
+            return CommandResult.Fail($"Nothing to play from '{startNodeId ?? graph.EntryNodeId}'.");
+        }
+
+        // Hide the editor UI (and close the console) so the dialogue box shows
+        // uncovered; DialogueManager blocks gameplay while it plays.
+        dialogueViewer.Visible = false;
+        if (Visible)
+        {
+            Toggle();
+        }
+        DialogueManager.Instance.Start(line, () =>
+        {
+            dialogueViewer.Visible = true;
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+        });
+        return CommandResult.Ok($"Playing '{graph.Id}' from '{startNodeId ?? graph.EntryNodeId}'. (preview — scene effects are skipped)");
+    }
+
+    // Hides the dialogue viewer and restores the pointer (visible if the
+    // console is still open, captured back to gameplay otherwise). Returns
+    // whether it was open.
+    public bool CloseDialogueViewer()
+    {
+        if (dialogueViewer is not { Visible: true })
+        {
+            return false;
+        }
+        dialogueViewer.Visible = false;
+        Input.MouseMode = Visible ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        return true;
     }
 
     // Flips editor mode and returns the new state; called by EditorModeCommand.
@@ -247,6 +433,12 @@ public partial class DevConsole : CanvasLayer
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "list" when index == 1 => new List<string> { "npcs" },
+            "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "play", "close", "assign" },
+            "dialogue" when index == 2 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
+                => NpcDatabase.All.Select(d => d.NpcId).ToList(),
+            "dialogue" when index == 2 => DialogueCatalog.Ids.ToList(),
+            "dialogue" when index == 3 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
+                => DialogueCatalog.Ids.ToList(),
             _ => new List<string>(),
         };
     }
@@ -262,7 +454,10 @@ public partial class DevConsole : CanvasLayer
         }
         else
         {
-            Input.MouseMode = Input.MouseModeEnum.Captured;
+            // Don't recapture the pointer out from under an open viewer panel.
+            Input.MouseMode = IsDialogueViewerOpen
+                ? Input.MouseModeEnum.Visible
+                : Input.MouseModeEnum.Captured;
         }
     }
 
