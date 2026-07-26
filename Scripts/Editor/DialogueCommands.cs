@@ -16,8 +16,8 @@ public sealed class DialogueCommand : IConsoleCommand
 	}
 
 	public string Name => "dialogue";
-	public string Usage => "dialogue <list|open|new|save|close|assign> [args]";
-	public string Summary => "List, open, edit, save, or assign conversations.";
+	public string Usage => "dialogue <list|open|new|save|play|close|assign> [args]";
+	public string Summary => "List, open, edit, save, preview, or assign conversations.";
 
 	public CommandResult Execute(IReadOnlyList<string> args)
 	{
@@ -28,6 +28,7 @@ public sealed class DialogueCommand : IConsoleCommand
 			"open" => Open(args),
 			"new" => New(args),
 			"save" => Save(args),
+			"play" => Play(args),
 			"close" => Close(),
 			"assign" => Assign(args),
 			_ => CommandResult.Fail($"Usage: {Usage}"),
@@ -67,6 +68,13 @@ public sealed class DialogueCommand : IConsoleCommand
 	private CommandResult Save(IReadOnlyList<string> args)
 	{
 		return console.SaveDialogue(args.Count > 1 ? args[1] : null);
+	}
+
+	// dialogue play [nodeId] — preview the open graph from a node (default: the
+	// node selected in the editor, else the entry).
+	private CommandResult Play(IReadOnlyList<string> args)
+	{
+		return console.PlayDialoguePreview(args.Count > 1 ? args[1] : null);
 	}
 
 	private CommandResult Close()

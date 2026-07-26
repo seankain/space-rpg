@@ -16,13 +16,20 @@ using System.Collections.Generic;
 // crash.
 public static class DialogueRuntime
 {
-    public static DialogueLine Compile(DialogueGraph graph, DialogueContext context)
+    public static DialogueLine Compile(DialogueGraph graph, DialogueContext context) =>
+        Compile(graph, context, null);
+
+    // Overload that starts compilation at an arbitrary node — the editor's
+    // "play from here" preview (dialogue-editor plan Phase 5) runs the open
+    // graph from the selected node. A null/empty startNodeId uses the entry.
+    public static DialogueLine Compile(DialogueGraph graph, DialogueContext context, string startNodeId)
     {
         if (graph == null)
         {
             return null;
         }
-        return new Compiler(graph, context).Build(graph.EntryNodeId);
+        var start = string.IsNullOrEmpty(startNodeId) ? graph.EntryNodeId : startNodeId;
+        return new Compiler(graph, context).Build(start);
     }
 
     private sealed class Compiler

@@ -24,8 +24,19 @@ public partial class DialogueEditorPanel : CanvasLayer
 	// working copy (so switching doesn't mutate the cached catalog graph).
 	public Action<string> OpenRequested { get; set; }
 
+	// Raised by "Play from here"; DevConsole runs the working graph through
+	// DialogueManager from the given node (null = the selected node / entry).
+	public Action<string> PlayRequested { get; set; }
+
 	// The working copy being edited (already a clone / fresh graph).
 	public DialogueGraph WorkingGraph => graph;
+
+	// The node the detail panel is showing — the "here" of "play from here".
+	public string SelectedNodeId => selectedNodeId;
+
+	// Editor-only positions from the graph canvas, or null if it was never
+	// opened; DevConsole saves it beside the dialogue on save.
+	public DialogueLayout CaptureLayout() => canvas?.CaptureLayout(graph?.Id);
 
 	private DialogueGraph graph;
 	private string selectedNodeId;
@@ -34,7 +45,11 @@ public partial class DialogueEditorPanel : CanvasLayer
 	private OptionButton picker;
 	private RichTextLabel validationLabel;
 	private Label statusLabel;
+	private VBoxContainer leftColumn;
 	private VBoxContainer nodeList;
+	private DialogueGraphCanvas canvas;
+	private Button graphViewButton;
+	private bool graphViewActive;
 	private VBoxContainer detail;
 	private readonly Dictionary<string, Button> nodeButtons = new();
 	private readonly List<string> pickerIds = new();
@@ -72,6 +87,24 @@ public partial class DialogueEditorPanel : CanvasLayer
 		BuildNodeList();
 		SelectNode(graph.EntryNodeId);
 		RefreshValidation();
+		if (graphViewActive)
+		{
+			RepopulateCanvas();
+		}
+	}
+
+	private void RepopulateCanvas() => canvas.Populate(graph, DialogueEditing.LoadLayout(graph.Id));
+
+	private void ToggleGraphView()
+	{
+		graphViewActive = !graphViewActive;
+		graphViewButton.Text = graphViewActive ? "List view" : "Graph view";
+		leftColumn.Visible = !graphViewActive;
+		canvas.Visible = graphViewActive;
+		if (graphViewActive)
+		{
+			RepopulateCanvas();
+		}
 	}
 
 	public void SetStatus(string text, bool ok)
@@ -683,6 +716,14 @@ public partial class DialogueEditorPanel : CanvasLayer
 		picker.ItemSelected += OnPickerSelected;
 		header.AddChild(picker);
 
+		graphViewButton = new Button { Text = "Graph view" };
+		graphViewButton.Pressed += ToggleGraphView;
+		header.AddChild(graphViewButton);
+
+		var play = new Button { Text = "▶ Play from here" };
+		play.Pressed += () => PlayRequested?.Invoke(selectedNodeId);
+		header.AddChild(play);
+
 		var save = new Button { Text = "Save" };
 		save.Pressed += () => SaveRequested?.Invoke();
 		header.AddChild(save);
@@ -712,7 +753,7 @@ public partial class DialogueEditorPanel : CanvasLayer
 		body.AddThemeConstantOverride("separation", 12);
 		root.AddChild(body);
 
-		var leftColumn = new VBoxContainer { CustomMinimumSize = new Vector2(240, 0) };
+		leftColumn = new VBoxContainer { CustomMinimumSize = new Vector2(240, 0) };
 		body.AddChild(leftColumn);
 
 		var nodesHeading = new Label { Text = "Nodes" };
@@ -739,6 +780,19 @@ public partial class DialogueEditorPanel : CanvasLayer
 		var addRouter = new Button { Text = "+ router", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
 		addRouter.Pressed += () => AddNode(router: true);
 		addRow.AddChild(addRouter);
+
+		// The optional graph canvas shares the left area with the node list,
+		// swapped in by the "Graph view" toggle. Wider than the list, so it
+		// takes the larger share of the body when shown.
+		canvas = new DialogueGraphCanvas
+		{
+			Visible = false,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+			SizeFlagsStretchRatio = 2f,
+		};
+		canvas.NodeClicked = id => SelectNode(id);
+		body.AddChild(canvas);
 
 		body.AddChild(new VSeparator());
 

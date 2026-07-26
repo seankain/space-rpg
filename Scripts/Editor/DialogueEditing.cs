@@ -107,5 +107,54 @@ public static class DialogueEditing
             $"Assigned '{dialogueId}' to {npcId}'s {role.GetType().Name}. Saved {path}. Reload the NPC to see it.");
     }
 
+    // Editor-only node positions for the graph canvas (Phase 5), read from the
+    // sibling <id>.layout.json. Missing or unreadable layout is fine (the canvas
+    // auto-arranges), so this never errors — it returns null.
+    public static DialogueLayout LoadLayout(string id)
+    {
+        var path = LayoutPath(id);
+        if (!FileAccess.FileExists(path))
+        {
+            return null;
+        }
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (file == null)
+        {
+            return null;
+        }
+        try
+        {
+            return DialogueLayoutSerialization.FromJson(file.GetAsText());
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    // Writes the canvas layout beside the dialogue file. Debug-gated like Save,
+    // but a layout failure is reported softly — it never blocks authoring.
+    public static CommandResult SaveLayout(DialogueLayout layout)
+    {
+        if (layout == null || string.IsNullOrEmpty(layout.Id))
+        {
+            return CommandResult.Fail("No layout to save.");
+        }
+        if (!IsEditorBuild())
+        {
+            return CommandResult.Fail("Saving layout writes to res:// and only works in the editor/debug player.");
+        }
+        var path = LayoutPath(layout.Id);
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
+        if (file == null)
+        {
+            return CommandResult.Fail($"Could not write '{path}': {FileAccess.GetOpenError()}.");
+        }
+        file.StoreString(DialogueLayoutSerialization.ToJson(layout));
+        return CommandResult.Ok($"Saved layout to {path}.");
+    }
+
+    private static string LayoutPath(string id) => $"{DialogueCatalog.DialogueDirectory}/{id}.layout.json";
+
     private static bool IsEditorBuild() => OS.IsDebugBuild() || OS.HasFeature("editor");
 }

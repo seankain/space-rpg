@@ -181,6 +181,12 @@ public partial class DevConsole : CanvasLayer
             // Reflect a possible rename and the now-cataloged id, keeping the
             // author's current node selection.
             dialogueViewer.OnSaved();
+            // Persist the graph-canvas layout beside it, if the author used the
+            // canvas (best-effort — never fails the graph save).
+            if (dialogueViewer.CaptureLayout() is { } layout)
+            {
+                DialogueEditing.SaveLayout(layout);
+            }
         }
         dialogueViewer.SetStatus(result.Message, result.Success);
         return result;
@@ -218,8 +224,66 @@ public partial class DevConsole : CanvasLayer
                 var result = SaveDialogue(null);
                 Print(result.Message, result.Success ? OkColor : ErrorColor);
             },
+            PlayRequested = startNodeId =>
+            {
+                var result = PlayDialoguePreview(startNodeId);
+                if (!result.Success)
+                {
+                    dialogueViewer.SetStatus(result.Message, false);
+                }
+            },
         };
         AddChild(dialogueViewer);
+    }
+
+    // "Play from here" (Phase 5): compiles the editor's working (unsaved) graph
+    // from a node and plays it through DialogueManager against the running
+    // GameState. Pure effects fire against that live state; scene effects are
+    // logged, not executed (DialoguePreviewHost). The editor UI hides while the
+    // dialogue box plays and returns when it ends.
+    public CommandResult PlayDialoguePreview(string startNodeId)
+    {
+        if (dialogueViewer?.WorkingGraph == null)
+        {
+            return CommandResult.Fail("No dialogue open. Use 'dialogue open <id>' or 'dialogue new <id>' first.");
+        }
+        var state = SaveManager.Instance?.CurrentState;
+        if (state == null)
+        {
+            return CommandResult.Fail("Preview needs a running game — load or start one first.");
+        }
+        if (DialogueManager.Instance == null || DialogueManager.IsDialogueActive)
+        {
+            return CommandResult.Fail("A conversation is already playing.");
+        }
+        var graph = dialogueViewer.WorkingGraph;
+        startNodeId ??= dialogueViewer.SelectedNodeId;
+        var context = new DialogueContext
+        {
+            State = state,
+            SpeakerName = graph.Id,
+            Host = new DialoguePreviewHost(message => Print(message, HintColor)),
+            LogWarning = message => Print(message, ErrorColor),
+        };
+        var line = DialogueRuntime.Compile(graph, context, startNodeId);
+        if (line == null)
+        {
+            return CommandResult.Fail($"Nothing to play from '{startNodeId ?? graph.EntryNodeId}'.");
+        }
+
+        // Hide the editor UI (and close the console) so the dialogue box shows
+        // uncovered; DialogueManager blocks gameplay while it plays.
+        dialogueViewer.Visible = false;
+        if (Visible)
+        {
+            Toggle();
+        }
+        DialogueManager.Instance.Start(line, () =>
+        {
+            dialogueViewer.Visible = true;
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+        });
+        return CommandResult.Ok($"Playing '{graph.Id}' from '{startNodeId ?? graph.EntryNodeId}'. (preview — scene effects are skipped)");
     }
 
     // Hides the dialogue viewer and restores the pointer (visible if the
@@ -369,7 +433,7 @@ public partial class DevConsole : CanvasLayer
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "list" when index == 1 => new List<string> { "npcs" },
-            "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "close", "assign" },
+            "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "play", "close", "assign" },
             "dialogue" when index == 2 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
                 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "dialogue" when index == 2 => DialogueCatalog.Ids.ToList(),
