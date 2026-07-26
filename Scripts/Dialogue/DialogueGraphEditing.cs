@@ -7,9 +7,19 @@ using System.Collections.Generic;
 public static class DialogueGraphEditing
 {
     // A working copy the editor mutates without touching the cached catalog
-    // graph until save (round-trips through JSON, so it is a deep clone).
-    public static DialogueGraph Clone(DialogueGraph graph) =>
-        DialogueSerialization.FromJson(DialogueSerialization.ToJson(graph));
+    // graph until save (round-trips through JSON, so it is a deep clone). The
+    // source format rides along by hand — it is deliberately not serialized, but
+    // a save has to write the file back in the form it came from.
+    public static DialogueGraph Clone(DialogueGraph graph)
+    {
+        if (graph == null)
+        {
+            return null;
+        }
+        var clone = DialogueSerialization.FromJson(DialogueSerialization.ToJson(graph));
+        clone.SourceFormat = graph.SourceFormat;
+        return clone;
+    }
 
     // A fresh conversation: one empty line node that is also the entry.
     public static DialogueGraph NewEmpty(string id) => new()

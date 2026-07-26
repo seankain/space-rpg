@@ -164,9 +164,11 @@ session, with the edits landing as reviewable repo diffs.
    `DialogueManager` against the running `GameState` for instant iteration.
 3. **Localization-ready text:** optionally externalize node `Text` to string keys once a
    localization system exists, so the editor edits keys + a table.
-4. **Yarn convergence:** when the [Yarn plan](npc-dialogue-yarn.md) lands, map Yarn commands
-   onto the same `DialogueEffects` vocabulary and offer an import/export path, so this editor's
-   data and Yarn stay interoperable rather than competing.
+4. **Yarn convergence** *(done — [Yarn plan](npc-dialogue-yarn.md) Phase 1)*: `.yarn` files compile
+   into the same `DialogueGraph` this editor edits, with Yarn commands mapping onto the same
+   `DialogueEffects` vocabulary and `<<if>>` onto `DialogueConditions`. The editor opens a Yarn
+   conversation like any other and saves it back as Yarn, so the two formats are interoperable
+   rather than competing.
 
 ## Decisions to settle early
 
