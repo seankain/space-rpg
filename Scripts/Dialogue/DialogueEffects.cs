@@ -18,6 +18,94 @@ public static class DialogueEffects
         "credits", "recruit", "start_battle", "open_shop",
     };
 
+    // Static check for the editor's pre-save validation (dialogue-editor plan
+    // Phase 4): does this effect name a known verb with args that parse against
+    // its vocabulary? Returns null when valid, else a human-readable reason.
+    // Engine-free like Run, so DialogueValidation and its tests use it without
+    // Godot.
+    public static string Validate(EffectRef effect)
+    {
+        if (effect == null || string.IsNullOrEmpty(effect.Id))
+        {
+            return "effect has no id";
+        }
+        var a = effect.Args ?? System.Array.Empty<string>();
+        switch (effect.Id)
+        {
+            case "give_item":
+            case "take_item":
+                if (a.Length is < 1 or > 2)
+                {
+                    return $"{effect.Id} takes <itemId> [qty]";
+                }
+                if (!uint.TryParse(a[0], out var itemId))
+                {
+                    return $"{effect.Id}: item id '{a[0]}' is not a whole number";
+                }
+                if (ItemCatalog.Get(itemId) == null)
+                {
+                    return $"{effect.Id}: no item with id {itemId}";
+                }
+                if (a.Length == 2 && !uint.TryParse(a[1], out _))
+                {
+                    return $"{effect.Id}: quantity '{a[1]}' is not a whole number";
+                }
+                return null;
+            case "set_quest":
+                if (a.Length != 2)
+                {
+                    return "set_quest takes <questId> <state>";
+                }
+                if (!uint.TryParse(a[0], out var setQuestId))
+                {
+                    return $"set_quest: quest id '{a[0]}' is not a whole number";
+                }
+                if (QuestCatalog.Get(setQuestId) == null)
+                {
+                    return $"set_quest: no quest with id {setQuestId}";
+                }
+                return IsQuestState(a[1]) ? null : $"set_quest: '{a[1]}' is not a quest state";
+            case "advance_quest":
+                if (a.Length != 1)
+                {
+                    return "advance_quest takes <questId>";
+                }
+                if (!uint.TryParse(a[0], out var advanceQuestId))
+                {
+                    return $"advance_quest: quest id '{a[0]}' is not a whole number";
+                }
+                return QuestCatalog.Get(advanceQuestId) == null
+                    ? $"advance_quest: no quest with id {advanceQuestId}"
+                    : null;
+            case "credits":
+                if (a.Length != 1)
+                {
+                    return "credits takes <amount>";
+                }
+                return int.TryParse(a[0], out _) ? null : $"credits: amount '{a[0]}' is not a number";
+            case "recruit":
+                if (a.Length != 1)
+                {
+                    return "recruit takes <partyCharacterId>";
+                }
+                return ulong.TryParse(a[0], out _) ? null : $"recruit: id '{a[0]}' is not a whole number";
+            case "start_battle":
+                if (a.Length == 0 || (a.Length == 1 && a[0] == "despawn"))
+                {
+                    return null;
+                }
+                return "start_battle takes an optional 'despawn'";
+            case "open_shop":
+                return a.Length == 0 ? null : "open_shop takes no arguments";
+            default:
+                return $"unknown effect '{effect.Id}'";
+        }
+    }
+
+    private static bool IsQuestState(string raw) =>
+        Enum.TryParse<QUESTSUCCESSSTATE>(raw, ignoreCase: true, out var value)
+        && Enum.IsDefined(typeof(QUESTSUCCESSSTATE), value);
+
     public static void Run(EffectRef effect, DialogueContext context)
     {
         if (effect == null || string.IsNullOrEmpty(effect.Id))

@@ -14,6 +14,65 @@ public static class DialogueConditions
         "quest_state", "has_item", "npc_defeated", "party_has_room",
     };
 
+    // Static check for the editor's pre-save validation (dialogue-editor plan
+    // Phase 4): known verb with args that parse? Returns null when valid (a
+    // null/empty condition is "always visible", also valid), else a reason.
+    public static string Validate(ConditionRef condition)
+    {
+        if (condition == null || string.IsNullOrEmpty(condition.Id))
+        {
+            return null;
+        }
+        var a = condition.Args ?? System.Array.Empty<string>();
+        switch (condition.Id)
+        {
+            case "quest_state":
+                if (a.Length != 2)
+                {
+                    return "quest_state takes <questId> <state>";
+                }
+                if (!uint.TryParse(a[0], out var questId))
+                {
+                    return $"quest_state: quest id '{a[0]}' is not a whole number";
+                }
+                if (QuestCatalog.Get(questId) == null)
+                {
+                    return $"quest_state: no quest with id {questId}";
+                }
+                return IsQuestState(a[1]) ? null : $"quest_state: '{a[1]}' is not a quest state";
+            case "has_item":
+                if (a.Length is < 1 or > 2)
+                {
+                    return "has_item takes <itemId> [count]";
+                }
+                if (!uint.TryParse(a[0], out var itemId))
+                {
+                    return $"has_item: item id '{a[0]}' is not a whole number";
+                }
+                if (ItemCatalog.Get(itemId) == null)
+                {
+                    return $"has_item: no item with id {itemId}";
+                }
+                if (a.Length == 2 && !uint.TryParse(a[1], out _))
+                {
+                    return $"has_item: count '{a[1]}' is not a whole number";
+                }
+                return null;
+            case "npc_defeated":
+                return a.Length == 1 && !string.IsNullOrEmpty(a[0])
+                    ? null
+                    : "npc_defeated takes <npcId>";
+            case "party_has_room":
+                return a.Length == 0 ? null : "party_has_room takes no arguments";
+            default:
+                return $"unknown condition '{condition.Id}'";
+        }
+    }
+
+    private static bool IsQuestState(string raw) =>
+        Enum.TryParse<QUESTSUCCESSSTATE>(raw, ignoreCase: true, out var value)
+        && Enum.IsDefined(typeof(QUESTSUCCESSSTATE), value);
+
     public static bool Evaluate(ConditionRef condition, DialogueContext context)
     {
         // No gate means always visible.

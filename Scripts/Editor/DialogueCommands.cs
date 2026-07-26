@@ -16,8 +16,8 @@ public sealed class DialogueCommand : IConsoleCommand
 	}
 
 	public string Name => "dialogue";
-	public string Usage => "dialogue <list|open|close> [id]";
-	public string Summary => "List conversations, or open one in the read-only viewer.";
+	public string Usage => "dialogue <list|open|new|save|close|assign> [args]";
+	public string Summary => "List, open, edit, save, or assign conversations.";
 
 	public CommandResult Execute(IReadOnlyList<string> args)
 	{
@@ -26,7 +26,10 @@ public sealed class DialogueCommand : IConsoleCommand
 		{
 			"list" => List(),
 			"open" => Open(args),
+			"new" => New(args),
+			"save" => Save(args),
 			"close" => Close(),
+			"assign" => Assign(args),
 			_ => CommandResult.Fail($"Usage: {Usage}"),
 		};
 	}
@@ -51,10 +54,34 @@ public sealed class DialogueCommand : IConsoleCommand
 		return console.OpenDialogueViewer(args[1]);
 	}
 
+	private CommandResult New(IReadOnlyList<string> args)
+	{
+		if (args.Count < 2)
+		{
+			return CommandResult.Fail("Usage: dialogue new <id>");
+		}
+		return console.NewDialogue(args[1]);
+	}
+
+	// dialogue save [id] — save the open graph, optionally under a new id.
+	private CommandResult Save(IReadOnlyList<string> args)
+	{
+		return console.SaveDialogue(args.Count > 1 ? args[1] : null);
+	}
+
 	private CommandResult Close()
 	{
 		return console.CloseDialogueViewer()
-			? CommandResult.Ok("Closed dialogue viewer.")
-			: CommandResult.Ok("Dialogue viewer is not open.");
+			? CommandResult.Ok("Closed dialogue editor.")
+			: CommandResult.Ok("Dialogue editor is not open.");
+	}
+
+	private static CommandResult Assign(IReadOnlyList<string> args)
+	{
+		if (args.Count < 3)
+		{
+			return CommandResult.Fail("Usage: dialogue assign <npcId> <dialogueId>");
+		}
+		return DialogueEditing.Assign(args[1], args[2]);
 	}
 }

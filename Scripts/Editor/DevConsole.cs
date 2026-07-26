@@ -124,9 +124,9 @@ public partial class DevConsole : CanvasLayer
         Print("Developer console. Type 'help' for commands.", OkColor);
     }
 
-    // Opens the read-only dialogue viewer on a graph by id (Phase 3), creating
-    // the panel on first use. Called by DialogueCommand; returns a result the
-    // console prints.
+    // Opens the dialogue editor on a graph by id (Phase 3-4), editing a working
+    // clone so edits don't touch the cached catalog graph until save. Called by
+    // DialogueCommand; returns a result the console prints.
     public CommandResult OpenDialogueViewer(string id)
     {
         if (!enabled)
@@ -138,18 +138,88 @@ public partial class DevConsole : CanvasLayer
         {
             return CommandResult.Fail($"No dialogue '{id}'. Try 'dialogue list'.");
         }
-        if (dialogueViewer == null)
-        {
-            dialogueViewer = new DialogueEditorPanel { Closed = () => CloseDialogueViewer() };
-            AddChild(dialogueViewer);
-        }
-        dialogueViewer.ShowGraph(graph);
-        dialogueViewer.Visible = true;
-        // Keep the pointer free so the node list and links are clickable, even
-        // after the console is toggled shut to see the panel in full.
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        ShowDialogueViewer(DialogueGraphEditing.Clone(graph));
         return CommandResult.Ok(
-            $"Opened '{id}'. Toggle the console (~) to browse; Esc, Close, or 'dialogue close' to exit.");
+            $"Editing '{id}'. Toggle the console (~) to see the panel; Save writes it; Esc or 'dialogue close' exits.");
+    }
+
+    // Seeds a fresh single-node conversation and opens it for editing (Phase 4).
+    public CommandResult NewDialogue(string id)
+    {
+        if (!enabled)
+        {
+            return CommandResult.Fail("Editor tooling is disabled in this build.");
+        }
+        if (string.IsNullOrEmpty(id))
+        {
+            return CommandResult.Fail("Usage: dialogue new <id>");
+        }
+        if (DialogueCatalog.Get(id) != null)
+        {
+            return CommandResult.Fail($"'{id}' already exists. Open it with 'dialogue open {id}'.");
+        }
+        ShowDialogueViewer(DialogueGraphEditing.NewEmpty(id));
+        return CommandResult.Ok($"New dialogue '{id}'. Edit it, then 'dialogue save' (or the Save button) to write it.");
+    }
+
+    // Validates and writes the editor's working graph (Phase 4). An optional id
+    // renames it (a "save as" to a new file).
+    public CommandResult SaveDialogue(string idOverride)
+    {
+        if (dialogueViewer?.WorkingGraph == null)
+        {
+            return CommandResult.Fail("No dialogue open. Use 'dialogue open <id>' or 'dialogue new <id>' first.");
+        }
+        var graph = dialogueViewer.WorkingGraph;
+        if (!string.IsNullOrEmpty(idOverride))
+        {
+            graph.Id = idOverride;
+        }
+        var result = DialogueEditing.Save(graph);
+        if (result.Success)
+        {
+            // Reflect a possible rename and the now-cataloged id, keeping the
+            // author's current node selection.
+            dialogueViewer.OnSaved();
+        }
+        dialogueViewer.SetStatus(result.Message, result.Success);
+        return result;
+    }
+
+    private void ShowDialogueViewer(DialogueGraph workingGraph)
+    {
+        EnsureDialogueViewer();
+        dialogueViewer.ShowGraph(workingGraph);
+        dialogueViewer.Visible = true;
+        // Keep the pointer free so the editor stays usable even after the
+        // console is toggled shut to see the panel in full.
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    private void EnsureDialogueViewer()
+    {
+        if (dialogueViewer != null)
+        {
+            return;
+        }
+        dialogueViewer = new DialogueEditorPanel
+        {
+            Closed = () => CloseDialogueViewer(),
+            OpenRequested = id =>
+            {
+                var result = OpenDialogueViewer(id);
+                if (!result.Success)
+                {
+                    dialogueViewer.SetStatus(result.Message, false);
+                }
+            },
+            SaveRequested = () =>
+            {
+                var result = SaveDialogue(null);
+                Print(result.Message, result.Success ? OkColor : ErrorColor);
+            },
+        };
+        AddChild(dialogueViewer);
     }
 
     // Hides the dialogue viewer and restores the pointer (visible if the
@@ -299,8 +369,12 @@ public partial class DevConsole : CanvasLayer
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "list" when index == 1 => new List<string> { "npcs" },
-            "dialogue" when index == 1 => new List<string> { "list", "open", "close" },
+            "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "close", "assign" },
+            "dialogue" when index == 2 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
+                => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "dialogue" when index == 2 => DialogueCatalog.Ids.ToList(),
+            "dialogue" when index == 3 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
+                => DialogueCatalog.Ids.ToList(),
             _ => new List<string>(),
         };
     }
