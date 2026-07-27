@@ -1,0 +1,99 @@
+// Dockmaster Hale — the "Return the Maguffin" fetch quest (quest 1, item 1).
+// Offer, in-progress reminder, turn-in, and the refusal branch that ends in a
+// fight. Beating him sets npc_defeated, which is why the refusal router has a
+// "gave up" side.
+
+title: entry
+---
+<<if quest_state(1, "Success")>>
+    <<jump already_done>>
+<<elseif quest_state(1, "InProgress")>>
+    <<jump inprogress>>
+<<else>>
+    <<jump offer>>
+<<endif>>
+===
+
+title: inprogress
+---
+// Handing it in works even if the cube was picked up before the quest.
+<<if has_item(1)>>
+    <<jump turnin>>
+<<else>>
+    <<jump reminder>>
+<<endif>>
+===
+
+title: already_done
+---
+$npc: The cube's back under lock and key, thanks to you. The station owes you one.
+===
+
+title: reminder
+---
+$npc: Any sign of my Maguffin Cube? Small, purple, hums like a bad capacitor. It's around here somewhere.
+===
+
+title: offer
+---
+$npc: A courier fumbled my Maguffin Cube somewhere on this deck and I can't leave my post. Would you track it down for me?
+-> I'll find it
+    <<set_quest 1 InProgress>>
+    <<jump offer_accept>>
+-> Not now
+    $npc: Hmph. It won't walk back on its own.
+===
+
+title: offer_accept
+---
+<<if has_item(1)>>
+    <<jump turnin>>
+<<else>>
+    <<jump offer_much_obliged>>
+<<endif>>
+===
+
+title: offer_much_obliged
+---
+$npc: Much obliged. It's a small purple cube with a hum you can feel in your teeth — you can't miss it.
+===
+
+title: turnin
+---
+$npc: That hum — you found it! Hand it over, courier.
+-> Hand it over
+    <<jump complete>>
+-> I'm keeping it
+    <<jump refusal>>
+===
+
+title: refusal
+---
+<<if npc_defeated("intro.dockmaster_hale")>>
+    <<jump refusal_gaveup>>
+<<else>>
+    <<jump refusal_demand>>
+<<endif>>
+===
+
+title: refusal_gaveup
+---
+$npc: Then it walks off with you. I'm not testing that arm twice.
+===
+
+title: refusal_demand
+---
+$npc: That cube is station property, courier. Last chance — hand it over, or I take it.
+-> Try and take it
+    <<start_battle>>
+    <<stop>>
+-> Fine, take it
+    <<jump complete>>
+===
+
+title: complete
+---
+<<take_item 1>>
+<<set_quest 1 Success>>
+$npc: Yes, that's the one. You have my thanks, courier.
+===

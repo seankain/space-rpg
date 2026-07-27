@@ -342,30 +342,49 @@ $npc: You have my thanks.
     }
 
     [Fact]
-    public void EveryCommittedJsonConversationSurvivesARoundTripThroughYarn()
+    public void ConversationsCrossBetweenTheTwoFormatsUnchanged()
     {
-        var files = Directory.GetFiles(DialogueDirectory(), "*.dialogue.json").OrderBy(p => p).ToList();
-        Assert.NotEmpty(files);
-        foreach (var path in files)
+        // The editor still writes .dialogue.json for conversations authored
+        // in-game, so a graph has to survive the trip in both directions: this is
+        // what makes converting a conversation to Yarn (or back) a safe diff.
+        foreach (var (name, graph) in CommittedYarn())
         {
-            var graph = DialogueSerialization.FromJson(File.ReadAllText(path));
-            var problems = new List<string>();
-            var source = YarnGraphWriter.Write(graph, problems);
-            Assert.Empty(problems);
+            var viaJson = DialogueSerialization.FromJson(DialogueSerialization.ToJson(graph));
+            AssertSameGraph(graph, viaJson, name);
 
-            var compiled = YarnGraphCompiler.Compile(graph.Id, source, problems);
-            Assert.Empty(problems);
-            AssertSameGraph(graph, compiled, Path.GetFileName(path));
+            var problems = new List<string>();
+            var viaYarn = YarnGraphCompiler.Compile(
+                graph.Id, YarnGraphWriter.Write(viaJson, problems), problems);
+            Assert.Empty(problems.Select(p => $"{name}: {p}"));
+            AssertSameGraph(graph, viaYarn, name);
         }
     }
 
     [Fact]
     public void EveryCommittedYarnConversationCompilesAndValidates()
     {
+        foreach (var (name, graph) in CommittedYarn())
+        {
+            var issues = DialogueValidation.Validate(graph);
+            Assert.Empty(issues.Select(i => $"{name}: {i}"));
+
+            // And it survives the editor's save path (graph -> .yarn -> graph).
+            var problems = new List<string>();
+            var rewritten = YarnGraphCompiler.Compile(graph.Id, YarnGraphWriter.Write(graph, problems), problems);
+            Assert.Empty(problems.Select(p => $"{name}: {p}"));
+            AssertSameGraph(graph, rewritten, name);
+        }
+    }
+
+    // Every conversation committed under Resources/Dialogue as Yarn, compiled.
+    // A compile problem fails here rather than in each caller.
+    private static List<(string name, DialogueGraph graph)> CommittedYarn()
+    {
         var files = Directory.GetFiles(DialogueDirectory(), "*" + YarnGraphCompiler.FileSuffix)
-            .OrderBy(p => p)
+            .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
         Assert.NotEmpty(files);
+        var loaded = new List<(string, DialogueGraph)>();
         foreach (var path in files)
         {
             var name = Path.GetFileName(path);
@@ -373,17 +392,9 @@ $npc: You have my thanks.
             var graph = YarnGraphCompiler.Compile(
                 YarnGraphCompiler.IdFromFileName(name), File.ReadAllText(path), problems);
             Assert.Empty(problems.Select(p => $"{name}: {p}"));
-
-            var errors = DialogueValidation.Validate(graph)
-                .Where(i => i.Severity == DialogueSeverity.Error)
-                .Select(i => $"{name}: {i.Message}");
-            Assert.Empty(errors);
-
-            // And it survives the editor's save path (graph -> .yarn -> graph).
-            var rewritten = YarnGraphCompiler.Compile(graph.Id, YarnGraphWriter.Write(graph, problems), problems);
-            Assert.Empty(problems.Select(p => $"{name}: {p}"));
-            AssertSameGraph(graph, rewritten, name);
+            loaded.Add((name, graph));
         }
+        return loaded;
     }
 
     private static string DialogueDirectory()

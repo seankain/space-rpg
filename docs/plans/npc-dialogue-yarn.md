@@ -34,17 +34,18 @@ That is what Phase 1 below now does, and it is done:
 3. `Scripts/Dialogue/Yarn/YarnGraphWriter.cs` — `DialogueGraph` → Yarn source, one node per graph node with explicit `<<jump>>`s, so ids survive and the write→parse round trip is exact. Used by the editor's save path and to convert a `.dialogue.json` conversation to Yarn.
 4. `DialogueCatalog` loads `*.yarn`; `DialogueEditing.Save` writes back in the source format; `dialogue list` reports it.
 5. `Resources/Dialogue/example.greeter.yarn` — the sample conversation, converted, authored in the idiomatic nested style (an option's reply indented under it).
-6. **Tests** (`Tests/YarnDialogueTests.cs`): the mapping of every construct; the problems reported for unknown verbs, unsupported Yarn, and broken structure; a compiled conversation played through `DialogueRuntime` against a live `GameState`; and a round-trip guard over **every committed conversation** in both formats — a `.dialogue.json` written to Yarn and recompiled must be the same graph.
+6. **Tests** (`Tests/YarnDialogueTests.cs`): the mapping of every construct; the problems reported for unknown verbs, unsupported Yarn, and broken structure; a compiled conversation played through `DialogueRuntime` against a live `GameState`; and a round-trip guard over **every committed conversation** — written back out and recompiled, and crossed through JSON and back, it must be the same graph.
 
 **Done when:** a `.yarn` file in `Resources/Dialogue` plays in-game through the normal dialogue box, with choices, gating, and effects, and the in-game editor can open, edit, and save it as Yarn. ✅
 
-## Phase 2 — Move the authored conversations to Yarn
+## Phase 2 — Move the authored conversations to Yarn *(done)*
 
-1. Convert the six intro conversations (`intro.dockmaster_hale`, `intro.chief_marlow`, `intro.chief_marlow_recruit`, `intro.rig`, `intro.vex`, `intro.shopkeeper`) from `.dialogue.json` to `.yarn`, one at a time: write the graph out with `YarnGraphWriter`, then tidy it into the nested style by hand where it reads better. The round-trip test is the safety net; `Tests/DialogueMigrationTests.cs` (which scans `*.dialogue.json`) grows a `.yarn` equivalent as files move.
-2. Play each converted NPC through every branch — offer/decline, in-progress, turn-in, refusal-to-battle, recruit, quest-gated recruit — the same regression pass the data migration used.
-3. Decide whether `.dialogue.json` stays a supported input (it is the editor's native output for brand-new conversations) or becomes legacy once the content is Yarn. Recommendation: keep both; the editor writes JSON for a `dialogue new`, and an author converts to Yarn when the conversation is worth writing prose in.
+1. All six intro conversations (`intro.dockmaster_hale`, `intro.chief_marlow`, `intro.chief_marlow_recruit`, `intro.rig`, `intro.vex`, `intro.shopkeeper`) are now `.yarn`; the `.dialogue.json` files are gone. Each was hand-written in the nested style — an option's reply indented under it rather than jumping to a node of its own — so the scripts read as dialogue. Nodes that more than one branch links to (`declined`, `complete`, `turnin`) keep their own `title:`, because they are real destinations; the ids of inlined replies are generated (`offer__2`) and no longer show under their old names in the editor's node list. Nothing outside the file referenced them — a role names a conversation id, never a node id.
+2. **Equivalence was checked mechanically, not by eye.** A throwaway harness compared each new `.yarn` graph against the `.dialogue.json` it replaced as a bisimulation from the entry node — same speakers, text, effects, conditions, choice order and branch order, up to node renaming — and was itself checked by mutating a script and confirming it failed. That is what made deleting the JSON safe in one commit.
+3. The branch-by-branch regression pass lives on as `Tests/IntroDialogueBranchTests.cs`, which plays the committed conversations through `DialogueRuntime` against real `GameState`s: offer/decline, the in-progress reminder, turn-in (including picking the cube up before taking the quest), refusal-to-battle, a beaten Hale backing down, the bounty paid before *and* after Vex falls, both recruits, a full party, Vex's despawning fight, and the shop hand-off. `Tests/DialogueMigrationTests.cs` now scans both formats.
+4. `.dialogue.json` stays a supported input — it is still what the editor writes for a `dialogue new` — and `Tests/YarnDialogueTests.cs` guards that a conversation crosses between the two formats unchanged in both directions.
 
-**Done when:** the intro NPCs' conversations are `.yarn` files, behave identically in game, and the dialogue editor still opens and saves them.
+**Done when:** the intro NPCs' conversations are `.yarn` files, behave identically in game, and the dialogue editor still opens and saves them. ✅ — with the caveat that a hands-on playthrough of the six NPCs is the half of the acceptance no test can cover.
 
 ## Phase 3 — Game-state bridge (world flags)
 
@@ -64,7 +65,7 @@ Most of this vocabulary already exists and is what Yarn commands compile to. Wha
 - `<<play_anim ...>>` / camera or emote niceties.
 - Keep command handlers thin — they call the owning system's API, no game logic inside dialogue glue (`DialogueEffects` already holds this line).
 
-**Done when:** a full "fetch" loop authored purely in Yarn works: NPC starts a quest, notices the fetched item, takes it, and rewards the player. (The Maguffin loop already does this from data; the acceptance is doing it from a `.yarn` file, which Phase 2 delivers.)
+**Done when:** a full "fetch" loop authored purely in Yarn works: NPC starts a quest, notices the fetched item, takes it, and rewards the player. ✅ — `intro.dockmaster_hale.yarn` is that loop, and `Tests/IntroDialogueBranchTests.cs` walks it. What is left above is polish, not the loop.
 
 ## Phase 5 — Production concerns (defer until content ramps)
 

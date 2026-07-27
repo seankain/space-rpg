@@ -1,0 +1,12 @@
+// Vex — the deck tough. "Settle it" launches a real turn-based battle and, on
+// the player's win, despawns him for good (recorded in DefeatedNpcs).
+
+title: greet
+---
+$npc: This is my stretch of deck, groundsider. Turn around, or we settle it right here.
+-> Settle it
+    <<start_battle despawn>>
+    <<stop>>
+-> Walk away
+    $npc: Smart. Keep walking.
+===
