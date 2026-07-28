@@ -349,4 +349,55 @@ public class IntroDialogueBranchTests
 
         Assert.Contains("Mind the merchandise", Pick(greet, "Just looking").Text);
     }
+
+    [Fact]
+    public void TheShopkeeperGreetsYouDifferentlyTheSecondTime()
+    {
+        // The world-flag payoff (npc-dialogue-yarn.md Phase 3): the first visit
+        // sets met_shopkeeper as the line shows, and every visit after that gets
+        // the returning-customer greeting.
+        var state = new GameState();
+        var first = Play("intro.shopkeeper", state);
+        Assert.Contains("Welcome in", first.Text);
+        Assert.False(state.IsFlagSet("met_shopkeeper"));
+
+        first.OnShown?.Invoke();
+        Assert.True(state.IsFlagSet("met_shopkeeper"));
+
+        var second = Play("intro.shopkeeper", state);
+        Assert.Contains("Back again", second.Text);
+        // Both greetings offer the same two options and share the reply.
+        Assert.Equal(
+            first.Choices.Select(c => c.Label),
+            second.Choices.Select(c => c.Label));
+        Assert.Contains("Mind the merchandise", Pick(second, "Just looking").Text);
+    }
+
+    [Fact]
+    public void TheShopkeeperStillRemembersYouAfterASaveAndReload()
+    {
+        // The other half of the Phase 3 acceptance: the flag is save state, not
+        // session state.
+        var root = Path.Combine(Path.GetTempPath(), $"spacerpg-intro-{Guid.NewGuid():N}");
+        try
+        {
+            var state = new GameState { CurrentLevelPath = "res://Scenes/Levels/ShopInterior.tscn" };
+            Play("intro.shopkeeper", state).OnShown?.Invoke();
+
+            var repository = new SaveRepository(root);
+            var slotId = Guid.NewGuid();
+            repository.Save(
+                new SaveData { SlotId = slotId, SaveVersion = SaveRepository.CurrentSaveVersion }, state);
+
+            var reloaded = repository.LoadState(slotId);
+            Assert.Contains("Back again", Play("intro.shopkeeper", reloaded).Text);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }

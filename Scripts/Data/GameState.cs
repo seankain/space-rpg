@@ -34,6 +34,59 @@ public class GameState
     // and chunk reloads and quests can check for them. Pre-v7 saves stored
     // display names; SaveManager migrates those through NpcDatabase on load.
     public List<string> DefeatedNpcs {get;set;} = new();
+    // Ad-hoc world flags a conversation sets and reads — "met_hale",
+    // "hale_mood" — the general-purpose slot the quest/inventory/defeated-NPC
+    // state doesn't cover (npc-dialogue-yarn.md Phase 3). Values are strings so
+    // a flag can carry a little state ("angry", "2") as well as a yes/no.
+    // Pre-v8 saves have no Flags and load with none.
+    //
+    // Keys are normalized (trimmed, lower-cased) by the accessors below rather
+    // than by a case-insensitive comparer, because System.Text.Json rebuilds
+    // this dictionary with the default comparer on load — a comparer set here
+    // would silently apply to new games only.
+    public Dictionary<string, string> Flags {get;set;} = new();
+
+    public string GetFlag(string name)
+    {
+        var key = FlagKey(name);
+        return key != null && Flags.TryGetValue(key, out var value) ? value : null;
+    }
+
+    // What flag("x") asks: the flag holds something that isn't an explicit no.
+    public bool IsFlagSet(string name) => IsFlagTruthy(GetFlag(name));
+
+    // Setting an empty value clears the flag, so "unset" has one representation
+    // and a cleared flag doesn't linger in every save file.
+    public void SetFlag(string name, string value)
+    {
+        var key = FlagKey(name);
+        if (key == null)
+        {
+            return;
+        }
+        if (string.IsNullOrEmpty(value))
+        {
+            Flags.Remove(key);
+            return;
+        }
+        Flags[key] = value;
+    }
+
+    public void ClearFlag(string name) => SetFlag(name, null);
+
+    // A value counts as set unless it explicitly says otherwise, so
+    // `set_flag met_hale false` reads as "not met" rather than "met, with a
+    // funny value".
+    public static bool IsFlagTruthy(string value) =>
+        !string.IsNullOrEmpty(value)
+        && !value.Equals("false", StringComparison.OrdinalIgnoreCase)
+        && value != "0";
+
+    private static string FlagKey(string name)
+    {
+        var trimmed = name?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed.ToLowerInvariant();
+    }
 
     public QUESTSUCCESSSTATE GetQuestState(uint questId) =>
         Quests.FirstOrDefault(q => q.QuestId == questId)?.State ?? QUESTSUCCESSSTATE.Unstarted;

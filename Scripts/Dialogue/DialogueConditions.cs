@@ -12,6 +12,15 @@ public static class DialogueConditions
     public static readonly string[] Ids =
     {
         "quest_state", "has_item", "npc_defeated", "party_has_room",
+        "flag", "party_size", "stat",
+    };
+
+    // The stats stat(...) can gate on, spelled as CharacterStats names.
+    // Charisma is the one the build plan earmarks for dialogue, but there is no
+    // reason to special-case it.
+    public static readonly string[] StatNames =
+    {
+        "Strength", "Intelligence", "Constitution", "Dexterity", "Wisdom", "Charisma",
     };
 
     // Static check for the editor's pre-save validation (dialogue-editor plan
@@ -64,6 +73,33 @@ public static class DialogueConditions
                     : "npc_defeated takes <npcId>";
             case "party_has_room":
                 return a.Length == 0 ? null : "party_has_room takes no arguments";
+            case "flag":
+                if (a.Length is < 1 or > 2)
+                {
+                    return "flag takes <flag> [value] (one arg asks whether it is set)";
+                }
+                if (string.IsNullOrWhiteSpace(a[0]))
+                {
+                    return "flag: the flag name is empty";
+                }
+                return TokenRef.ArgFormatError("flag", "flag name", a[0])
+                    ?? TokenRef.ArgFormatError("flag", "value", a.Length > 1 ? a[1] : null);
+            case "party_size":
+                if (a.Length != 1)
+                {
+                    return "party_size takes <atLeast>";
+                }
+                return uint.TryParse(a[0], out _) ? null : $"party_size: '{a[0]}' is not a whole number";
+            case "stat":
+                if (a.Length != 2)
+                {
+                    return $"stat takes <{string.Join("|", StatNames)}> <atLeast>";
+                }
+                if (StatName(a[0]) == null)
+                {
+                    return $"stat: '{a[0]}' is not a stat ({string.Join(", ", StatNames)})";
+                }
+                return uint.TryParse(a[1], out _) ? null : $"stat: '{a[1]}' is not a whole number";
             default:
                 return $"unknown condition '{condition.Id}'";
         }
@@ -96,10 +132,89 @@ public static class DialogueConditions
                 return NpcDefeated(condition, context);
             case "party_has_room":
                 return !new PartyManager(context.State.Party).IsFull;
+            case "flag":
+                return Flag(condition, context);
+            case "party_size":
+                return TryUInt(condition, 0, context, out var atLeast)
+                    && context.State.Party.Count >= atLeast;
+            case "stat":
+                return Stat(condition, context);
             default:
                 context.Warn($"Unknown dialogue condition '{condition.Id}'.");
                 return false;
         }
+    }
+
+    // flag("met_hale") — is it set at all? flag("hale_mood", "angry") — does it
+    // hold that value? A second arg of "" asks whether the flag is unset, which
+    // is how an author writes the negative case the vocabulary otherwise has no
+    // way to express.
+    private static bool Flag(ConditionRef condition, DialogueContext context)
+    {
+        var name = condition.Arg(0);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            context.Warn("Dialogue condition 'flag' expected a flag name arg 0.");
+            return false;
+        }
+        if (condition.Args.Length < 2)
+        {
+            return context.State.IsFlagSet(name);
+        }
+        var expected = condition.Arg(1) ?? "";
+        var actual = context.State.GetFlag(name) ?? "";
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // stat("Charisma", 12): the party leader's stat — the character the player
+    // is speaking as — is at least that high. Stat-gated options (the build
+    // plan's dialogue modifier hook) are the point.
+    private static bool Stat(ConditionRef condition, DialogueContext context)
+    {
+        var name = StatName(condition.Arg(0));
+        if (name == null)
+        {
+            context.Warn($"Dialogue condition 'stat' names unknown stat '{condition.Arg(0)}'.");
+            return false;
+        }
+        if (!TryUInt(condition, 1, context, out var atLeast))
+        {
+            return false;
+        }
+        var stats = new PartyManager(context.State.Party).Leader?.Stats;
+        if (stats == null)
+        {
+            context.Warn("Dialogue condition 'stat' ran with no party leader; hiding.");
+            return false;
+        }
+        var value = name switch
+        {
+            "Strength" => stats.Strength,
+            "Intelligence" => stats.Intelligence,
+            "Constitution" => stats.Constitution,
+            "Dexterity" => stats.Dexterity,
+            "Wisdom" => stats.Wisdom,
+            _ => stats.Charisma,
+        };
+        return value >= atLeast;
+    }
+
+    // Canonical spelling of an authored stat name, or null when it isn't one.
+    // Case-insensitive so a script can say "charisma".
+    private static string StatName(string raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+        {
+            return null;
+        }
+        foreach (var name in StatNames)
+        {
+            if (name.Equals(raw, StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+        return null;
     }
 
     private static bool QuestState(ConditionRef condition, DialogueContext context)

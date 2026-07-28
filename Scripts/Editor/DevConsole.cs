@@ -115,6 +115,10 @@ public partial class DevConsole : CanvasLayer
         // Phase 5: quests.
         registry.Register(new QuestCommand());
         registry.Register(new QuestsCommand());
+        // World flags — dialogue state with no UI of its own
+        // (npc-dialogue-yarn.md Phase 3).
+        registry.Register(new FlagCommand());
+        registry.Register(new FlagsCommand());
         // Phase 6: convenience.
         registry.Register(new SaveCommand());
         registry.Register(new GotoCommand(this));
@@ -431,6 +435,10 @@ public partial class DevConsole : CanvasLayer
             "give" or "takeitem" when index == 1 => ItemCatalog.All.Select(i => i.Id.ToString()).ToList(),
             "quest" when index == 1 => new List<string> { "start", "set", "stage", "advance" },
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
+            "flag" when index == 1 => new List<string> { "set", "clear", "get" },
+            // Only flags that exist can be completed; a new one is typed out.
+            "flag" when index == 2 => SaveManager.Instance?.CurrentState?.Flags.Keys.ToList()
+                ?? new List<string>(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
             "list" when index == 1 => new List<string> { "npcs" },
             "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "play", "close", "assign" },

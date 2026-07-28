@@ -121,8 +121,18 @@ public class DialogueBranch
 // DialogueEffects and DialogueConditions dispatch on.
 public abstract class TokenRef
 {
+    public const char ArgSeparator = ':';
+
     public string Id { get; set; }
     public string[] Args { get; set; } = Array.Empty<string>();
+
+    // Verbs whose arguments are free-form text (a world-flag name or value)
+    // can't accept the separator: ToToken/Parse would split the argument in
+    // two. Returns null when the value is usable, else a reason to report.
+    public static string ArgFormatError(string verb, string what, string value) =>
+        value != null && value.IndexOf(ArgSeparator) >= 0
+            ? $"{verb}: {what} '{value}' can't contain '{ArgSeparator}'"
+            : null;
 
     public string Arg(int index) =>
         Args != null && index >= 0 && index < Args.Length ? Args[index] : null;

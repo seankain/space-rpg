@@ -19,9 +19,9 @@ That is what Phase 1 below now does, and it is done:
 - **One file, one conversation:** `Resources/Dialogue/<id>.yarn`, where the file stem is the conversation id — the same directory and id space as `<id>.dialogue.json`, discovered by the same scan. A conversation must live in *one* of the two forms; the catalog reports an id claimed by both.
 - **The file's nodes are the conversation's nodes.** A `title:` becomes the graph node id, so links and node names in the editor match what the writer typed. The first node in the file is the entry, unless another carries an `entry: true` header.
 - **`$npc` speaks as the NPC** playing the conversation (`DialogueGraph.SpeakerToken`), so a script isn't bound to one character. A line with no `Speaker:` prefix is narration.
-- **Commands are the `DialogueEffects` verbs** — `<<give_item 4 1>>`, `<<take_item 1>>`, `<<set_quest 1 Success>>`, `<<advance_quest 1>>`, `<<credits 50>>`, `<<recruit 2>>`, `<<start_battle>>`, `<<open_shop>>`. A command above a line runs when that line shows; at the end of a block it runs on the line it was written under; at the top of an option's body it runs when that option is picked.
-- **`<<if>>` takes one `DialogueConditions` call** — `has_item(1)`, `quest_state(1, "Success")`, `npc_defeated("intro.vex")`, `party_has_room()`. An `<<if>>` chain compiles to a router node; a `<<if>>` trailing an option gates that choice.
-- **No Yarn variables or expressions.** `$variables`, comparisons, `and`/`or`/`not`, `<<set>>`, `<<declare>>`, `<<wait>>` are rejected with a line-numbered message. Dialogue reads game state through the condition vocabulary; anything it can't ask for is a missing condition to add, not a Yarn expression to write. (Phase 3 is where a general world-flag store would land.)
+- **Commands are the `DialogueEffects` verbs** — `<<give_item 4 1>>`, `<<take_item 1>>`, `<<set_quest 1 Success>>`, `<<advance_quest 1>>`, `<<credits 50>>`, `<<recruit 2>>`, `<<start_battle>>`, `<<open_shop>>`, `<<set_flag met_hale>>`. A command above a line runs when that line shows; at the end of a block it runs on the line it was written under; at the top of an option's body it runs when that option is picked.
+- **`<<if>>` takes one `DialogueConditions` call** — `has_item(1)`, `quest_state(1, "Success")`, `npc_defeated("intro.vex")`, `party_has_room()`, `flag("met_hale")`, `party_size(2)`, `stat("Charisma", 12)`. An `<<if>>` chain compiles to a router node; a `<<if>>` trailing an option gates that choice.
+- **No Yarn variables or expressions.** `$variables`, comparisons, `and`/`or`/`not`, `<<set>>`, `<<declare>>`, `<<wait>>` are rejected with a line-numbered message. Dialogue reads and writes ad-hoc state through `flag()`/`<<set_flag>>` (Phase 3) and asks about the rest through the condition vocabulary; anything it can't ask for is a missing condition to add, not a Yarn expression to write.
 - **Editing preserves the format.** The in-game editor tracks which form a conversation came from (`DialogueGraph.SourceFormat`) and `dialogue save` writes it back the same way, so editing a `.yarn` conversation in-game doesn't leave a rival `.json` with the same id. `dialogue list` shows each conversation's format.
 - **Exported builds:** `.yarn` (like `.dialogue.json`) is a plain text file, not a Godot resource — an export preset's "non-resource files to export" filter needs `*.yarn` alongside `*.json` for a packaged build to find conversations.
 
@@ -47,21 +47,24 @@ That is what Phase 1 below now does, and it is done:
 
 **Done when:** the intro NPCs' conversations are `.yarn` files, behave identically in game, and the dialogue editor still opens and saves them. ✅ — with the caveat that a hands-on playthrough of the six NPCs is the half of the acceptance no test can cover.
 
-## Phase 3 — Game-state bridge (world flags)
+## Phase 3 — Game-state bridge (world flags) *(done)*
 
-The condition vocabulary covers quests, inventory, defeated NPCs, and party room. What it can't express is the ad-hoc `$met_dockmaster` flag a writer reaches for constantly.
+The condition vocabulary covered quests, inventory, defeated NPCs, and party room. What it couldn't express was the ad-hoc `$met_dockmaster` flag a writer reaches for constantly.
 
-1. A **world-flag store** in `GameState` (a `Dictionary<string, string>` in the world-state bucket, alongside `DefeatedNpcs`), with a `SaveVersion` bump and migration, so flags survive save/load.
-2. New vocabulary over it: a `flag("met_hale")` / `flag("met_hale", "2")` condition and a `<<set_flag met_hale true>>` effect — named verbs like every other, so the editor's dropdowns and the validator pick them up for free.
-3. Read-only facts worth exposing as conditions once something needs them: party size, leader name, and Charisma (the build plan's dialogue modifier) for stat-gated options.
+1. **`GameState.Flags`** — a `Dictionary<string, string>` in the world-state bucket, beside `DefeatedNpcs`, saved with everything else (`SaveVersion` 8; pre-v8 saves load with no flags, so a restored old save is simply greeted as a first meeting — no migration step needed). Values are strings, so a flag can carry a little state (`"angry"`, `"2"`) as well as a yes/no. Keys are normalized (trimmed, lower-cased) by the accessors rather than by a case-insensitive comparer, because `System.Text.Json` rebuilds the dictionary with the default comparer on load — a comparer set in the initializer would have applied to new games only.
+2. **Vocabulary:** the `<<set_flag met_hale>>` effect (value defaults to `"true"`; an explicitly empty one clears the flag) and the `flag("met_hale")` / `flag("hale_mood", "angry")` condition. "Set" means *holds something that isn't an explicit no*, so `set_flag met_hale false` reads back as not met rather than as a strange value. `flag("met_hale", "")` asks whether a flag is **unset** — the way to write the negative case in a vocabulary that has no `not`.
+3. **Stat- and party-gated options:** `stat("Charisma", 12)` (the party leader's stat, since the leader is who the player speaks as) and `party_size(2)`, both "at least" comparisons like `has_item`. Leader *name* was on this list and was deliberately left off: gating on a display string isn't a game fact, and what a writer actually wants there is text interpolation (`{$leader}`), which is a separate feature the graph has no slot for yet.
+4. **`flag` / `flags` console verbs** (`EditorFlagCommands`, debug-gated with the rest of the console): set, clear, read, and list flags. Flags are the one piece of save state with no UI anywhere — no quest log, no inventory tab — so without these an author could only reach a flag-gated branch by replaying the conversation that sets it. `flag get` also spells out when a value like `false` exists but reads as unset.
+5. **`intro.shopkeeper.yarn` is the demo:** the first visit sets `met_shopkeeper` and every visit after gets the returning-customer greeting. Both greetings share the "Just looking" reply, which is why the shared node keeps its own `title:`.
+6. **Tests:** `Tests/WorldFlagTests.cs` (the store, truthiness, key normalization, a save round trip, a hand-written pre-v8 save loading with no flags, every new verb's evaluation and validation, and the verbs authored in Yarn surviving a writer round trip), `Tests/EditorFlagCommandTests.cs` (the console verbs), and two cases in `Tests/IntroDialogueBranchTests.cs` — the shopkeeper's second greeting, and the same greeting after a save and reload.
 
-**Done when:** an NPC greets differently on second interaction, and after save/quit/load still remembers you.
+**Done when:** an NPC greets differently on second interaction, and after save/quit/load still remembers you. ✅ — the reload half is a test rather than a hands-on quit-and-restart.
 
 ## Phase 4 — Commands (dialogue acts on the world)
 
 Most of this vocabulary already exists and is what Yarn commands compile to. What is left:
 
-- `<<set_npc_flag NpcId Flag Value>>` (NPC plan Phase 4) — likely subsumed by Phase 3's flag store.
+- `<<set_npc_flag NpcId Flag Value>>` (NPC plan Phase 4) — **subsumed by Phase 3's flag store**: a per-NPC flag is `<<set_flag hale_mood angry>>` with a naming convention, not a second store. Revisit only if NPC state needs to be enumerable per NPC (a UI listing what an NPC remembers).
 - `<<play_anim ...>>` / camera or emote niceties.
 - Keep command handlers thin — they call the owning system's API, no game logic inside dialogue glue (`DialogueEffects` already holds this line).
 

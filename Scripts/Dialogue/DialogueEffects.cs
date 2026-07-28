@@ -15,7 +15,7 @@ public static class DialogueEffects
     public static readonly string[] Ids =
     {
         "give_item", "take_item", "set_quest", "advance_quest",
-        "credits", "recruit", "start_battle", "open_shop",
+        "credits", "recruit", "start_battle", "open_shop", "set_flag",
     };
 
     // Static check for the editor's pre-save validation (dialogue-editor plan
@@ -97,6 +97,17 @@ public static class DialogueEffects
                 return "start_battle takes an optional 'despawn'";
             case "open_shop":
                 return a.Length == 0 ? null : "open_shop takes no arguments";
+            case "set_flag":
+                if (a.Length is < 1 or > 2)
+                {
+                    return "set_flag takes <flag> [value] (default 'true'; an empty value clears it)";
+                }
+                if (string.IsNullOrWhiteSpace(a[0]))
+                {
+                    return "set_flag: the flag name is empty";
+                }
+                return TokenRef.ArgFormatError("set_flag", "flag name", a[0])
+                    ?? TokenRef.ArgFormatError("set_flag", "value", a.Length > 1 ? a[1] : null);
             default:
                 return $"unknown effect '{effect.Id}'";
         }
@@ -146,6 +157,9 @@ public static class DialogueEffects
                 break;
             case "open_shop":
                 RequireHost(context, effect)?.OpenShop();
+                break;
+            case "set_flag":
+                SetFlag(effect, context);
                 break;
             default:
                 context.Warn($"Unknown dialogue effect '{effect.Id}'.");
@@ -219,6 +233,20 @@ public static class DialogueEffects
         }
         var balance = (long)context.State.Credits + delta;
         context.State.Credits = (uint)Math.Max(0, balance);
+    }
+
+    // set_flag:<name>[:<value>] records ad-hoc world state ("met_hale") that
+    // survives saves. The value defaults to "true" — the common case is a
+    // yes/no — and an explicitly empty one clears the flag.
+    private static void SetFlag(EffectRef effect, DialogueContext context)
+    {
+        var name = effect.Arg(0);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            context.Warn("Dialogue effect 'set_flag' expected a flag name arg 0.");
+            return;
+        }
+        context.State.SetFlag(name, effect.Args.Length > 1 ? effect.Arg(1) : "true");
     }
 
     private static void Recruit(EffectRef effect, DialogueContext context)
