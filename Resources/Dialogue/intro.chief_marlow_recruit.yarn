@@ -21,6 +21,7 @@ title: offer
 $npc: Hey! You look like you're headed somewhere more interesting than this dock. Can I join up with you?
 -> Yes
     <<recruit 3>>
+    <<play_anim Cheering>>
     $npc: You won't regret it. Lead the way, boss!
 -> No
     $npc: Suit yourself. I'll be right here if you change your mind.

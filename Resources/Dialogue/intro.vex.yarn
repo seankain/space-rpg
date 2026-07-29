@@ -3,6 +3,9 @@
 
 title: greet
 ---
+// Blade out for the whole confrontation: a looping gesture holds until the
+// conversation closes (or the fight starts).
+<<play_anim Sword_Idle loop>>
 $npc: This is my stretch of deck, groundsider. Turn around, or we settle it right here.
 -> Settle it
     <<start_battle despawn>>

@@ -16,6 +16,7 @@ public static class DialogueEffects
     {
         "give_item", "take_item", "set_quest", "advance_quest",
         "credits", "recruit", "start_battle", "open_shop", "set_flag",
+        "play_anim",
     };
 
     // Static check for the editor's pre-save validation (dialogue-editor plan
@@ -108,6 +109,19 @@ public static class DialogueEffects
                 }
                 return TokenRef.ArgFormatError("set_flag", "flag name", a[0])
                     ?? TokenRef.ArgFormatError("set_flag", "value", a.Length > 1 ? a[1] : null);
+            case "play_anim":
+                if (a.Length is < 1 or > 2)
+                {
+                    return "play_anim takes <clip> [loop]";
+                }
+                if (DialogueAnimations.Resolve(a[0]) == null)
+                {
+                    return $"play_anim: '{a[0]}' is not a dialogue clip "
+                        + $"({string.Join(", ", DialogueAnimations.Ids)})";
+                }
+                return a.Length == 1 || a[1] == LoopArg
+                    ? null
+                    : $"play_anim: second argument is '{LoopArg}' or nothing, got '{a[1]}'";
             default:
                 return $"unknown effect '{effect.Id}'";
         }
@@ -160,6 +174,9 @@ public static class DialogueEffects
                 break;
             case "set_flag":
                 SetFlag(effect, context);
+                break;
+            case "play_anim":
+                PlayAnimation(effect, context);
                 break;
             default:
                 context.Warn($"Unknown dialogue effect '{effect.Id}'.");
@@ -233,6 +250,25 @@ public static class DialogueEffects
         }
         var balance = (long)context.State.Credits + delta;
         context.State.Credits = (uint)Math.Max(0, balance);
+    }
+
+    // The optional second argument of play_anim: keep the clip looping instead
+    // of playing it once and settling back into idle.
+    public const string LoopArg = "loop";
+
+    // play_anim:<clip>[:loop] plays a gesture on the speaking NPC — the one
+    // verb here that changes nothing but what you see. A one-shot returns the
+    // NPC to idle when it finishes; a looping one runs until the conversation
+    // closes (or another play_anim replaces it).
+    private static void PlayAnimation(EffectRef effect, DialogueContext context)
+    {
+        var clip = DialogueAnimations.Resolve(effect.Arg(0));
+        if (clip == null)
+        {
+            context.Warn($"Dialogue effect 'play_anim' names unknown clip '{effect.Arg(0)}'.");
+            return;
+        }
+        RequireHost(context, effect)?.PlayAnimation(clip, effect.Arg(1) == LoopArg);
     }
 
     // set_flag:<name>[:<value>] records ad-hoc world state ("met_hale") that

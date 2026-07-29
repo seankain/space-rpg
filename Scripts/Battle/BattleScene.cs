@@ -25,7 +25,8 @@ public partial class BattleScene : Node3D
     // The same Knight body Player.tscn wears in the field, as a rig wrapper.
     private const string PlayerRigPath = "res://Scenes/Characters/Rigs/Knight.tscn";
 
-    private const string AnimationDirectory = "res://ThirdParty/AnimationLibrary";
+    // Same clip directory the rigs load their on-demand animations from.
+    private const string AnimationDirectory = CharacterRig.ClipDirectory;
     private const string AnimLibName = "BattleAnimLib";
     private const string IdleAnim = "Idle";
     private const string DeathAnim = "Death";

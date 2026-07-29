@@ -68,6 +68,7 @@ $npc: Then keep your credits out of his reach, and don't say I didn't warn you.
 
 title: turnin
 ---
+<<play_anim Use_Item>>
 <<give_item 5>>
 <<set_quest 2 Success>>
 $npc: So the deck finally goes quiet. A deal's a deal — here's the maintenance keycard. It'll open doors most people never get to see.

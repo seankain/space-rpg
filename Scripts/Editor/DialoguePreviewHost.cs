@@ -22,4 +22,10 @@ public sealed class DialoguePreviewHost : IDialogueEffectHost
 
 	public void Recruit(ulong partyCharacterId) =>
 		log($"[preview] recruit:{partyCharacterId} — skipped in preview.");
+
+	// A gesture is harmless, but a preview has no speaking NPC to play it on
+	// (it runs a graph by id, not a conversation with somebody), so it is
+	// reported like the rest.
+	public void PlayAnimation(string clip, bool loop) =>
+		log($"[preview] play_anim:{clip}{(loop ? ":loop" : "")} — no NPC in preview.");
 }

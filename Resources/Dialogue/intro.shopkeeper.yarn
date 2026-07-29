@@ -27,6 +27,7 @@ $npc: Welcome in. Best prices on the station — care to see my stock?
 
 title: regular
 ---
+<<play_anim Waving>>
 $npc: Back again. Stock's turned over since you were last in — take a look.
 -> Let's trade
     <<open_shop>>

@@ -29,6 +29,11 @@ public class IntroDialogueBranchTests
         public void OpenShop() => Shops++;
 
         public void Recruit(ulong partyCharacterId) => Recruited.Add(partyCharacterId);
+
+        public readonly List<string> Animations = new();
+
+        public void PlayAnimation(string clip, bool loop) =>
+            Animations.Add(loop ? $"{clip}:loop" : clip);
     }
 
     private const uint MaguffinQuest = 1;
@@ -67,6 +72,8 @@ public class IntroDialogueBranchTests
 
     // Compiles a conversation the way an NPC role does, and fails on any runtime
     // warning (a dangling link or an unknown verb reports through the context).
+    // A host is always supplied — the scene verbs warn without one, and a
+    // conversation is free to gesture on any line.
     private static DialogueLine Play(string id, GameState state, FakeHost host = null, string speaker = "NPC")
     {
         var warnings = new List<string>();
@@ -74,7 +81,7 @@ public class IntroDialogueBranchTests
         {
             State = state,
             SpeakerName = speaker,
-            Host = host,
+            Host = host ?? new FakeHost(),
             LogWarning = warnings.Add,
         };
         var line = DialogueRuntime.Compile(Conversations[id], context);
@@ -150,17 +157,20 @@ public class IntroDialogueBranchTests
     public void HaleRemindsYouWhileTheQuestRunsAndTakesTheCubeOnTurnIn()
     {
         var state = new GameState();
+        var host = new FakeHost();
         state.SetQuestState(MaguffinQuest, QUESTSUCCESSSTATE.InProgress);
-        Assert.Contains("Any sign of my Maguffin Cube", Play("intro.dockmaster_hale", state).Text);
+        Assert.Contains("Any sign of my Maguffin Cube", Play("intro.dockmaster_hale", state, host).Text);
 
         state.Inventory.Add(MaguffinCube, 1);
-        var turnin = Play("intro.dockmaster_hale", state);
+        var turnin = Play("intro.dockmaster_hale", state, host);
         Assert.Contains("you found it", turnin.Text);
 
         var complete = Pick(turnin, "Hand it over");
         Assert.Contains("You have my thanks", complete.Text);
         Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(MaguffinQuest));
         Assert.Equal(0u, state.Inventory.CountOf(MaguffinCube));
+        // He reaches out and takes it as the line shows.
+        Assert.Equal(new[] { "PickUp" }, host.Animations);
     }
 
     [Fact]
@@ -237,14 +247,17 @@ public class IntroDialogueBranchTests
     public void MarlowPaysOutWhenVexIsDown()
     {
         var state = new GameState();
+        var host = new FakeHost();
         state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.InProgress);
         state.MarkNpcDefeated("intro.vex");
 
-        var turnin = Play("intro.chief_marlow", state);
+        var turnin = Play("intro.chief_marlow", state, host);
         turnin.OnShown?.Invoke();
         Assert.Contains("deck finally goes quiet", turnin.Text);
         Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(BountyQuest));
         Assert.Equal(1u, state.Inventory.CountOf(Keycard));
+        // He holds the keycard out as he says it.
+        Assert.Equal(new[] { "Use_Item" }, host.Animations);
     }
 
     [Fact]
@@ -291,6 +304,7 @@ public class IntroDialogueBranchTests
         var joined = Pick(Play(id, state, host), "Yes");
         Assert.Equal(new[] { memberId }, host.Recruited);
         Assert.Contains("Lead the way", joined.Text);
+        Assert.Equal(new[] { "Cheering" }, host.Animations);
     }
 
     [Theory]
@@ -323,6 +337,10 @@ public class IntroDialogueBranchTests
         var host = new FakeHost();
         var greet = Play("intro.vex", new GameState(), host);
         Assert.Contains("my stretch of deck", greet.Text);
+
+        // Blade out for the whole confrontation, not a one-shot flourish.
+        greet.OnShown?.Invoke();
+        Assert.Equal(new[] { "Sword_Idle:loop" }, host.Animations);
 
         Assert.Null(Pick(greet, "Settle it"));
         Assert.Equal(1, host.Battles);
@@ -364,8 +382,11 @@ public class IntroDialogueBranchTests
         first.OnShown?.Invoke();
         Assert.True(state.IsFlagSet("met_shopkeeper"));
 
-        var second = Play("intro.shopkeeper", state);
+        var host = new FakeHost();
+        var second = Play("intro.shopkeeper", state, host);
         Assert.Contains("Back again", second.Text);
+        second.OnShown?.Invoke();
+        Assert.Equal(new[] { "Waving" }, host.Animations);
         // Both greetings offer the same two options and share the reply.
         Assert.Equal(
             first.Choices.Select(c => c.Label),

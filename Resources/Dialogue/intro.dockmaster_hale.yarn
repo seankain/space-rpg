@@ -93,6 +93,7 @@ $npc: That cube is station property, courier. Last chance — hand it over, or I
 
 title: complete
 ---
+<<play_anim PickUp>>
 <<take_item 1>>
 <<set_quest 1 Success>>
 $npc: Yes, that's the one. You have my thanks, courier.
