@@ -2,12 +2,12 @@ using Godot;
 using System.Collections.Generic;
 
 // Bridges the scene-touching dialogue effects (start_battle, open_shop,
-// recruit) to a live Npc (dialogue-editor plan Phase 2). The pure verbs
-// (give_item, set_quest, …) mutate GameState directly inside DialogueEffects;
-// these three need the running node, so they live here where a Godot type can
-// reach the scene tree. Each body is a relocated role lambda — the same battle
-// hand-off, shop open, and recruit-and-follow the role classes used to run
-// inline.
+// recruit, play_anim) to a live Npc (dialogue-editor plan Phase 2). The pure
+// verbs (give_item, set_quest, …) mutate GameState directly inside
+// DialogueEffects; these need the running node, so they live here where a Godot
+// type can reach the scene tree. The first three bodies are relocated role
+// lambdas — the same battle hand-off, shop open, and recruit-and-follow the
+// role classes used to run inline.
 public sealed class NpcDialogueHost : IDialogueEffectHost
 {
 	private readonly Npc npc;
@@ -54,6 +54,10 @@ public sealed class NpcDialogueHost : IDialogueEffectHost
 		}
 		Callable.From(() => shopMenu.Open(merchant, npc.ShowPromptIfPlayerInRange)).CallDeferred();
 	}
+
+	// Gesture on the speaking NPC's rig (npc-dialogue-yarn.md Phase 4). The
+	// only verb here with no consequence beyond what the player sees.
+	public void PlayAnimation(string clip, bool loop) => npc.PlayDialogueAnimation(clip, loop);
 
 	// Copy this NPC into the party as the given character id, hand the world
 	// body off to a follower, and despawn it when the conversation closes

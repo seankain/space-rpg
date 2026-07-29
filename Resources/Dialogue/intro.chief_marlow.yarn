@@ -1,0 +1,75 @@
+// Chief Marlow — the "Clear the Deck" bounty (quest 2): put Vex down, report
+// back, get paid a Maintenance Keycard (item 5). The offer and turn-in both
+// check npc_defeated, so beating Vex before taking the bounty still pays out.
+
+title: entry
+---
+<<if quest_state(2, "Success")>>
+    <<jump already_done>>
+<<elseif quest_state(2, "InProgress")>>
+    <<jump inprogress>>
+<<else>>
+    <<jump offer>>
+<<endif>>
+===
+
+title: inprogress
+---
+<<if npc_defeated("intro.vex")>>
+    <<jump turnin>>
+<<else>>
+    <<jump inprogress_waiting>>
+<<endif>>
+===
+
+title: offer
+---
+<<if npc_defeated("intro.vex")>>
+    <<jump offer_downed>>
+<<else>>
+    <<jump offer_pending>>
+<<endif>>
+===
+
+title: already_done
+---
+$npc: Deck's been quiet since you put Vex on the plates. Keep that keycard handy — it opens more doors than you'd think.
+===
+
+title: inprogress_waiting
+---
+$npc: Vex is still strutting around the plaza like he owns it. The keycard's yours the moment that changes.
+===
+
+title: offer_pending
+---
+$npc: See that red-suited thug by the plaza? Vex. He's been shaking down every courier on this deck and my hands are tied. Put him down a peg and there's a maintenance keycard in it for you.
+-> I'll handle Vex
+    <<set_quest 2 InProgress>>
+    $npc: Watch yourself — he doesn't fight fair, and he keeps a drone at his back. Come see me when it's done.
+-> Not my problem
+    <<jump declined>>
+===
+
+title: offer_downed
+---
+$npc: Word is somebody already put Vex on the deck plates. That was you, wasn't it? I was about to post a bounty on him — say the word and it's yours.
+-> That was me
+    <<set_quest 2 InProgress>>
+    <<jump turnin>>
+-> Not my problem
+    <<jump declined>>
+===
+
+title: declined
+---
+$npc: Then keep your credits out of his reach, and don't say I didn't warn you.
+===
+
+title: turnin
+---
+<<play_anim Use_Item>>
+<<give_item 5>>
+<<set_quest 2 Success>>
+$npc: So the deck finally goes quiet. A deal's a deal — here's the maintenance keycard. It'll open doors most people never get to see.
+===

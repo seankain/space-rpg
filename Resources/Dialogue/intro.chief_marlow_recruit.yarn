@@ -1,0 +1,28 @@
+// Chief Marlow's second role, unlocked once the "Clear the Deck" bounty is
+// paid: he can join the party (member id 3). The role itself is quest-gated on
+// the NPC definition, so this conversation only ever plays after the bounty.
+
+title: entry
+---
+<<if party_has_room()>>
+    <<jump offer>>
+<<else>>
+    <<jump full>>
+<<endif>>
+===
+
+title: full
+---
+$npc: Looks like you're already running a full crew. Come find me if a spot opens up.
+===
+
+title: offer
+---
+$npc: Hey! You look like you're headed somewhere more interesting than this dock. Can I join up with you?
+-> Yes
+    <<recruit 3>>
+    <<play_anim Cheering>>
+    $npc: You won't regret it. Lead the way, boss!
+-> No
+    $npc: Suit yourself. I'll be right here if you change your mind.
+===

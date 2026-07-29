@@ -46,4 +46,11 @@ public interface IDialogueEffectHost
     // recruit:<partyCharacterId>: adds the speaking NPC to the party as the
     // given character id and hands off the world body to a follower.
     void Recruit(ulong partyCharacterId);
+
+    // play_anim:<clip>[:loop]: plays a gesture on the speaking NPC's rig
+    // (npc-dialogue-yarn.md Phase 4). The clip is one of DialogueAnimations.Ids,
+    // already resolved to its canonical spelling. Unlike the other verbs here
+    // this one changes nothing but what the player sees, so an NPC with no rig
+    // simply doesn't gesture.
+    void PlayAnimation(string clip, bool loop);
 }

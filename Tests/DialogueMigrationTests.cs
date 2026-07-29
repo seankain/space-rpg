@@ -4,12 +4,13 @@ using System.IO;
 using System.Linq;
 using Xunit;
 
-// Guards the Phase 2 migration: the committed Resources/Dialogue/*.dialogue.json
-// files must parse, name only known effect/condition verbs, and have every
-// link (Next, choice target, router branch) resolve to a real node. This is the
-// automated half of the "every branch behaves as before" acceptance — it can't
-// play the game, but it catches a typo'd node id or an invented verb before a
-// playthrough does.
+// Guards the migrated conversations: every committed file under
+// Resources/Dialogue — .dialogue.json or .yarn (npc-dialogue-yarn.md Phase 2
+// moved the intro NPCs to Yarn) — must parse, name only known effect/condition
+// verbs, and have every link (Next, choice target, router branch) resolve to a
+// real node. This is the automated half of the "every branch behaves as before"
+// acceptance — it can't play the game, but it catches a typo'd node id or an
+// invented verb before a playthrough does.
 public class DialogueMigrationTests
 {
     private static readonly HashSet<string> KnownEffects = new(DialogueEffects.Ids);
@@ -41,13 +42,30 @@ public class DialogueMigrationTests
         throw new DirectoryNotFoundException("Could not locate Resources/Dialogue above the test assembly.");
     }
 
+    // Both authored formats, loaded the way the game loads them: JSON straight
+    // off disk, Yarn through the compiler.
     private static List<(string name, DialogueGraph graph)> LoadAll()
     {
         var dir = DialogueDirectory();
-        return Directory.GetFiles(dir, "*.dialogue.json")
-            .OrderBy(p => p)
-            .Select(p => (Path.GetFileName(p), DialogueSerialization.FromJson(File.ReadAllText(p))))
-            .ToList();
+        var loaded = new List<(string, DialogueGraph)>();
+        foreach (var path in Directory.GetFiles(dir).OrderBy(p => p, StringComparer.Ordinal))
+        {
+            var name = Path.GetFileName(path);
+            if (name.EndsWith(".dialogue.json", StringComparison.Ordinal))
+            {
+                loaded.Add((name, DialogueSerialization.FromJson(File.ReadAllText(path))));
+            }
+            else if (name.EndsWith(YarnGraphCompiler.FileSuffix, StringComparison.Ordinal))
+            {
+                var problems = new List<string>();
+                var graph = YarnGraphCompiler.Compile(
+                    YarnGraphCompiler.IdFromFileName(name), File.ReadAllText(path), problems);
+                Assert.Empty(problems.Select(p => $"{name}: {p}"));
+                loaded.Add((name, graph));
+            }
+        }
+        Assert.NotEmpty(loaded);
+        return loaded;
     }
 
     [Fact]

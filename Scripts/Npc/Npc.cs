@@ -42,6 +42,8 @@ public partial class Npc : CharacterBody3D
 	private InteractionPrompt prompt;
 	private bool despawnWhenDialogueEnds;
 	private CharacterRig rig;
+	// True while a play_anim gesture owns the rig (see PlayDialogueAnimation).
+	private bool dialogueAnimation;
 
 	// Mutable per-NPC state the shared role resources can't hold themselves
 	// (a shopkeeper's Merchant), keyed by the role that created it.
@@ -173,9 +175,50 @@ public partial class Npc : CharacterBody3D
 		!playerInRange && !DialogueManager.IsDialogueActive && !DevConsole.IsEditorActive;
 
 	// Locomotion animation for behaviors; capsule NPCs have no rig and
-	// simply slide.
-	public void PlayLocomotion(bool moving) =>
+	// simply slide. A gesture a conversation asked for outranks it: behaviors
+	// call this every physics frame (Halt does, even while the body is frozen
+	// for a dialogue), so without the guard a play_anim clip would be stomped
+	// by idle on the very next frame.
+	public void PlayLocomotion(bool moving)
+	{
+		if (dialogueAnimation)
+		{
+			return;
+		}
 		rig?.Play(moving ? CharacterRig.WalkClip : CharacterRig.IdleClip);
+	}
+
+	// play_anim:<clip>[:loop] from the running conversation
+	// (npc-dialogue-yarn.md Phase 4). A one-shot clip returns the NPC to idle
+	// when it finishes; a looping one holds until the conversation closes or
+	// another gesture replaces it. An NPC still wearing the placeholder capsule
+	// has nothing to animate and silently doesn't gesture, exactly as it
+	// silently doesn't walk.
+	public void PlayDialogueAnimation(string clip, bool loop)
+	{
+		if (rig == null)
+		{
+			return;
+		}
+		if (!rig.PlayExtra(clip, loop))
+		{
+			GD.PushWarning($"Npc '{DisplayName}' could not load dialogue clip '{clip}'.");
+			return;
+		}
+		dialogueAnimation = true;
+	}
+
+	// Back to the neutral stand, whether the gesture ran out or the
+	// conversation closed under a looping one.
+	private void EndDialogueAnimation()
+	{
+		if (!dialogueAnimation)
+		{
+			return;
+		}
+		dialogueAnimation = false;
+		rig?.Play(CharacterRig.IdleClip);
+	}
 
 	// Roles whose actions remove the NPC from the world (a recruit joining)
 	// call this so the body lingers until the conversation closes.
@@ -227,6 +270,7 @@ public partial class Npc : CharacterBody3D
 
 	private void OnDialogueEnded()
 	{
+		EndDialogueAnimation();
 		if (despawnWhenDialogueEnds)
 		{
 			if (!IsQueuedForDeletion())
@@ -260,6 +304,10 @@ public partial class Npc : CharacterBody3D
 		{
 			capsule.QueueFree();
 		}
+		// A one-shot dialogue gesture hands the rig back when it runs out.
+		// Stationary NPCs never call PlayLocomotion, so this — not the
+		// behaviors — is what unfreezes them from a gesture's last pose.
+		rig.Anim.AnimationFinished += _ => EndDialogueAnimation();
 		rig.Play(CharacterRig.IdleClip);
 	}
 

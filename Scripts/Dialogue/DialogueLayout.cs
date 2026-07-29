@@ -4,7 +4,7 @@ using System.Text.Json;
 // Editor-only node positions for the graph-canvas view (dialogue-editor plan
 // Phase 5), stored in a sibling Resources/Dialogue/<id>.layout.json so the
 // gameplay <id>.dialogue.json stays minimal and the game never loads layout
-// (DialogueCatalog only scans *.dialogue.json). Engine-free and JSON-
+// (DialogueCatalog only scans *.dialogue.json and *.yarn). Engine-free and JSON-
 // serializable like the graph itself, so the round-trip is unit-tested.
 public class DialogueLayout
 {

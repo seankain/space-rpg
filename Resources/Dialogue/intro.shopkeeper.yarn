@@ -1,0 +1,42 @@
+// Trader Moss — the shop interior's merchant. "Let's trade" hands off to the
+// shop screen, so the conversation ends there.
+//
+// Also the demo for world flags (npc-dialogue-yarn.md Phase 3): the first visit
+// sets met_shopkeeper, and every visit after that gets the returning-customer
+// greeting instead — including after a save, quit and reload.
+
+title: greet
+---
+<<if flag("met_shopkeeper")>>
+    <<jump regular>>
+<<else>>
+    <<jump first_time>>
+<<endif>>
+===
+
+title: first_time
+---
+<<set_flag met_shopkeeper>>
+$npc: Welcome in. Best prices on the station — care to see my stock?
+-> Let's trade
+    <<open_shop>>
+    <<stop>>
+-> Just looking
+    <<jump just_looking>>
+===
+
+title: regular
+---
+<<play_anim Waving>>
+$npc: Back again. Stock's turned over since you were last in — take a look.
+-> Let's trade
+    <<open_shop>>
+    <<stop>>
+-> Just looking
+    <<jump just_looking>>
+===
+
+title: just_looking
+---
+$npc: Take your time. Mind the merchandise.
+===

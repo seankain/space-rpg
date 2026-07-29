@@ -25,6 +25,11 @@ public class DialogueGraphTests
 
         public void OpenShop() => Shops++;
         public void Recruit(ulong partyCharacterId) => Recruited.Add(partyCharacterId);
+
+        public readonly List<string> Animations = new();
+
+        public void PlayAnimation(string clip, bool loop) =>
+            Animations.Add(loop ? $"{clip}:loop" : clip);
     }
 
     private static DialogueContext Context(

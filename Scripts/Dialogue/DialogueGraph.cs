@@ -11,17 +11,26 @@ using System.Collections.Generic;
 // without cycles-as-references. DialogueRuntime compiles a graph into the
 // existing DialogueLine/DialogueChoice tree at play time.
 //
-// This is the placeholder format until Yarn Spinner lands
-// (docs/plans/npc-dialogue-yarn.md); keeping side effects and gating as a small
-// named vocabulary (DialogueEffects/DialogueConditions) means a future Yarn
-// bridge maps onto the same dispatcher rather than a rewrite.
+// This is also the format Yarn compiles into: keeping side effects and gating as
+// a small named vocabulary (DialogueEffects/DialogueConditions) is what let the
+// Yarn bridge (Scripts/Dialogue/Yarn/, docs/plans/npc-dialogue-yarn.md Phase 1)
+// map onto the same dispatcher instead of bringing a second runtime. A
+// conversation is authored either as <id>.dialogue.json or as <id>.yarn and ends
+// up here either way.
 public class DialogueGraph
 {
-    // Stable id, matching the file stem: Resources/Dialogue/<Id>.dialogue.json.
+    // Stable id, matching the file stem: Resources/Dialogue/<Id>.dialogue.json
+    // (or <Id>.yarn, for a conversation authored in Yarn).
     public string Id { get; set; }
     // Node the conversation starts on.
     public string EntryNodeId { get; set; }
     public List<DialogueNode> Nodes { get; set; } = new();
+
+    // Which on-disk form this conversation was loaded from, so the editor saves
+    // it back the same way instead of leaving a .json and a .yarn fighting over
+    // one id (npc-dialogue-yarn.md Phase 1). Not part of the file's contents.
+    [JsonIgnore]
+    public DialogueSourceFormat SourceFormat { get; set; }
 
     // A node whose Speaker equals this token renders as the speaking NPC's
     // display name (resolved from the play context), so authored data stays
@@ -44,6 +53,15 @@ public class DialogueGraph
         }
         return null;
     }
+}
+
+// How a conversation is written on disk: the editor's own JSON, or Yarn source
+// compiled by YarnGraphCompiler. Both produce the same graph — Yarn is an
+// authoring format, not a second runtime.
+public enum DialogueSourceFormat
+{
+    Json,
+    Yarn,
 }
 
 // One screen of dialogue: a speaker + line, on-shown side effects, and either
@@ -103,8 +121,18 @@ public class DialogueBranch
 // DialogueEffects and DialogueConditions dispatch on.
 public abstract class TokenRef
 {
+    public const char ArgSeparator = ':';
+
     public string Id { get; set; }
     public string[] Args { get; set; } = Array.Empty<string>();
+
+    // Verbs whose arguments are free-form text (a world-flag name or value)
+    // can't accept the separator: ToToken/Parse would split the argument in
+    // two. Returns null when the value is usable, else a reason to report.
+    public static string ArgFormatError(string verb, string what, string value) =>
+        value != null && value.IndexOf(ArgSeparator) >= 0
+            ? $"{verb}: {what} '{value}' can't contain '{ArgSeparator}'"
+            : null;
 
     public string Arg(int index) =>
         Args != null && index >= 0 && index < Args.Length ? Args[index] : null;

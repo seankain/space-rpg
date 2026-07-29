@@ -37,9 +37,11 @@ public sealed class DialogueCommand : IConsoleCommand
 
 	private static CommandResult List()
 	{
+		// The format is listed because that is what 'dialogue save' writes back
+		// (npc-dialogue-yarn.md Phase 1).
 		var ids = DialogueCatalog.All
 			.OrderBy(g => g.Id, System.StringComparer.OrdinalIgnoreCase)
-			.Select(g => $"  {g.Id}  ({g.Nodes.Count} nodes)")
+			.Select(g => $"  {g.Id}  ({g.Nodes.Count} nodes, {g.SourceFormat.ToString().ToLowerInvariant()})")
 			.ToList();
 		return ids.Count == 0
 			? CommandResult.Ok("No dialogue files under Resources/Dialogue.")

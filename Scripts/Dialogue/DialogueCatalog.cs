@@ -4,17 +4,24 @@ using System.Collections.Generic;
 // Discovers and caches the serialized conversations, keyed by DialogueGraph.Id
 // (dialogue-editor plan Phase 1). Same manifest-free, directory-is-the-content
 // pattern as NpcDatabase/ChunkManager: authoring a conversation is just saving
-// a <id>.dialogue.json under Resources/Dialogue, no index to drift. The graphs
-// are read once on first use and cached; Invalidate() drops the cache so the
-// in-game editor's save can make an edited conversation play live (Phase 4).
+// a <id>.dialogue.json — or a <id>.yarn (npc-dialogue-yarn.md Phase 1) — under
+// Resources/Dialogue, no index to drift. The graphs are read once on first use
+// and cached; Invalidate() drops the cache so the in-game editor's save can make
+// an edited conversation play live (Phase 4).
+//
+// Both formats produce the same DialogueGraph: .yarn files are compiled by
+// YarnGraphCompiler at load, so writers can author in Yarn while the runtime,
+// the editor, and the effect/condition vocabulary stay as they are.
 //
 // Godot-facing (DirAccess + FileAccess so exported .pck builds resolve res://),
-// so it stays out of the engine-free xunit build; the JSON round-trip itself
-// lives in DialogueSerialization, which the tests exercise directly.
+// so it stays out of the engine-free xunit build; the JSON round-trip and the
+// Yarn compile themselves live in DialogueSerialization/YarnGraphCompiler,
+// which the tests exercise directly.
 public static class DialogueCatalog
 {
     public const string DialogueDirectory = "res://Resources/Dialogue";
     public const string FileSuffix = ".dialogue.json";
+    public const string YarnSuffix = YarnGraphCompiler.FileSuffix;
 
     private static Dictionary<string, DialogueGraph> graphs;
 
@@ -51,34 +58,36 @@ public static class DialogueCatalog
             // the catalog is simply empty until one lands.
             return;
         }
-        foreach (var subdirectory in dir.GetDirectories())
+        var subdirectories = dir.GetDirectories();
+        System.Array.Sort(subdirectories, System.StringComparer.Ordinal);
+        foreach (var subdirectory in subdirectories)
         {
             LoadDirectory($"{directoryPath}/{subdirectory}");
         }
-        foreach (var file in dir.GetFiles())
+        // Sorted so which file wins an id clash (a .json and a .yarn claiming
+        // the same conversation) does not depend on directory listing order.
+        var files = dir.GetFiles();
+        System.Array.Sort(files, System.StringComparer.Ordinal);
+        foreach (var file in files)
         {
             // Exported builds list resource files with a .remap suffix.
             var name = file.EndsWith(".remap") ? file[..^".remap".Length] : file;
-            if (!name.EndsWith(FileSuffix))
+            if (name.EndsWith(FileSuffix))
             {
-                continue;
+                Load($"{directoryPath}/{name}");
             }
-            Load($"{directoryPath}/{name}");
+            else if (name.EndsWith(YarnSuffix))
+            {
+                LoadYarn($"{directoryPath}/{name}");
+            }
         }
     }
 
     private static void Load(string path)
     {
-        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
-        if (file == null)
+        var json = ReadText(path);
+        if (json == null)
         {
-            GD.PushError($"Dialogue file '{path}' could not be read: {FileAccess.GetOpenError()}");
-            return;
-        }
-        var json = file.GetAsText();
-        if (string.IsNullOrEmpty(json))
-        {
-            GD.PushError($"Dialogue file '{path}' is empty.");
             return;
         }
 
@@ -97,9 +106,55 @@ public static class DialogueCatalog
             GD.PushError($"Dialogue file '{path}' has no Id.");
             return;
         }
+        graph.SourceFormat = DialogueSourceFormat.Json;
+        Add(graph, path);
+    }
+
+    // A .yarn file is one conversation whose id is the file stem (there is no
+    // Id field to read). Compile problems are reported and the graph is still
+    // cached, so a half-broken script is visible in the editor's validator
+    // rather than vanishing from the catalog.
+    private static void LoadYarn(string path)
+    {
+        var source = ReadText(path);
+        if (source == null)
+        {
+            return;
+        }
+        var id = YarnGraphCompiler.IdFromFileName(path);
+        var problems = new List<string>();
+        var graph = YarnGraphCompiler.Compile(id, source, problems);
+        foreach (var problem in problems)
+        {
+            GD.PushError($"{path}: {problem}");
+        }
+        Add(graph, path);
+    }
+
+    private static void Add(DialogueGraph graph, string path)
+    {
         if (!graphs.TryAdd(graph.Id, graph))
         {
-            GD.PushError($"Duplicate dialogue id '{graph.Id}' at '{path}'; keeping the first.");
+            GD.PushError(
+                $"Duplicate dialogue id '{graph.Id}' at '{path}'; keeping the first. "
+                + "A conversation lives in one file — either the .dialogue.json or the .yarn.");
         }
+    }
+
+    private static string ReadText(string path)
+    {
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (file == null)
+        {
+            GD.PushError($"Dialogue file '{path}' could not be read: {FileAccess.GetOpenError()}");
+            return null;
+        }
+        var text = file.GetAsText();
+        if (string.IsNullOrEmpty(text))
+        {
+            GD.PushError($"Dialogue file '{path}' is empty.");
+            return null;
+        }
+        return text;
     }
 }

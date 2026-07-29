@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 using System.Linq;
 
 // The Godot-facing side of dialogue editing (dialogue-editor plan Phase 4):
@@ -9,9 +10,10 @@ using System.Linq;
 // and validation live in Scripts/Dialogue; this is just the file I/O.
 public static class DialogueEditing
 {
-    // Validate then write the graph to its <id>.dialogue.json and invalidate the
-    // catalog so the next conversation plays the edit live. Errors block the
-    // save; warnings (orphans) are reported but allowed.
+    // Validate then write the graph to its <id>.dialogue.json (or <id>.yarn, if
+    // that is how it was authored) and invalidate the catalog so the next
+    // conversation plays the edit live. Errors block the save; warnings (orphans)
+    // are reported but allowed.
     public static CommandResult Save(DialogueGraph graph)
     {
         if (graph == null)
@@ -49,22 +51,35 @@ public static class DialogueEditing
             }
         }
 
-        var path = $"{directory}/{graph.Id}{DialogueCatalog.FileSuffix}";
-        var json = DialogueSerialization.ToJson(graph);
+        // A conversation is written back in the format it was authored in, so
+        // editing a .yarn script in-game keeps it Yarn instead of leaving a
+        // second file with the same id (npc-dialogue-yarn.md Phase 1).
+        var yarn = graph.SourceFormat == DialogueSourceFormat.Yarn;
+        var path = $"{directory}/{graph.Id}{(yarn ? DialogueCatalog.YarnSuffix : DialogueCatalog.FileSuffix)}";
+        var yarnProblems = new List<string>();
+        var contents = yarn
+            ? YarnGraphWriter.Write(graph, yarnProblems)
+            : DialogueSerialization.ToJson(graph);
         {
             using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
             if (file == null)
             {
                 return CommandResult.Fail($"Could not write '{path}': {FileAccess.GetOpenError()}.");
             }
-            file.StoreString(json);
+            file.StoreString(contents);
         }
         // File closed (using scope ended) before the rescan reads it back.
         DialogueCatalog.Invalidate();
 
-        var warnings = issues.Count(i => i.Severity == DialogueSeverity.Warning);
+        var warnings = issues.Count(i => i.Severity == DialogueSeverity.Warning) + yarnProblems.Count;
         var note = warnings > 0 ? $"  ({warnings} warning{(warnings == 1 ? "" : "s")})" : "";
-        return CommandResult.Ok($"Saved '{graph.Id}' to {path}.{note} Replay the NPC to see it live.");
+        // Anything Yarn couldn't express is named outright — the author is
+        // standing in front of the console and the file is already written.
+        var wrote = yarnProblems.Count > 0
+            ? "\n" + string.Join("\n", yarnProblems.Select(p => "  - " + p))
+            : "";
+        return CommandResult.Ok(
+            $"Saved '{graph.Id}' to {path}.{note} Replay the NPC to see it live.{wrote}");
     }
 
     // Point an NPC's first role at a conversation and re-save its definition

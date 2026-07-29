@@ -1,0 +1,33 @@
+// example.greeter — the sample conversation, authored in Yarn Spinner syntax
+// (docs/plans/npc-dialogue-yarn.md Phase 1). A .yarn file is one conversation:
+// its id is the file stem and its first node is where the conversation starts.
+//
+// $npc speaks as whichever NPC is playing this conversation. Commands
+// (<<give_item>>, <<take_item>>, ...) are the DialogueEffects vocabulary and
+// <<if>> takes one DialogueConditions call — the same fixed verbs the in-game
+// dialogue editor offers, so Yarn scripts and edited .dialogue.json graphs stay
+// interchangeable.
+
+title: hello
+---
+$npc: New around the station? I can point you somewhere useful.
+-> Where's the medbay?
+    <<jump medbay>>
+-> Here, take this cube off my hands <<if has_item(1)>>
+    <<take_item 1>>
+    $npc: Huh, a Maguffin Cube. I'll see it gets where it's going.
+-> Just passing through
+    <<jump farewell>>
+===
+
+title: medbay
+---
+<<give_item 4 1>>
+$npc: Two decks down, follow the green stripe. Here, a medkit for the road.
+<<jump farewell>>
+===
+
+title: farewell
+---
+$npc: Watch your step out there.
+===

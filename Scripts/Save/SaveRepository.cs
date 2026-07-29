@@ -23,7 +23,11 @@ public class SaveRepository
     //     of display names. The rewrite of legacy entries needs NpcDatabase
     //     (a Godot-side registry), so SaveManager performs it after
     //     LoadState rather than here.
-    public const int CurrentSaveVersion = 7;
+    // v8: GameState gained Flags, the world-flag store conversations set and
+    //     read (npc-dialogue-yarn.md Phase 3). Pre-v8 saves load with no flags
+    //     — the property default covers it, so there is no migration step; an
+    //     NPC simply greets a restored old save as if for the first time.
+    public const int CurrentSaveVersion = 8;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -104,6 +108,8 @@ public class SaveRepository
         state.Quests ??= new List<QuestProgress>();
         // Pre-v6 saves have no defeated-NPC record.
         state.DefeatedNpcs ??= new List<string>();
+        // Pre-v8 saves have no world flags.
+        state.Flags ??= new Dictionary<string, string>();
         // Pre-v4 saves stored placeholder enum slots whose properties no
         // longer bind; make sure every member has an (empty) slot block.
         state.Party ??= new List<CharacterEntity>();
