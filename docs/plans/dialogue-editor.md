@@ -147,7 +147,12 @@ without changing anything.
    edited version live.
 4. `dialogue new <id>` seeds an empty single-node graph to author a conversation from scratch,
    and `dialogue assign <npcId> <dialogueId>` points an NPC/role at it (updating and re-saving
-   the `NpcDefinition` `.tres` through the Phase-3 NPC save path).
+   the `NpcDefinition` `.tres` through the Phase-3 NPC save path). The editor-mode NPC form
+   ([in-game-editor.md](in-game-editor.md) Phase 7) does both from its **Conversations**
+   section: a row per role with a dialogue dropdown, an **Edit dialogue** button that opens
+   this editor on that conversation and returns to the NPC when it closes, and **New…** for a
+   fresh conversation named after the NPC — so authoring an NPC's dialogue never means
+   remembering two ids and typing two commands.
 5. **Tests** (`Tests/DialogueEditTests.cs`): graph edits (add/remove/relink node and choice)
    preserve a valid graph; the validator flags a dangling link, a missing entry, a bad effect
    arg; save→reload round-trips an edited graph byte-stably enough to diff cleanly in a PR.

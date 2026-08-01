@@ -233,8 +233,9 @@ console keeps every verb it has; nothing here removes a command.
    hand-placed NPC with no `.tres` behind it says so rather than pretending.
 7. **The NPC editor** (`Scripts/Editor/NpcEditorPanel.cs`): identity (id, display name), the
    **character mesh/rig** as a dropdown of `Scenes/Characters/Rigs/*.tscn`, the **character
-   sheet** (level, max HP/PP and the six stats), **credits**, and the **starting item** rows
-   (catalog dropdown + quantity + remove). It edits an engine-free `NpcEditModel`, validates
+   sheet** (level, max HP/PP and the six stats), **credits**, the **starting item** rows
+   (catalog dropdown + quantity + remove), and the **conversations** its roles play (see 9).
+   It edits an engine-free `NpcEditModel`, validates
    on every keystroke, and disables Save until the form is clean; Save writes the `.tres`
    through `EditorPlacement.SaveDefinition` (same debug gate, same `NpcDatabase.Invalidate`)
    and re-spawns the body so a rig swap shows immediately. An **existing NPC's id is
@@ -245,11 +246,22 @@ console keeps every verb it has; nothing here removes a command.
    party with its own sheet instead of the one shared template, and a challenger without an
    authored `EnemyCatalog` encounter fights with its own numbers. A definition without a
    block behaves exactly as before, so no committed `.tres` needs touching.
-9. **Tests** (`Tests/EditorFlyCameraTests.cs`, `Tests/NpcEditorTests.cs`): the flight
+9. **Conversations, edited in place.** The NPC editor's **Conversations** section lists one
+   row per role — the conversation it plays (a dropdown of every `DialogueCatalog` id, or
+   small talk), **Edit dialogue** to open it in the
+   [dialogue editor](dialogue-editor.md), and **New…** to start a fresh one named after the
+   NPC (`<npcId>`, then `<npcId>.2`). **+ conversation** gives an NPC with no roles a plain
+   talking one, so a just-placed NPC can be made to talk without a trip through the Godot
+   inspector — the point-and-click form of `dialogue assign`. The two panels take turns: the
+   NPC form hides while the dialogue editor is up and returns, rows refreshed from the
+   catalog, when it closes. Each save stays where it belongs — the dialogue editor's Save
+   writes the `.yarn`, the NPC form's Save writes the role's `DialogueId` into the `.tres` —
+   and a row still naming an unsaved conversation is called out rather than silently shipped.
+10. **Tests** (`Tests/EditorFlyCameraTests.cs`, `Tests/NpcEditorTests.cs`): the flight
    direction rules (opposing keys cancel, diagonals aren't faster, vertical is independent),
    speed/pitch/yaw clamping, the edit form's validation (empty/duplicate/file-hostile ids,
-   unknown items, zero quantities, every problem reported at once), item-row merging, and the
-   generated placement ids.
+   unknown items, zero quantities, file-hostile conversation ids, every problem reported at
+   once), item-row merging, and the generated placement and conversation ids.
 
 **Done when:** `editor` drops the author into a camera that flies with WASD/Space/Ctrl and
 looks on held right-mouse; the right-hand palette switches between navigating, placing, and

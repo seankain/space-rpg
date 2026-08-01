@@ -29,6 +29,15 @@ public partial class NpcEditorPanel : CanvasLayer
     // would otherwise rebuild the NPC dozens of times a second.
     public Action<float> FacingChanged { get; set; }
 
+    // Raised by a conversation row's "Edit dialogue" button with the id to
+    // open; DevConsole hands the graph to the dialogue editor and brings this
+    // form back when that panel closes.
+    public Action<string> EditDialogueRequested { get; set; }
+
+    // Same, for a conversation that doesn't exist yet: DevConsole seeds an
+    // empty graph under this id and opens it.
+    public Action<string> NewDialogueRequested { get; set; }
+
     // The working copy. Nothing is written to the definition — or to disk —
     // until DevConsole applies it on save. Seeded with defaults so the widgets
     // built in _Ready have something to read before the first Edit.
@@ -46,6 +55,7 @@ public partial class NpcEditorPanel : CanvasLayer
     private static readonly Color OkColor = new(0.55f, 0.85f, 0.6f);
 
     private const string NoRigLabel = "(none — capsule)";
+    private const string NoDialogueLabel = "(none — small talk)";
 
     private Label titleLabel;
     private Label placementLabel;
@@ -56,6 +66,7 @@ public partial class NpcEditorPanel : CanvasLayer
     private OptionButton rigPicker;
     private SpinBox rotationSpin;
     private SpinBox creditsSpin;
+    private VBoxContainer dialogueRows;
     private VBoxContainer itemRows;
     private OptionButton addItemPicker;
     private Button saveButton;
@@ -126,7 +137,17 @@ public partial class NpcEditorPanel : CanvasLayer
         statSpins["Wisdom"].Value = Model.Stats.Wisdom;
         statSpins["Charisma"].Value = Model.Stats.Charisma;
         suppressSignals = false;
+        RebuildDialogueRows();
         RebuildItemRows();
+        RefreshValidation();
+    }
+
+    // Re-reads the catalog into the conversation rows — DevConsole calls this
+    // when the dialogue editor closes, so a conversation just written shows as
+    // a real one instead of the "(not saved yet)" it was a moment ago.
+    public void RefreshDialogues()
+    {
+        RebuildDialogueRows();
         RefreshValidation();
     }
 
@@ -163,6 +184,153 @@ public partial class NpcEditorPanel : CanvasLayer
         RefreshValidation();
         PreviewRefreshRequested?.Invoke();
     }
+
+    // --- Conversations --------------------------------------------------------
+
+    // One row per role: which conversation it plays, a picker to re-point it at
+    // another, and the buttons that open the dialogue editor on it. Rebuilt
+    // whenever the set of conversations could have changed (a form load, a new
+    // row, a return from the dialogue editor).
+    private void RebuildDialogueRows()
+    {
+        foreach (var child in dialogueRows.GetChildren())
+        {
+            dialogueRows.RemoveChild(child);
+            child.QueueFree();
+        }
+        if (Model.Dialogues.Count == 0)
+        {
+            AddText(dialogueRows, "  (no roles — this NPC has nothing to say yet)", MutedColor, 14);
+        }
+        foreach (var link in Model.Dialogues)
+        {
+            AddDialogueRow(link);
+        }
+    }
+
+    private void AddDialogueRow(NpcDialogueLink link)
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 6);
+        dialogueRows.AddChild(row);
+
+        var label = new Label { Text = link.RoleLabel, CustomMinimumSize = new Vector2(96, 0) };
+        label.AddThemeColorOverride("font_color", link.IsNewRole ? OkColor : Colors.White);
+        label.TooltipText = link.IsNewRole
+            ? "A talking role this editor will add to the NPC when you save."
+            : "The role that plays this conversation.";
+        row.AddChild(label);
+
+        var picker = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        var ids = BuildDialoguePicker(picker, link.DialogueId);
+        picker.ItemSelected += index =>
+        {
+            if (suppressSignals || index < 0 || index >= ids.Count)
+            {
+                return;
+            }
+            link.DialogueId = ids[(int)index];
+            // The row's buttons and the "not saved yet" marker both depend on
+            // what is selected, so redraw rather than patch — deferred, because
+            // the dropdown raising this is one of the rows about to be freed.
+            Callable.From(RebuildDialogueRows).CallDeferred();
+            RefreshValidation();
+            SetStatus(
+                string.IsNullOrEmpty(link.DialogueId)
+                    ? "Role set to small talk. Save the NPC to keep it."
+                    : $"Role now plays '{link.DialogueId}'. Save the NPC to keep it.",
+                true);
+        };
+        row.AddChild(picker);
+
+        var edit = new Button
+        {
+            Text = "Edit dialogue",
+            FocusMode = Control.FocusModeEnum.None,
+            Disabled = string.IsNullOrEmpty(link.DialogueId) || DialogueCatalog.Get(link.DialogueId) == null,
+        };
+        edit.TooltipText = edit.Disabled
+            ? "No saved conversation on this role yet — pick one, or start a new one."
+            : $"Open '{link.DialogueId}' in the dialogue editor.";
+        edit.Pressed += () => EditDialogueRequested?.Invoke(link.DialogueId);
+        row.AddChild(edit);
+
+        var create = new Button { Text = "New…", FocusMode = Control.FocusModeEnum.None };
+        create.TooltipText = "Start a fresh conversation for this role and open it in the dialogue editor.";
+        create.Pressed += () => StartNewDialogue(link);
+        row.AddChild(create);
+    }
+
+    // Fills a row's dropdown with "(none)" plus every conversation in the
+    // catalog, and returns the ids by index. A conversation the role names that
+    // the catalog doesn't have is listed too — either it was just created here
+    // and not saved yet, or the role points at something that no longer exists;
+    // either way, hiding it would silently drop the author's link.
+    private List<string> BuildDialoguePicker(OptionButton picker, string current)
+    {
+        var ids = new List<string> { "" };
+        picker.AddItem(NoDialogueLabel);
+        foreach (var id in DialogueCatalog.Ids.OrderBy(i => i, StringComparer.OrdinalIgnoreCase))
+        {
+            ids.Add(id);
+            picker.AddItem(id);
+        }
+        var selected = string.IsNullOrEmpty(current) ? 0 : ids.IndexOf(current);
+        if (selected < 0)
+        {
+            ids.Add(current);
+            picker.AddItem($"{current}  (not saved yet)");
+            selected = ids.Count - 1;
+        }
+        picker.Select(selected);
+        return ids;
+    }
+
+    // "New…" on a row, and the "+ conversation" button (which adds the row
+    // first): name a free conversation after the NPC, point the role at it, and
+    // ask DevConsole to open an empty graph under that id. The link is only on
+    // the form until the NPC is saved; the conversation itself is written by
+    // the dialogue editor's own Save.
+    private void StartNewDialogue(NpcDialogueLink link)
+    {
+        var id = Model.SuggestDialogueId(IsDialogueIdTaken);
+        link.DialogueId = id;
+        RebuildDialogueRows();
+        RefreshValidation();
+        SetStatus($"New conversation '{id}'. Save it in the dialogue editor, then save the NPC to link it.", true);
+        NewDialogueRequested?.Invoke(id);
+    }
+
+    private void OnAddDialogueRole()
+    {
+        StartNewDialogue(Model.AddDialogueRole(""));
+    }
+
+    // Rows naming a conversation the catalog doesn't have: a "New…" the author
+    // never saved, or a role pointing at a file that has gone. Not save-
+    // blocking — in game the role just falls back to small talk — but the
+    // author should hear about it rather than find out in the conversation.
+    public string MissingDialogueWarning()
+    {
+        var missing = Model.Dialogues
+            .Select(d => d.DialogueId)
+            .Where(id => !string.IsNullOrEmpty(id) && DialogueCatalog.Get(id) == null)
+            .Distinct()
+            .ToList();
+        if (missing.Count == 0)
+        {
+            return null;
+        }
+        var tail = missing.Count == 1
+            ? "isn't saved yet — that role falls back to small talk until it is."
+            : "aren't saved yet — those roles fall back to small talk until they are.";
+        return $"Heads up: {string.Join(", ", missing)} {tail}";
+    }
+
+    // A conversation id is taken if the catalog has it or another row on this
+    // form already claimed it (a second new conversation in the same sitting).
+    private bool IsDialogueIdTaken(string id) =>
+        DialogueCatalog.Get(id) != null || Model.Dialogues.Any(d => d.DialogueId == id);
 
     private void RebuildItemRows()
     {
@@ -328,8 +496,35 @@ public partial class NpcEditorPanel : CanvasLayer
         scroll.AddChild(body);
 
         BuildIdentitySection(body);
+        BuildDialogueSection(body);
         BuildStatsSection(body);
         BuildLootSection(body);
+    }
+
+    // The NPC's conversations: what each of its roles says, editable in the
+    // dialogue editor without leaving the form (dialogue-editor plan Phase 4's
+    // `dialogue assign` and `dialogue open`, as buttons).
+    private void BuildDialogueSection(Node parent)
+    {
+        AddHeading(parent, "Conversations");
+        AddText(
+            parent,
+            "One row per role. Editing opens the dialogue editor; its Save writes the .yarn, "
+            + "and this form's Save keeps the link.",
+            MutedColor,
+            13,
+            wrap: true);
+
+        dialogueRows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        dialogueRows.AddThemeConstantOverride("separation", 3);
+        parent.AddChild(dialogueRows);
+
+        var add = new Button { Text = "+ conversation", FocusMode = Control.FocusModeEnum.None };
+        add.TooltipText =
+            "Add a plain talking role to this NPC and start a conversation for it. "
+            + "Other kinds of role (shop, quest, recruit) are still authored in the Godot inspector.";
+        add.Pressed += OnAddDialogueRole;
+        parent.AddChild(add);
     }
 
     private void BuildIdentitySection(Node parent)
@@ -468,9 +663,14 @@ public partial class NpcEditorPanel : CanvasLayer
         parent.AddChild(label);
     }
 
-    private static void AddText(Node parent, string text, Color color, int fontSize = 15)
+    private static void AddText(Node parent, string text, Color color, int fontSize = 15, bool wrap = false)
     {
         var label = new Label { Text = text };
+        if (wrap)
+        {
+            label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        }
         label.AddThemeColorOverride("font_color", color);
         label.AddThemeFontSizeOverride("font_size", fontSize);
         parent.AddChild(label);
