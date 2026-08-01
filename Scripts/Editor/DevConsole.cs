@@ -339,6 +339,7 @@ public partial class DevConsole : CanvasLayer
 
     public override void _Process(double delta)
     {
+        KeepInputFocused();
         if (!editorActive)
         {
             return;
@@ -390,6 +391,24 @@ public partial class DevConsole : CanvasLayer
         {
             NavigateHistory(1);
             GetViewport().SetInputAsHandled();
+        }
+    }
+
+    // Submitting a line hands focus back to nobody (the LineEdit consumes the
+    // Return keystroke but the viewport's focus owner ends up cleared), which
+    // left the user clicking into the field again for every command. While the
+    // console is open, take focus back whenever nothing else owns it — a
+    // dialogue-editor field the author is typing in keeps focus, so this only
+    // fills the gap.
+    private void KeepInputFocused()
+    {
+        if (!enabled || !Visible)
+        {
+            return;
+        }
+        if (GetViewport().GuiGetFocusOwner() == null)
+        {
+            input.GrabFocus();
         }
     }
 
@@ -459,6 +478,9 @@ public partial class DevConsole : CanvasLayer
             Input.MouseMode = Input.MouseModeEnum.Visible;
             input.Clear();
             input.GrabFocus();
+            // Anything printed while the panel was hidden laid out just now, so
+            // open on the newest line rather than wherever the log was left.
+            ScrollOutputToBottom();
         }
         else
         {
@@ -471,9 +493,11 @@ public partial class DevConsole : CanvasLayer
 
     private void OnCommandSubmitted(string text)
     {
-        // Keep the input ready for the next command regardless of outcome.
+        // Keep the input ready for the next command regardless of outcome. The
+        // grab is deferred so it lands after the viewport finishes routing the
+        // Return keystroke, which would otherwise drop focus right back off.
         input.Clear();
-        input.GrabFocus();
+        input.CallDeferred(Control.MethodName.GrabFocus);
         if (string.IsNullOrWhiteSpace(text))
         {
             return;
@@ -531,6 +555,25 @@ public partial class DevConsole : CanvasLayer
         output.AddText(text);
         output.Pop();
         output.Newline();
+        ScrollOutputToBottom();
+    }
+
+    // ScrollFollowing alone isn't enough: RichTextLabel only keeps following
+    // while the view is already pinned to the end, so scrolling back through
+    // the log (or printing while the panel is hidden) strands the newest lines
+    // off-screen. Pin the view to the last line after every print — deferred,
+    // because the text added above only re-flows at the end of the frame.
+    private void ScrollOutputToBottom() => Callable.From(ScrollOutputToEnd).CallDeferred();
+
+    private void ScrollOutputToEnd()
+    {
+        // GetLineCount forces the pending re-flow, so both the line index and
+        // the scrollbar range are current by the time we scroll.
+        var lines = output.GetLineCount();
+        if (lines > 0)
+        {
+            output.ScrollToLine(lines - 1);
+        }
     }
 
     private void BuildUi()
