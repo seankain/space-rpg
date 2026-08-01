@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 // Static definition of one enemy type. Instantiated into a BattleCombatant
@@ -25,6 +26,28 @@ public class BattleEncounter
 {
     public string IntroMessage { get; set; }
     public List<EnemyDefinition> Enemies { get; set; } = new();
+
+    // The line-up as one phrase for event-log entries: "Vex", "Vex and Dock
+    // Drone x2". Built from the definitions rather than the live combatants so
+    // repeats collapse into a count instead of BattleScene's per-body A/B
+    // suffixes.
+    public string OpponentSummary
+    {
+        get
+        {
+            var names = Enemies
+                .Select(enemy => string.IsNullOrWhiteSpace(enemy.Name) ? "an unknown foe" : enemy.Name)
+                .GroupBy(name => name)
+                .Select(group => group.Count() > 1 ? $"{group.Key} x{group.Count()}" : group.Key)
+                .ToList();
+            return names.Count switch
+            {
+                0 => "an unknown foe",
+                1 => names[0],
+                _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
+            };
+        }
+    }
 }
 
 // Encounters keyed by the challenging NPC's stable id (NpcDefinition.NpcId,

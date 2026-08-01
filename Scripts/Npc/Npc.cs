@@ -144,6 +144,11 @@ public partial class Npc : CharacterBody3D
 			GetViewport().SetInputAsHandled();
 			FacePlayer();
 			prompt.Visible = false;
+			// Logged as the conversation opens rather than when it closes, so
+			// the entry lands ahead of whatever the conversation goes on to
+			// give the player.
+			SaveManager.Instance?.CurrentState?.RecordEvent(
+				GameEventKind.Conversation, $"Spoke with {DisplayName}.");
 			DialogueManager.Instance.Start(ComposeDialogue(), OnDialogueEnded);
 		}
 	}

@@ -75,6 +75,7 @@ public partial class BattleManager : Node
         }
 
         var encounter = EnemyCatalog.GetEncounter(opponentId, opponentName);
+        state.RecordEvent(GameEventKind.Battle, $"Battle started against {encounter.OpponentSummary}.");
         var partyCombatants = state.Party.Select(BattleCombatant.FromPartyMember).ToList();
         var theme = BattleArenaTheme.GetForLocation(state.LocationName);
 

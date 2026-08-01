@@ -108,7 +108,6 @@ public sealed class NpcDialogueHost : IDialogueEffectHost
 		{
 			PartyMemberFollower.Spawn(player.GetParent(), member, party.Members.Count - 1, npc.GlobalPosition);
 		}
-		// TODO: HUD toast once PlayerHud grows one (same note as Pickup).
-		GD.Print($"{npc.DisplayName} joined the party.");
+		state.RecordEvent(GameEventKind.Party, $"{npc.DisplayName} joined the party.", notify: true);
 	}
 }

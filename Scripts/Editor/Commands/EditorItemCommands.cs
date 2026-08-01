@@ -75,6 +75,7 @@ public static class EditorItemCommands
         {
             return CommandResult.Fail($"Only holding {state.Inventory.CountOf(itemId)}x {item.Name}.");
         }
+        state.RecordEvent(GameEventKind.Item, $"Removed {item.Name} x{qty} (console).");
         return CommandResult.Ok($"Removed {qty}x {item.Name}. Inventory now holds {state.Inventory.CountOf(itemId)}.");
     }
 
@@ -103,6 +104,11 @@ public static class EditorItemCommands
             '-' => amount >= before ? 0u : before - amount,
             _ => amount,
         };
+        if (state.Credits != before)
+        {
+            state.RecordEvent(GameEventKind.Credits,
+                $"Credits {before} -> {state.Credits} (console).");
+        }
         return CommandResult.Ok($"Credits {before} -> {state.Credits}.");
     }
 
@@ -129,6 +135,9 @@ public static class EditorItemCommands
             return CommandResult.Fail(qtyError);
         }
         state.Inventory.Add(item.Id, qty);
+        // Logged like any other acquisition so the Log tab matches the bag, but
+        // never toasted: the console already echoes the result back.
+        state.RecordEvent(GameEventKind.Item, $"Received {item.Name} x{qty} (console).");
         return CommandResult.Ok($"Gave {qty}x {item.Name}. Inventory now holds {state.Inventory.CountOf(item.Id)}.");
     }
 

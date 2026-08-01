@@ -27,7 +27,10 @@ public class SaveRepository
     //     read (npc-dialogue-yarn.md Phase 3). Pre-v8 saves load with no flags
     //     — the property default covers it, so there is no migration step; an
     //     NPC simply greets a restored old save as if for the first time.
-    public const int CurrentSaveVersion = 8;
+    // v9: GameState gained EventLog, the running history the in-game menu's
+    //     Log tab shows. Pre-v9 saves load with an empty log — history starts
+    //     from the moment the old save is picked back up.
+    public const int CurrentSaveVersion = 9;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";
@@ -110,6 +113,9 @@ public class SaveRepository
         state.DefeatedNpcs ??= new List<string>();
         // Pre-v8 saves have no world flags.
         state.Flags ??= new Dictionary<string, string>();
+        // Pre-v9 saves have no event log.
+        state.EventLog ??= new GameEventLog();
+        state.EventLog.Entries ??= new List<GameEvent>();
         // Pre-v4 saves stored placeholder enum slots whose properties no
         // longer bind; make sure every member has an (empty) slot block.
         state.Party ??= new List<CharacterEntity>();

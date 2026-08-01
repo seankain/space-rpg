@@ -241,6 +241,8 @@ public partial class BattleScene : Node3D
     {
         var xp = (uint)enemies.Sum(e => e.XpReward);
         hud.ShowMessage($"Victory! The party gains {xp} XP.");
+        SaveManager.Instance?.CurrentState?.RecordEvent(GameEventKind.Battle,
+            $"Defeated {encounter.OpponentSummary} and gained {xp} XP.", notify: true);
 
         // Persist the fight's outcome onto the party entities. Downed members
         // get back up at 1 HP — losing a fighter costs resources, not the run.
@@ -258,6 +260,11 @@ public partial class BattleScene : Node3D
     private void OnDefeat()
     {
         hud.ShowMessage("The party has fallen...");
+        // Recorded even though the run is over: the log rides in GameState, so
+        // the entry only survives if the player saves after this — but it is
+        // the honest last line while the game-over panel is up.
+        SaveManager.Instance?.CurrentState?.RecordEvent(GameEventKind.Battle,
+            $"The party was defeated by {encounter.OpponentSummary}.");
         hud.ShowGameOver(() => BattleManager.Instance.ResolveGameOver());
     }
 
