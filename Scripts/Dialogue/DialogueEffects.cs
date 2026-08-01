@@ -191,12 +191,15 @@ public static class DialogueEffects
             return;
         }
         var quantity = OptionalUInt(effect, 1, 1);
-        if (ItemCatalog.Get(itemId) == null)
+        var item = ItemCatalog.Get(itemId);
+        if (item == null)
         {
             context.Warn($"give_item names unknown item id {itemId}.");
             return;
         }
         context.State.Inventory.Add(itemId, quantity);
+        context.State.RecordEvent(GameEventKind.Item,
+            $"Received {Describe(itemId, quantity)}{From(context)}.", notify: true);
     }
 
     private static void TakeItem(EffectRef effect, DialogueContext context)
@@ -209,7 +212,12 @@ public static class DialogueEffects
         if (!context.State.Inventory.Remove(itemId, quantity))
         {
             context.Warn($"take_item could not remove {quantity}x item {itemId} (not enough held).");
+            return;
         }
+        // Logged but not toasted: the player just watched themselves hand it
+        // over in the conversation.
+        context.State.RecordEvent(GameEventKind.Item,
+            $"Handed over {Describe(itemId, quantity)}{To(context)}.");
     }
 
     private static void SetQuest(EffectRef effect, DialogueContext context)
@@ -219,7 +227,7 @@ public static class DialogueEffects
         {
             return;
         }
-        context.State.SetQuestState(questId, target);
+        MoveQuest(context, questId, target);
     }
 
     // Bumps a quest one step along Unstarted -> InProgress -> Success, clamped
@@ -237,7 +245,28 @@ public static class DialogueEffects
             QUESTSUCCESSSTATE.InProgress => QUESTSUCCESSSTATE.Success,
             var current => current,
         };
-        context.State.SetQuestState(questId, next);
+        MoveQuest(context, questId, next);
+    }
+
+    // Applies a quest state change and logs it, but only when it actually
+    // moves: a conversation the player replays shouldn't fill the log with
+    // "started" lines for a quest they already have.
+    private static void MoveQuest(DialogueContext context, uint questId, QUESTSUCCESSSTATE target)
+    {
+        if (context.State.GetQuestState(questId) == target)
+        {
+            return;
+        }
+        context.State.SetQuestState(questId, target);
+        var title = QuestCatalog.Get(questId)?.Title ?? $"quest {questId}";
+        var line = target switch
+        {
+            QUESTSUCCESSSTATE.InProgress => $"Started the quest '{title}'.",
+            QUESTSUCCESSSTATE.Success => $"Completed the quest '{title}'.",
+            QUESTSUCCESSSTATE.Failed => $"Failed the quest '{title}'.",
+            _ => $"Abandoned the quest '{title}'.",
+        };
+        context.State.RecordEvent(GameEventKind.Quest, line, notify: true);
     }
 
     // credits:<amount> adds (or, with a negative amount, spends) party credits,
@@ -248,8 +277,22 @@ public static class DialogueEffects
         {
             return;
         }
-        var balance = (long)context.State.Credits + delta;
+        var before = context.State.Credits;
+        var balance = (long)before + delta;
         context.State.Credits = (uint)Math.Max(0, balance);
+        // Report what the balance actually did, not what the effect asked for:
+        // spending more than the party has clamps at zero.
+        var change = (long)context.State.Credits - before;
+        if (change > 0)
+        {
+            context.State.RecordEvent(GameEventKind.Credits,
+                $"Earned {change} credits{From(context)}.", notify: true);
+        }
+        else if (change < 0)
+        {
+            context.State.RecordEvent(GameEventKind.Credits,
+                $"Paid {-change} credits{To(context)}.");
+        }
     }
 
     // The optional second argument of play_anim: keep the clip looping instead
@@ -348,6 +391,24 @@ public static class DialogueEffects
         context.Warn($"Dialogue effect '{effect.Id}' expected a {typeof(TEnum).Name} arg {index}, got '{raw}'.");
         return false;
     }
+
+    // ----- Event-log phrasing -----
+
+    // "Ration" / "Ration x3", falling back to the raw id for an item the
+    // catalog doesn't know (only reachable from a hand-edited save).
+    private static string Describe(uint itemId, uint quantity)
+    {
+        var name = ItemCatalog.Get(itemId)?.Name ?? $"item {itemId}";
+        return quantity > 1 ? $"{name} x{quantity}" : name;
+    }
+
+    // " from Hale" / " to Hale", or nothing when the conversation has no named
+    // speaker, so a log line reads as a sentence either way.
+    private static string From(DialogueContext context) =>
+        string.IsNullOrWhiteSpace(context.SpeakerName) ? "" : $" from {context.SpeakerName}";
+
+    private static string To(DialogueContext context) =>
+        string.IsNullOrWhiteSpace(context.SpeakerName) ? "" : $" to {context.SpeakerName}";
 
     private static uint OptionalUInt(EffectRef effect, int index, uint fallback) =>
         uint.TryParse(effect.Arg(index), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)

@@ -2,7 +2,7 @@
 
 _Last updated: 2026-08-01_
 
-space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs whose dialogue is authored as Yarn Spinner scripts and edited with an in-game dialogue editor (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), a party system (roster rules, followers walking behind the leader, a management tab), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), and a set of stubbed data classes exist.
+space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs whose dialogue is authored as Yarn Spinner scripts and edited with an in-game dialogue editor (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), a party system (roster rules, followers walking behind the leader, a management tab), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), an event log that records what the party has done (with corner toasts for pickups and credits), and a set of stubbed data classes exist.
 
 ## Project setup
 
@@ -58,7 +58,7 @@ Phase 1 of the [level chunking plan](plans/level-chunking.md) — the world stre
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
 - `Spawn.cs` tracks whether bodies occupy a spawn point via an `Area3D` trigger.
-- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests, Party, and Inventory tabs are driven by their own `QuestLogMenu`/`PartyMenu`/`InventoryMenu` scripts; the Map tab is still empty).
+- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests, Party, Inventory, Map, and Log tabs are driven by their own `QuestLogMenu`/`PartyMenu`/`InventoryMenu`/`MapMenu`/`EventLogMenu` scripts).
 
 ### NPCs and data-driven dialogue (`Scripts/Npc/`, `Scripts/Dialogue/`)
 
@@ -147,6 +147,15 @@ First slice of the [quest plan](plans/quest-system.md)'s Phase 3 journal:
 
 - `QuestLogMenu` — drives the Quests tab of the in-game menu (Tab): every quest the player has picked up, grouped into Main Quests / Side Quests (in progress) and Completed / Failed sections in one list; selecting a quest shows its title, main/side + status line, and description. Shows a "no quests yet" hint until the first quest is taken. Stage subtitles/objectives wait on the quest plan's stage work.
 
+### Event log and toasts (`Scripts/Data/GameEventLog.cs`, `Scripts/EventLogMenu.cs`, `Scripts/EventToasts.cs`)
+
+A running history of what the party has done, plus the transient on-screen nudge that goes with the good parts:
+
+- `GameEventLog` / `GameEvent` (`Scripts/Data/`) — engine-free record on `GameState`, so it saves and loads with everything else (save version 9; pre-v9 saves load with an empty log). Each entry carries a `GameEventKind` (Item / Credits / Battle / Conversation / Quest / Party), a display-ready sentence composed at record time, and a timestamp; the log is capped at 250 entries, oldest dropped first. Gameplay records through `GameState.RecordEvent`, and a static `GameEventLog.Recorded` hook is what the Godot-side views listen on (the log instance is swapped out whenever a save loads, so per-instance subscriptions would go stale).
+- What gets recorded — item pickups (`Pickup`), `give_item`/`take_item` and `credits` from dialogue, shop buys and sells (`Trade`), quest state moves (logged only when the state actually changes, so replaying a conversation doesn't re-log it), battle start/victory/defeat, conversations as they open, recruits joining the party, and the console's `give`/`takeitem`/`credits` verbs.
+- `EventLogMenu` — drives the Log tab of the in-game menu (Tab): entries newest first, colour-coded by kind, with a dropdown to narrow to one kind and a count/empty-state line. Follows the log live while the tab is open, since the in-game menu doesn't pause the world.
+- `EventToasts` (autoload) — code-built `CanvasLayer` at layer 60 (above the dialogue box, below the dev console). Entries recorded with `notify` set — items acquired, credits earned, quest moves, party joins — fade a small line into the top-right corner for a couple of seconds and fade out; at most five stack at once. Runs with `ProcessMode.Always`, so a battle victory's toast still animates while the tree is paused.
+
 ### Data model stubs (`Scripts/Data/`)
 
 These are plain C# classes (not Godot nodes/resources) sketching the future game systems. `SaveData` and `GameState` are live (used by the save/load system); the rest are not used by gameplay code yet.
@@ -154,7 +163,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | Class | File | Purpose |
 |-------|------|---------|
 | `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
-| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, `Quests` progress, defeated NPCs, and the `Flags` world-flag store (with get/set helpers for each). |
+| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, `Quests` progress, defeated NPCs, the `Flags` world-flag store, and the `EventLog` history (with get/set/record helpers for each). |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `PartyManager` | `PartyManager.cs` | Roster rules over `GameState.Party`: leader at index 0, max size 4, add/remove/reorder. Live — used by recruiting and the Party tab. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
@@ -167,13 +176,15 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest and the "Clear the Deck" bounty quest. |
 | `Merchant` | `Merchant.cs` | A trading NPC's side of the shop ledger: name, credits, and stock `Inventory`. Built by `ShopkeeperRole` from the definition's `Credits`/`InitialItems`; not yet persisted. |
 | `Trade` | `Trade.cs` | Engine-free buy/sell rules and execution between the party (`GameState.Credits`/`Inventory`) and a `Merchant`: buy at `Item.Value`, sell at half, quest/zero-value items untradable; returns user-facing result messages. |
+| `GameEvent`, `GameEventKind` | `GameEvent.cs` | One line of the event log: kind, display-ready text, timestamp, and a non-serialized `Notify` flag asking for a toast. Live — stored in `GameState.EventLog` (save version 9). |
+| `GameEventLog` | `GameEventLog.cs` | Capped, newest-first-readable history on `GameState` with a static `Recorded` hook for the Log tab and toast layer. Live. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
 
 ## Not yet implemented
 
 - Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters; see the [battle plan](plans/battle-system.md)
-- Quest depth — stages/objectives in the journal, HUD notifications, rewards; see the [quest plan](plans/quest-system.md)
-- Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state, HUD pickup toast; see the [inventory plan](plans/inventory-system.md)
+- Quest depth — stages/objectives in the journal, rewards; see the [quest plan](plans/quest-system.md)
+- Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state; see the [inventory plan](plans/inventory-system.md)
 - Dialogue/NPC depth — no text interpolation (an NPC can't greet the leader by name) and no portraits or voice ([Yarn plan](plans/npc-dialogue-yarn.md) Phase 5); localization-key text waits on a localization system ([dialogue-editor plan](plans/dialogue-editor.md) Phase 5); `dialogue assign` targets an NPC's first role only; NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
 - Shop depth — merchant stock/credit persistence across visits, buying/selling in quantities, per-merchant price modifiers, more interiors (houses) beyond the prototype shop
 - Party depth — navmesh follower pathing, benched members beyond the active four, portraits in the Party tab; see the [party plan](plans/party-system.md)

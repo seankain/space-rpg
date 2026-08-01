@@ -45,6 +45,17 @@ public class GameState
     // this dictionary with the default comparer on load — a comparer set here
     // would silently apply to new games only.
     public Dictionary<string, string> Flags {get;set;} = new();
+    // What the party has done: items picked up, credits earned, battles,
+    // conversations. Capped and display-ready (see GameEventLog); the in-game
+    // menu's Log tab reads it and the toast layer listens for new entries.
+    // Pre-v9 saves have no log and load with an empty one.
+    public GameEventLog EventLog {get;set;} = new();
+
+    // Single funnel for recording a moment, so callers don't each have to
+    // cope with a save whose log block is missing. `notify` also asks the
+    // toast layer for a brief on-screen line.
+    public GameEvent RecordEvent(GameEventKind kind, string text, bool notify = false) =>
+        (EventLog ??= new GameEventLog()).Record(kind, text, notify);
 
     public string GetFlag(string name)
     {

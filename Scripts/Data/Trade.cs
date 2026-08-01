@@ -39,6 +39,11 @@ public static class Trade
         player.Credits -= price;
         merchant.Credits += price;
         message = $"Bought the {item.Name} for {price} credits.";
+        // One entry per transaction rather than an item line plus a credit
+        // line: a purchase is a single thing that happened, and the toast that
+        // comes with it should say so once.
+        player.RecordEvent(GameEventKind.Item,
+            $"Bought {item.Name} from {merchant.Name} for {price} credits.", notify: true);
         return true;
     }
 
@@ -65,6 +70,10 @@ public static class Trade
         player.Credits += price;
         merchant.Credits -= price;
         message = $"Sold the {item.Name} for {price} credits.";
+        // Logged as a credit event: the item leaving is incidental to the
+        // player earning the price for it.
+        player.RecordEvent(GameEventKind.Credits,
+            $"Sold {item.Name} to {merchant.Name} for {price} credits.", notify: true);
         return true;
     }
 }

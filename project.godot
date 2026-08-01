@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 SaveManager="*res://Scripts/Save/SaveManager.cs"
 DialogueManager="*res://Scripts/Dialogue/DialogueManager.cs"
 BattleManager="*res://Scripts/Battle/BattleManager.cs"
+EventToasts="*res://Scripts/EventToasts.cs"
 DevConsole="*res://Scripts/Editor/DevConsole.cs"
 
 [dotnet]

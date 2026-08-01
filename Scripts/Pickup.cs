@@ -80,8 +80,9 @@ public partial class Pickup : Area3D
 			return;
 		}
 		state.Inventory.Add(ItemId, Quantity);
-		// TODO: replace with a HUD toast once PlayerHud grows one.
-		GD.Print($"Picked up {item.Name} x{Quantity}");
+		state.RecordEvent(GameEventKind.Item,
+			Quantity > 1 ? $"Picked up {item.Name} x{Quantity}." : $"Picked up {item.Name}.",
+			notify: true);
 		QueueFree();
 	}
 }
