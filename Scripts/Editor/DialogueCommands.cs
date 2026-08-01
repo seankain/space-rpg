@@ -37,8 +37,9 @@ public sealed class DialogueCommand : IConsoleCommand
 
 	private static CommandResult List()
 	{
-		// The format is listed because that is what 'dialogue save' writes back
-		// (npc-dialogue-yarn.md Phase 1).
+		// The format is listed because 'dialogue save' always writes .yarn: a
+		// conversation still shown as json is one a save will convert
+		// (npc-dialogue-yarn.md).
 		var ids = DialogueCatalog.All
 			.OrderBy(g => g.Id, System.StringComparer.OrdinalIgnoreCase)
 			.Select(g => $"  {g.Id}  ({g.Nodes.Count} nodes, {g.SourceFormat.ToString().ToLowerInvariant()})")

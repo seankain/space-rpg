@@ -26,11 +26,18 @@ public class DialogueGraph
     public string EntryNodeId { get; set; }
     public List<DialogueNode> Nodes { get; set; } = new();
 
-    // Which on-disk form this conversation was loaded from, so the editor saves
-    // it back the same way instead of leaving a .json and a .yarn fighting over
-    // one id (npc-dialogue-yarn.md Phase 1). Not part of the file's contents.
+    // Which on-disk form this conversation was loaded from. The editor always
+    // saves Yarn (npc-dialogue-yarn.md — Yarn is the authoring format), so this
+    // says whether a save is a rewrite or a conversion away from JSON, and
+    // `dialogue list` shows what is still to convert. Not part of the contents.
     [JsonIgnore]
     public DialogueSourceFormat SourceFormat { get; set; }
+
+    // The file this conversation was loaded from, so a save rewrites it in
+    // place (and deletes the .dialogue.json it converts). Empty for a graph the
+    // editor has just created. Not part of the file's contents.
+    [JsonIgnore]
+    public string SourcePath { get; set; }
 
     // A node whose Speaker equals this token renders as the speaking NPC's
     // display name (resolved from the play context), so authored data stays

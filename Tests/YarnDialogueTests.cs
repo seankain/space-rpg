@@ -344,9 +344,9 @@ $npc: You have my thanks.
     [Fact]
     public void ConversationsCrossBetweenTheTwoFormatsUnchanged()
     {
-        // The editor still writes .dialogue.json for conversations authored
-        // in-game, so a graph has to survive the trip in both directions: this is
-        // what makes converting a conversation to Yarn (or back) a safe diff.
+        // .dialogue.json is still a supported *input*, and saving one in the
+        // editor converts it to Yarn, so a graph has to survive the trip in both
+        // directions: this is what makes that conversion a safe diff.
         foreach (var (name, graph) in CommittedYarn())
         {
             var viaJson = DialogueSerialization.FromJson(DialogueSerialization.ToJson(graph));

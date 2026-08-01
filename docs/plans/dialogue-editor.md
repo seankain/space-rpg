@@ -140,9 +140,11 @@ without changing anything.
    exists, no orphan nodes unreachable from entry (warn, don't block), effect/condition args
    parse against their vocabulary. Show problems inline in the panel.
 3. `dialogue save [id]` writes the edited `DialogueGraph` to
-   `res://Resources/Dialogue/<id>.dialogue.json` via `System.Text.Json`, debug-build gated,
-   creating a new file for a new id — the same commit-to-repo workflow as NPC placement. Then
-   `DialogueCatalog.Invalidate()` so the next conversation plays the edited version live.
+   `res://Resources/Dialogue/<id>.yarn` (`YarnGraphWriter`, since the Yarn convergence below
+   landed — it wrote `<id>.dialogue.json` via `System.Text.Json` when this phase shipped),
+   debug-build gated, creating a new file for a new id — the same commit-to-repo workflow as
+   NPC placement. Then `DialogueCatalog.Invalidate()` so the next conversation plays the
+   edited version live.
 4. `dialogue new <id>` seeds an empty single-node graph to author a conversation from scratch,
    and `dialogue assign <npcId> <dialogueId>` points an NPC/role at it (updating and re-saving
    the `NpcDefinition` `.tres` through the Phase-3 NPC save path).

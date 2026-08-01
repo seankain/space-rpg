@@ -186,4 +186,79 @@ public class DialogueEditTests
         Assert.Equal("hi", graph.GetNode("a").Text);
         Assert.Equal("changed", clone.GetNode("a").Text);
     }
+
+    [Fact]
+    public void CloneCarriesTheSourceFileAndFormat()
+    {
+        var graph = TwoNodeGraph();
+        graph.SourceFormat = DialogueSourceFormat.Json;
+        graph.SourcePath = "res://Resources/Dialogue/test" + DialogueFiles.JsonSuffix;
+
+        var clone = DialogueGraphEditing.Clone(graph);
+
+        // The editor edits the clone, so the clone is what a save consults to
+        // know which file it is rewriting.
+        Assert.Equal(graph.SourcePath, clone.SourcePath);
+        Assert.Equal(DialogueSourceFormat.Json, clone.SourceFormat);
+    }
+
+    // --- What a save writes (npc-dialogue-yarn.md: Yarn is the format) --------
+
+    [Fact]
+    public void NewConversationIsYarn()
+    {
+        var graph = DialogueGraphEditing.NewEmpty("brand.new");
+
+        Assert.Equal(DialogueSourceFormat.Yarn, graph.SourceFormat);
+        Assert.Equal(
+            "res://Resources/Dialogue/brand.new.yarn",
+            DialogueFiles.SavePath(graph, "res://Resources/Dialogue"));
+    }
+
+    [Fact]
+    public void SavingAJsonConversationWritesYarnBesideItAndReplacesIt()
+    {
+        var graph = TwoNodeGraph();
+        graph.SourceFormat = DialogueSourceFormat.Json;
+        graph.SourcePath = "res://Resources/Dialogue/intro/test" + DialogueFiles.JsonSuffix;
+
+        // Rewritten where it already lives, as Yarn...
+        Assert.Equal("res://Resources/Dialogue/intro/test.yarn", DialogueFiles.SavePath(graph, "res://elsewhere"));
+        // ...and the .json it came from goes, or two files claim 'test'.
+        Assert.Equal(graph.SourcePath, DialogueFiles.ReplacedJsonPath(graph));
+    }
+
+    [Fact]
+    public void SavingAYarnConversationReplacesNothing()
+    {
+        var graph = TwoNodeGraph();
+        graph.SourceFormat = DialogueSourceFormat.Yarn;
+        graph.SourcePath = "res://Resources/Dialogue/test.yarn";
+
+        Assert.Equal(graph.SourcePath, DialogueFiles.SavePath(graph, "res://elsewhere"));
+        Assert.Null(DialogueFiles.ReplacedJsonPath(graph));
+    }
+
+    [Fact]
+    public void SaveAsUnderANewIdLeavesTheOriginalFileAlone()
+    {
+        var graph = TwoNodeGraph();
+        graph.SourceFormat = DialogueSourceFormat.Json;
+        graph.SourcePath = "res://Resources/Dialogue/test" + DialogueFiles.JsonSuffix;
+        graph.Id = "copy";
+
+        // 'dialogue save copy' writes a second conversation; deleting the file
+        // the first one still lives in would be a rename, not a copy.
+        Assert.Equal("res://Resources/Dialogue/copy.yarn", DialogueFiles.SavePath(graph, "res://elsewhere"));
+        Assert.Null(DialogueFiles.ReplacedJsonPath(graph));
+    }
+
+    [Fact]
+    public void AnUnsavedConversationLandsInTheDialogueRoot()
+    {
+        var graph = DialogueGraphEditing.NewEmpty("brand.new");
+
+        Assert.Equal("res://Resources/Dialogue", DialogueFiles.SaveDirectory(graph, "res://Resources/Dialogue"));
+        Assert.Null(DialogueFiles.ReplacedJsonPath(graph));
+    }
 }

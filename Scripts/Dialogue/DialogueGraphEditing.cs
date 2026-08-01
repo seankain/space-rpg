@@ -8,8 +8,8 @@ public static class DialogueGraphEditing
 {
     // A working copy the editor mutates without touching the cached catalog
     // graph until save (round-trips through JSON, so it is a deep clone). The
-    // source format rides along by hand — it is deliberately not serialized, but
-    // a save has to write the file back in the form it came from.
+    // source file and format ride along by hand — they are deliberately not
+    // serialized, but a save has to know which file it is rewriting.
     public static DialogueGraph Clone(DialogueGraph graph)
     {
         if (graph == null)
@@ -18,13 +18,16 @@ public static class DialogueGraphEditing
         }
         var clone = DialogueSerialization.FromJson(DialogueSerialization.ToJson(graph));
         clone.SourceFormat = graph.SourceFormat;
+        clone.SourcePath = graph.SourcePath;
         return clone;
     }
 
-    // A fresh conversation: one empty line node that is also the entry.
+    // A fresh conversation: one empty line node that is also the entry. It is
+    // Yarn from the start, because that is what a save writes.
     public static DialogueGraph NewEmpty(string id) => new()
     {
         Id = id,
+        SourceFormat = DialogueSourceFormat.Yarn,
         EntryNodeId = "start",
         Nodes = new List<DialogueNode>
         {
