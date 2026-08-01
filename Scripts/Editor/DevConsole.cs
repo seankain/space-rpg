@@ -394,21 +394,21 @@ public partial class DevConsole : CanvasLayer
         }
     }
 
-    // Submitting a line hands focus back to nobody (the LineEdit consumes the
-    // Return keystroke but the viewport's focus owner ends up cleared), which
-    // left the user clicking into the field again for every command. While the
-    // console is open, take focus back whenever nothing else owns it — a
-    // dialogue-editor field the author is typing in keeps focus, so this only
-    // fills the gap.
+    // Backstop for the typing-goes-nowhere case: KeepEditingOnTextSubmit covers
+    // Enter, but a click on the log or Escape also ends edit mode, and either
+    // one leaves the console looking ready while ignoring the keyboard. While
+    // the panel is open the command line owns input, so put it back in edit
+    // mode (Edit also takes focus). Skipped while the dialogue editor is up so
+    // its own fields keep the caret.
     private void KeepInputFocused()
     {
-        if (!enabled || !Visible)
+        if (!enabled || !Visible || IsDialogueViewerOpen)
         {
             return;
         }
-        if (GetViewport().GuiGetFocusOwner() == null)
+        if (!input.IsEditing())
         {
-            input.GrabFocus();
+            input.Edit();
         }
     }
 
@@ -477,7 +477,10 @@ public partial class DevConsole : CanvasLayer
         {
             Input.MouseMode = Input.MouseModeEnum.Visible;
             input.Clear();
-            input.GrabFocus();
+            // Edit rather than GrabFocus: focus alone doesn't put a 4.4+
+            // LineEdit in edit mode, and the console should be typeable the
+            // moment it drops down.
+            input.Edit();
             // Anything printed while the panel was hidden laid out just now, so
             // open on the newest line rather than wherever the log was left.
             ScrollOutputToBottom();
@@ -493,11 +496,11 @@ public partial class DevConsole : CanvasLayer
 
     private void OnCommandSubmitted(string text)
     {
-        // Keep the input ready for the next command regardless of outcome. The
-        // grab is deferred so it lands after the viewport finishes routing the
-        // Return keystroke, which would otherwise drop focus right back off.
+        // Keep the input ready for the next command regardless of outcome; the
+        // caret stays put (KeepEditingOnTextSubmit), and commands that close the
+        // console — `dialogue play` — leave it closed rather than pulling the
+        // keyboard back to a hidden field.
         input.Clear();
-        input.CallDeferred(Control.MethodName.GrabFocus);
         if (string.IsNullOrWhiteSpace(text))
         {
             return;
@@ -614,6 +617,11 @@ public partial class DevConsole : CanvasLayer
         {
             PlaceholderText = "Enter command - 'help' for a list",
             ClearButtonEnabled = false,
+            // Godot 4.4+ separates focus from edit mode: by default a LineEdit
+            // leaves edit mode when ui_text_submit fires, so after Enter the
+            // field still holds focus but ignores every keystroke — the user
+            // had to click back in for each command. Stay in edit mode instead.
+            KeepEditingOnTextSubmit = true,
         };
         input.TextSubmitted += OnCommandSubmitted;
         column.AddChild(input);
