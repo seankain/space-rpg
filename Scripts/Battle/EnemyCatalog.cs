@@ -101,8 +101,12 @@ public static class EnemyCatalog
                 };
             default:
                 // Unknown challengers still produce a playable fight instead
-                // of a crash — a lone generic brawler wearing their name.
+                // of a crash — a lone brawler wearing their name, built from
+                // their own character sheet when the definition carries one
+                // (the in-world NPC editor writes it) and from the generic
+                // block when it doesn't.
                 opponentName = string.IsNullOrEmpty(opponentName) ? opponentId : opponentName;
+                var sheet = NpcDatabase.Get(opponentId)?.Stats;
                 return new BattleEncounter
                 {
                     IntroMessage = $"{opponentName} squares up!",
@@ -114,8 +118,9 @@ public static class EnemyCatalog
                             // The challenger is an NPC, so their mesh still
                             // resolves even without an authored encounter.
                             NpcId = opponentId,
-                            MaxHealthPoints = 10,
-                            Stats = new CharacterStats
+                            MaxHealthPoints = sheet?.MaxHealthPoints ?? 10,
+                            MaxPowerPoints = sheet?.MaxMagicPoints ?? 0,
+                            Stats = sheet?.ToCharacterStats() ?? new CharacterStats
                             {
                                 Strength = 5, Intelligence = 3, Constitution = 4,
                                 Dexterity = 5, Wisdom = 3, Charisma = 3,

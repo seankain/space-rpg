@@ -78,6 +78,12 @@ public partial class NpcDefinition : Resource, INpcDefinition
 	[Export]
 	public Color BodyColor { get; set; } = Colors.White;
 
+	// Character sheet: vitals and the six stats a runtime copy of this NPC
+	// starts with (a recruited party member, a battle combatant without an
+	// authored EnemyCatalog encounter). Null keeps the old shared template.
+	[Export]
+	public NpcStatBlock Stats { get; set; }
+
 	// Starting wallet and inventory: shop bankroll/stock for shopkeepers,
 	// carried items for future recruit/loot use.
 	[Export]

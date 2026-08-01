@@ -16,11 +16,14 @@ public sealed class EditorModeCommand : IConsoleCommand
 
     public string Name { get; }
     public string Usage => $"{Name}";
-    public string Summary => "Toggle editor mode (placement cursor + gameplay lock).";
+    public string Summary => "Toggle editor mode (free camera + tool palette + gameplay lock).";
 
     public CommandResult Execute(IReadOnlyList<string> args)
     {
         var active = console.ToggleEditorMode();
-        return CommandResult.Ok(active ? "Editor mode ON." : "Editor mode OFF.");
+        return CommandResult.Ok(active
+            ? "Editor mode ON. WASD flies, Space/Ctrl rise and sink, Shift boosts, "
+              + "hold right-mouse to look. Pick a tool on the right."
+            : "Editor mode OFF.");
     }
 }

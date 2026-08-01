@@ -193,6 +193,70 @@ prints live progress, and the command logic is unit-tested.
 4. Guard rails audit: confirm every mutating command is debug-gated and that the console can
    never open in a shipped build; a smoke test asserts the release gate.
 
+## Phase 7 — Editor mode as a place you *inhabit* (free camera + tool palette)
+
+Phases 2–3 made editor mode a *modifier* on normal play: the player body stayed on the
+ground, the pointer stayed captured, the cursor tracked the screen centre, and every action
+was a typed command. That is a fine console, but a poor editor — you cannot get above a
+rooftop to see what you are placing, and authoring an NPC means remembering the argument
+order of `place`. This phase turns editor mode into its own controller and surface. The
+console keeps every verb it has; nothing here removes a command.
+
+1. **A free-floating camera controller** (`Scripts/Editor/EditorFlyCamera.cs`): entering
+   editor mode detaches the view from the player and puts the author in a `Camera3D` that
+   flies. `WASD` moves along the look direction, `Jump` (Space) rises and a new `EditorDown`
+   action (Ctrl) sinks — both world-vertical, so up is up with the view angled down — a new
+   `EditorBoost` action (Shift) multiplies the speed, and the wheel retunes it. It starts at
+   the player camera's exact transform (entering editor mode reframes nothing) and hands the
+   viewport back on exit. The arithmetic is engine-free `FlyCameraMath` and unit-tested.
+2. **Chunk streaming follows the camera.** `ChunkManager` centred on the player body, which
+   in editor mode is parked wherever the author left it — flying out would show empty space
+   to place NPCs into. It now streams around `DevConsole.EditorCameraPosition` when editor
+   mode is on, and never unloads the chunk the parked player is standing on (they still fall
+   under gravity), so leaving editor mode lands on ground.
+3. **The pointer is free, look is on a held button.** Editor mode is point-and-click now, so
+   the cursor stays visible for the palette and for clicking bodies in the level; holding
+   right-mouse captures it for a look-turn and releases on the way up, the way every editor
+   viewport works. `EditorCursor` follows the mouse instead of the screen centre and also
+   reports *what* it hit, so a click can resolve to an NPC. `CameraController` gains the
+   `DevConsole.BlocksGameplay` guard so the player's rig doesn't spin along during a turn.
+4. **A tool palette down the right-hand side** (`Scripts/Editor/EditorToolbar.cs`), alive only
+   while editor mode is on: **Navigate** (fly only), **Place NPC**, **Edit NPC**. The active
+   tool decides what a left-click in the level means; `DevConsole._UnhandledInput` reads it
+   and runs the action, so UI clicks never fall through to the world.
+5. **Place NPC** — clicking a spot drops a new NPC there: `EditorPlacement.CreateAtPoint`
+   builds a definition with a generated free id (`<area>.npcN`), splits the world position
+   through the same `PlacementMath` the `place` verb uses, stands a preview on it, and opens
+   the NPC editor on it. It *is* the pending placement, so `nudge`/`rotate`/`savenpc`/
+   `cancelplace` still act on it from the console.
+6. **Edit NPC** — clicking an existing NPC opens the same editor on its definition. A
+   hand-placed NPC with no `.tres` behind it says so rather than pretending.
+7. **The NPC editor** (`Scripts/Editor/NpcEditorPanel.cs`): identity (id, display name), the
+   **character mesh/rig** as a dropdown of `Scenes/Characters/Rigs/*.tscn`, the **character
+   sheet** (level, max HP/PP and the six stats), **credits**, and the **starting item** rows
+   (catalog dropdown + quantity + remove). It edits an engine-free `NpcEditModel`, validates
+   on every keystroke, and disables Save until the form is clean; Save writes the `.tres`
+   through `EditorPlacement.SaveDefinition` (same debug gate, same `NpcDatabase.Invalidate`)
+   and re-spawns the body so a rig swap shows immediately. An **existing NPC's id is
+   read-only** — ids are referenced by quests, saves, and dialogue and are permanent once
+   shipped, so only a brand-new NPC can type one.
+8. **Stats become real data.** `NpcDefinition` gains a `Stats` sub-resource (`NpcStatBlock`),
+   and the two places that used to invent numbers now read it: a recruited NPC joins the
+   party with its own sheet instead of the one shared template, and a challenger without an
+   authored `EnemyCatalog` encounter fights with its own numbers. A definition without a
+   block behaves exactly as before, so no committed `.tres` needs touching.
+9. **Tests** (`Tests/EditorFlyCameraTests.cs`, `Tests/NpcEditorTests.cs`): the flight
+   direction rules (opposing keys cancel, diagonals aren't faster, vertical is independent),
+   speed/pitch/yaw clamping, the edit form's validation (empty/duplicate/file-hostile ids,
+   unknown items, zero quantities, every problem reported at once), item-row merging, and the
+   generated placement ids.
+
+**Done when:** `editor` drops the author into a camera that flies with WASD/Space/Ctrl and
+looks on held right-mouse; the right-hand palette switches between navigating, placing, and
+editing; clicking the ground with Place NPC stands a new character there and opens a form
+where its mesh, stats, items, and credits can be set and saved to a `.tres`; and clicking an
+existing NPC with Edit NPC opens the same form on it.
+
 ## Decisions to settle early
 
 | Decision | Recommendation |
@@ -204,3 +268,7 @@ prints live progress, and the command logic is unit-tested.
 | Refreshing the NPC index | Add an explicit `NpcDatabase.Invalidate()` and call it after `savenpc`, rather than reloading every frame. Cheap, and keeps the normal cached-once behavior for gameplay. |
 | Item/quest persistence | Mutate `GameState` directly; the existing save system captures it. No new save fields, no version bump for the commands themselves. |
 | Input suppression during editor mode | Reuse the cooperative `IsActive` guard pattern already used for dialogue (`Player`/`Pickup`/`Npc` check a static flag), not a new input-eating layer — consistent with the codebase and easy to reason about. |
+| The editor controller (Phase 7) | A separate `Camera3D` the author inhabits, parented under the scene root and freed with editor mode — not a mode on `Player`. The player body stays exactly where it was standing, so leaving editor mode resumes play rather than teleporting. |
+| Mouse look vs. clicking (Phase 7) | Look on held right-mouse, pointer free otherwise. Editor mode is a point-and-click surface (palette, NPC form, clicking bodies); permanent capture would cost all of that, and a toggle would leave the author guessing which mode they are in. |
+| Renaming an NPC id in the editor | Not allowed for a saved NPC. Ids are the handle quests, saves, dialogue, and `EnemyCatalog` use and are permanent once shipped; only a brand-new placement can type one. This also keeps `<id>.tres` and the id it holds from ever disagreeing. |
+| Where NPC stats live | An `NpcStatBlock` sub-resource on `NpcDefinition`, the same shape as `NpcItemStack` — Godot can't export the engine-free `CharacterStats` directly, and a sub-resource folds into one inspector block. Null means "the old shared template", so nothing already committed changes behaviour. |

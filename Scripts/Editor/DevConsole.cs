@@ -26,6 +26,10 @@ public partial class DevConsole : CanvasLayer
     // True while the read-only dialogue viewer (Phase 3) is showing.
     public static bool IsDialogueViewerOpen => Instance?.dialogueViewer is { Visible: true };
 
+    // True while the in-world NPC editor form is up. The fly camera checks it
+    // so WASD typed into a text field doesn't also fly the view.
+    public static bool IsNpcEditorOpen => Instance?.npcEditor is { Visible: true };
+
     // The single flag gameplay checks to freeze normal play — true while the
     // console is open, editor mode is active, or the dialogue viewer is up.
     // Guarded cooperatively, the same way Player/Pickup/Npc check
@@ -36,6 +40,14 @@ public partial class DevConsole : CanvasLayer
     // off or the ray misses. The `here` token (Phase 3) resolves to this.
     public static Vector3? PlacementCursorPosition =>
         IsEditorActive ? Instance.cursor?.WorldPosition : null;
+
+    // Where the author's free camera is, or null when editor mode is off.
+    // ChunkManager streams around this instead of the parked player body, so
+    // flying somewhere shows the world rather than a hole.
+    public static Vector3? EditorCameraPosition =>
+        IsEditorActive && Instance.flyCamera is { } camera && IsInstanceValid(camera)
+            ? camera.GlobalPosition
+            : null;
 
     private static readonly Color EchoColor = new(0.6f, 0.75f, 0.95f);
     private static readonly Color OkColor = new(0.8f, 0.85f, 0.78f);
@@ -56,12 +68,21 @@ public partial class DevConsole : CanvasLayer
     private RichTextLabel output;
     private LineEdit input;
 
-    // Editor-mode state: a translucent placement marker parented under the
-    // scene root and a bottom-left HUD strip, both alive only while editor mode
-    // is on.
+    // Editor-mode state, all alive only while editor mode is on: a free-flying
+    // camera the author inhabits instead of the player, a pointer probe that
+    // marks what the mouse is over, the right-hand tool palette, and a
+    // bottom-left HUD strip.
     private bool editorActive;
     private EditorCursor cursor;
+    private EditorFlyCamera flyCamera;
+    private EditorToolbar toolbar;
     private Label editorHud;
+
+    // The NPC editor form, created on first use and reused after; null until
+    // then, hidden when closed. `editedNpc` is the live body behind an
+    // already-saved NPC being edited, so a save can re-spawn it.
+    private NpcEditorPanel npcEditor;
+    private Npc editedNpc;
 
     // The read-only dialogue viewer (Phase 3), created on first `dialogue open`
     // and reused after; null until then, hidden when closed.
@@ -301,7 +322,9 @@ public partial class DevConsole : CanvasLayer
             return false;
         }
         dialogueViewer.Visible = false;
-        Input.MouseMode = Visible ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        Input.MouseMode = Visible || editorActive
+            ? Input.MouseModeEnum.Visible
+            : Input.MouseModeEnum.Captured;
         return true;
     }
 
@@ -326,15 +349,41 @@ public partial class DevConsole : CanvasLayer
         editorHud.Visible = active;
         if (active)
         {
-            // Parent the marker under the scene root so it lives in the main
-            // 3D world and survives level changes; freed when editor mode ends.
+            // Parent the probe and the camera under the scene root so they
+            // live in the main 3D world and survive level changes; both are
+            // freed when editor mode ends.
             cursor = new EditorCursor();
             GetTree().Root.AddChild(cursor);
+            flyCamera = new EditorFlyCamera();
+            GetTree().Root.AddChild(flyCamera);
+            toolbar = new EditorToolbar
+            {
+                ExitRequested = () => SetEditorMode(false),
+                // A half-finished placement belongs to the tool that started
+                // it; switching tools closes the form rather than leaving it
+                // pointing at a body the next click will replace.
+                ToolChanged = _ => CloseNpcEditor(),
+            };
+            AddChild(toolbar);
+            // Editor mode is point-and-click now: the palette, the NPC editor,
+            // and clicking bodies in the level all need a free pointer. The
+            // fly camera captures it only while the look button is held.
+            Input.MouseMode = Input.MouseModeEnum.Visible;
         }
         else
         {
+            CloseNpcEditor();
             cursor?.QueueFree();
             cursor = null;
+            // Frees on the way out, handing the viewport back to the player's
+            // camera (EditorFlyCamera._ExitTree).
+            flyCamera?.QueueFree();
+            flyCamera = null;
+            toolbar?.QueueFree();
+            toolbar = null;
+            Input.MouseMode = Visible || IsDialogueViewerOpen
+                ? Input.MouseModeEnum.Visible
+                : Input.MouseModeEnum.Captured;
         }
     }
 
@@ -345,16 +394,188 @@ public partial class DevConsole : CanvasLayer
         {
             return;
         }
+        var speed = flyCamera == null ? FlyCameraMath.DefaultSpeed : flyCamera.Speed;
         if (cursor?.WorldPosition is { } p)
         {
             var chunk = ChunkManager.ToChunkCoord(p);
+            var hovered = cursor.HoveredNpc is { } npc ? $"   over  {npc.NpcId}" : "";
             editorHud.Text =
-                $"EDITOR MODE\ncursor  ({p.X:0.0}, {p.Y:0.0}, {p.Z:0.0})   chunk ({chunk.X}, {chunk.Y})";
+                $"EDITOR MODE   fly {speed:0.#} m/s\n"
+                + $"cursor  ({p.X:0.0}, {p.Y:0.0}, {p.Z:0.0})   chunk ({chunk.X}, {chunk.Y}){hovered}";
         }
         else
         {
-            editorHud.Text = "EDITOR MODE\ncursor  (no target)";
+            editorHud.Text = $"EDITOR MODE   fly {speed:0.#} m/s\ncursor  (no target)";
         }
+    }
+
+    // Editor-mode clicks in the level (anything the UI didn't take): the
+    // active tool decides what they mean.
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (!editorActive || Visible || IsNpcEditorOpen || toolbar == null)
+        {
+            return;
+        }
+        if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+        {
+            return;
+        }
+        switch (toolbar.ActiveTool)
+        {
+            case EditorTool.PlaceNpc:
+                GetViewport().SetInputAsHandled();
+                PlaceNpcAtCursor();
+                break;
+            case EditorTool.EditNpc:
+                GetViewport().SetInputAsHandled();
+                EditNpcUnderCursor();
+                break;
+        }
+    }
+
+    private void PlaceNpcAtCursor()
+    {
+        if (cursor?.WorldPosition is not { } world)
+        {
+            toolbar.SetStatus("No target — aim at the ground and click.", false);
+            return;
+        }
+        var definition = EditorPlacement.CreateAtPoint(world, out var error);
+        if (definition == null)
+        {
+            toolbar.SetStatus(error, false);
+            Print(error, ErrorColor);
+            return;
+        }
+        toolbar.SetStatus($"Placed '{definition.NpcId}'. Fill in the sheet and Save.", true);
+        OpenNpcEditor(definition, isNew: true, liveNpc: null);
+    }
+
+    private void EditNpcUnderCursor()
+    {
+        if (cursor?.HoveredNpc is not { } npc)
+        {
+            toolbar.SetStatus("Nothing there — click an NPC.", false);
+            return;
+        }
+        if (npc.Definition == null)
+        {
+            toolbar.SetStatus(
+                $"'{npc.DisplayName}' is hand-placed in a scene, not authored as a .tres — nothing to edit.",
+                false);
+            return;
+        }
+        toolbar.SetStatus($"Editing '{npc.Definition.NpcId}'.", true);
+        OpenNpcEditor(npc.Definition, isNew: EditorPlacement.IsPending(npc.Definition), liveNpc: npc);
+    }
+
+    private void OpenNpcEditor(NpcDefinition definition, bool isNew, Npc liveNpc)
+    {
+        EnsureNpcEditor();
+        editedNpc = liveNpc;
+        // The definition's own placement, not the cursor's: the pointer has
+        // usually moved on by the time the form opens.
+        var local = definition.LocalPosition;
+        npcEditor.Edit(definition, isNew,
+            $"{PlacementMath.AreaFromScenePath(definition.SpawnScenePath)}"
+            + $"   chunk ({definition.ChunkCoords.X}, {definition.ChunkCoords.Y})"
+            + $"   local ({local.X:0.0}, {local.Y:0.0}, {local.Z:0.0})");
+        npcEditor.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    private void EnsureNpcEditor()
+    {
+        if (npcEditor != null)
+        {
+            return;
+        }
+        npcEditor = new NpcEditorPanel
+        {
+            Closed = () => CloseNpcEditor(),
+            SaveRequested = SaveEditedNpc,
+            PreviewRefreshRequested = () =>
+            {
+                // Only the unsaved placement re-spawns live: an already-saved
+                // NPC's definition is a shared cached resource, so its body is
+                // rebuilt on save, once the edit is real.
+                if (npcEditor.IsNew)
+                {
+                    NpcEditMapping.Apply(npcEditor.Model, npcEditor.Definition);
+                    editedNpc = EditorPlacement.RefreshPending();
+                }
+            },
+            FacingChanged = degrees =>
+            {
+                if (npcEditor.IsNew)
+                {
+                    EditorPlacement.SetPendingFacing(degrees);
+                }
+                else if (editedNpc != null && IsInstanceValid(editedNpc))
+                {
+                    // A saved NPC's body can turn live even though the file
+                    // only changes on save — the author is aiming it.
+                    editedNpc.RotationDegrees = new Vector3(0f, degrees, 0f);
+                }
+            },
+        };
+        AddChild(npcEditor);
+    }
+
+    // Save from the NPC editor: validate the form, write the model into the
+    // definition, and persist it. An already-saved NPC's body is re-spawned so
+    // a new rig or name shows without reloading the level.
+    private void SaveEditedNpc()
+    {
+        if (npcEditor?.Definition == null)
+        {
+            return;
+        }
+        var problems = npcEditor.Problems();
+        if (problems.Count > 0)
+        {
+            npcEditor.SetStatus(problems[0], false);
+            return;
+        }
+        var definition = npcEditor.Definition;
+        var wasNew = npcEditor.IsNew;
+        NpcEditMapping.Apply(npcEditor.Model, definition);
+        // Re-spawn the placement *before* writing, while it is still pending,
+        // so the body left standing is the one the file describes.
+        var body = wasNew ? EditorPlacement.RefreshPending() : editedNpc;
+        var result = EditorPlacement.SaveDefinition(definition);
+        Print(result.Message, result.Success ? OkColor : ErrorColor);
+        if (!result.Success)
+        {
+            npcEditor.SetStatus(result.Message, false);
+            return;
+        }
+        if (wasNew)
+        {
+            // It has a file now, so re-open it as an existing NPC: the id
+            // locks, and the body standing in the world is the real thing.
+            OpenNpcEditor(definition, isNew: false, liveNpc: body);
+        }
+        else if (body != null)
+        {
+            editedNpc = EditorPlacement.Respawn(body, definition);
+        }
+        // After the re-open, which seeds its own status line.
+        npcEditor.SetStatus(result.Message, true);
+        toolbar?.SetStatus($"Saved '{definition.NpcId}'.", true);
+    }
+
+    // Hides the NPC editor, if it is up. Returns whether it was open.
+    private bool CloseNpcEditor()
+    {
+        editedNpc = null;
+        if (npcEditor is not { Visible: true })
+        {
+            return false;
+        }
+        npcEditor.Visible = false;
+        return true;
     }
 
     public override void _Input(InputEvent @event)
@@ -488,8 +709,10 @@ public partial class DevConsole : CanvasLayer
         }
         else
         {
-            // Don't recapture the pointer out from under an open viewer panel.
-            Input.MouseMode = IsDialogueViewerOpen
+            // Don't recapture the pointer out from under an open viewer panel,
+            // or out from under editor mode — which is point-and-click and
+            // captures only while the look button is held.
+            Input.MouseMode = IsDialogueViewerOpen || editorActive
                 ? Input.MouseModeEnum.Visible
                 : Input.MouseModeEnum.Captured;
         }

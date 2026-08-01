@@ -141,12 +141,95 @@ public static class EditorPlacement
     }
 
     // savenpc: write the pending definition to Resources/Npcs/<Area>/<id>.tres
-    // and refresh NpcDatabase so it streams in like any authored NPC.
+    // and refresh NpcDatabase so it streams in like any authored NPC. The write
+    // itself is SaveDefinition, shared with the NPC editor's Save button so the
+    // two routes to a .tres can't drift apart.
     public static CommandResult Save()
     {
         if (pending == null)
         {
             return CommandResult.Fail("Nothing placed. Use 'place' first.");
+        }
+        var result = SaveDefinition(pending);
+        return result.Success
+            ? CommandResult.Ok(result.Message + " It will stream in with its chunk.")
+            : result;
+    }
+
+    // ---- point-and-click editing (the editor-mode toolbar) ----
+
+    // Place NPC tool: author a new NPC at a clicked world point, with an id
+    // picked for the author (`<area>.npcN`) and a default character sheet, and
+    // stand a preview on it. Returns the pending definition for the NPC editor
+    // to fill in, or null with the reason. It becomes *the* pending placement,
+    // so the console's nudge/rotate/savenpc/cancelplace act on it too.
+    public static NpcDefinition CreateAtPoint(Vector3 world, out string error)
+    {
+        if (!TryLevelContext(out var context, out error))
+        {
+            return null;
+        }
+        var area = PlacementMath.AreaFromScenePath(context.LevelScenePath);
+        var ids = new List<string>();
+        foreach (var definition in NpcDatabase.All)
+        {
+            ids.Add(definition.NpcId);
+        }
+        ClearPending();
+        pending = BuildDefinition(PlacementMath.NextNpcId(area, ids), "New NPC", null, world, context);
+        pending.Stats = new NpcStatBlock();
+        pendingWorld = world;
+        preview = SpawnPreview(pending, world, 0f, context);
+        return pending;
+    }
+
+    // Re-spawns the preview of the pending placement after the NPC editor
+    // changed something the standing body can't pick up in place — a rig swap,
+    // a display name, a facing. Returns the new body (null when nothing is
+    // pending or no level can host it).
+    public static Npc RefreshPending()
+    {
+        if (pending == null || !TryLevelContext(out var context, out _))
+        {
+            return null;
+        }
+        if (IsPreviewAlive())
+        {
+            preview.QueueFree();
+        }
+        preview = SpawnPreview(pending, pendingWorld, pending.RotationDegreesY, context);
+        return preview;
+    }
+
+    // Turns the pending placement in place. Cheap enough for a spinner drag,
+    // where re-spawning the body per step would thrash the scene tree.
+    public static void SetPendingFacing(float degrees)
+    {
+        if (pending == null)
+        {
+            return;
+        }
+        pending.RotationDegreesY = degrees;
+        if (IsPreviewAlive())
+        {
+            preview.RotationDegrees = new Vector3(0f, degrees, 0f);
+        }
+    }
+
+    // True while the given definition is the one being placed — the NPC editor
+    // asks so it knows whether Save is writing a brand-new .tres.
+    public static bool IsPending(NpcDefinition definition) =>
+        pending != null && ReferenceEquals(pending, definition);
+
+    // Writes any definition to disk: back to the file it was loaded from when
+    // it has one, otherwise to Resources/Npcs/<Area>/<id>.tres for a newly
+    // placed NPC. Same debug gate and index refresh as `savenpc`, which is
+    // still the console route to the same place.
+    public static CommandResult SaveDefinition(NpcDefinition definition)
+    {
+        if (definition == null)
+        {
+            return CommandResult.Fail("Nothing to save.");
         }
         if (!(OS.IsDebugBuild() || OS.HasFeature("editor")))
         {
@@ -154,35 +237,97 @@ public static class EditorPlacement
                 "Saving NPCs writes to res:// and only works in the editor/debug player "
                 + "(like the map baker). Author here, then commit the .tres.");
         }
-        var area = PlacementMath.AreaFromScenePath(pending.SpawnScenePath);
-        if (string.IsNullOrEmpty(area))
+        var path = definition.ResourcePath;
+        if (string.IsNullOrEmpty(path))
         {
-            return CommandResult.Fail("Could not determine the area folder from the current level.");
-        }
-        var directory = $"{NpcSaveRoot}/{area}";
-        if (!DirAccess.DirExistsAbsolute(directory))
-        {
-            var mkdir = DirAccess.MakeDirRecursiveAbsolute(directory);
-            if (mkdir != Error.Ok)
+            var area = PlacementMath.AreaFromScenePath(definition.SpawnScenePath);
+            if (string.IsNullOrEmpty(area))
             {
-                return CommandResult.Fail($"Could not create '{directory}': {mkdir}.");
+                return CommandResult.Fail("Could not determine the area folder from the NPC's level.");
             }
+            var directory = $"{NpcSaveRoot}/{area}";
+            if (!DirAccess.DirExistsAbsolute(directory))
+            {
+                var mkdir = DirAccess.MakeDirRecursiveAbsolute(directory);
+                if (mkdir != Error.Ok)
+                {
+                    return CommandResult.Fail($"Could not create '{directory}': {mkdir}.");
+                }
+            }
+            path = $"{directory}/{definition.NpcId}.tres";
         }
-        var path = $"{directory}/{pending.NpcId}.tres";
-        var error = ResourceSaver.Save(pending, path);
+        var error = ResourceSaver.Save(definition, path);
         if (error != Error.Ok)
         {
             return CommandResult.Fail($"Saving '{path}' failed: {error}.");
         }
-        // The saved NPC now owns this world spot; the preview stays standing and
-        // the pending slot clears so a re-save can't double-write.
+        // Own the path from here on, so a second Save overwrites the same file
+        // instead of deriving a fresh one, and the cache hands this instance
+        // out for the id it now holds.
+        definition.TakeOverPath(path);
+        if (IsPending(definition))
+        {
+            // The saved NPC owns this world spot now; the preview stays
+            // standing and the pending slot clears so a re-save can't
+            // double-write it as a new placement.
+            pending = null;
+            preview = null;
+            pendingWorld = Vector3.Zero;
+        }
         NpcDatabase.Invalidate();
-        var savedId = pending.NpcId;
-        pending = null;
-        preview = null;
-        pendingWorld = Vector3.Zero;
-        return CommandResult.Ok($"Saved '{savedId}' to {path}. It will stream in with its chunk.");
+        return CommandResult.Ok($"Saved '{definition.NpcId}' to {path}.");
     }
+
+    // Re-spawns a live, already-saved NPC so an edited rig/behavior/name shows
+    // in the world without reloading the level. Returns the new body, or null
+    // when the old one is gone or nothing can host it.
+    public static Npc Respawn(Npc npc, NpcDefinition definition)
+    {
+        if (npc == null || !GodotObject.IsInstanceValid(npc) || definition == null)
+        {
+            return null;
+        }
+        if (!TryLevelContext(out var context, out _))
+        {
+            return null;
+        }
+        var world = npc.GlobalPosition;
+        npc.QueueFree();
+        return SpawnPreview(definition, world, definition.RotationDegreesY, context);
+    }
+
+    // The rig wrapper scenes an NPC can wear, by basename, for the editor's
+    // mesh dropdown. Empty when the directory is missing.
+    public static IReadOnlyList<string> RigNames()
+    {
+        var names = new List<string>();
+        using var dir = DirAccess.Open(RigDirectory);
+        if (dir == null)
+        {
+            return names;
+        }
+        foreach (var file in dir.GetFiles())
+        {
+            // Exported builds list resource files with a .remap suffix.
+            var name = file.EndsWith(".remap") ? file[..^".remap".Length] : file;
+            if (name.EndsWith(".tscn"))
+            {
+                names.Add(name[..^".tscn".Length]);
+            }
+        }
+        names.Sort(System.StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    public static PackedScene LoadRig(string name) =>
+        string.IsNullOrEmpty(name) ? null : ResolveRig(name, out _);
+
+    // The basename a rig scene came from, for showing the current pick in the
+    // dropdown; empty for the placeholder capsule.
+    public static string RigNameOf(PackedScene rig) =>
+        string.IsNullOrEmpty(rig?.ResourcePath)
+            ? ""
+            : PlacementMath.AreaFromScenePath(rig.ResourcePath);
 
     // list npcs [area]: print known ids, optionally filtered by area folder.
     public static CommandResult ListNpcs(IReadOnlyList<string> args)

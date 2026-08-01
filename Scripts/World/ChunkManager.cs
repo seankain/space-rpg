@@ -59,11 +59,16 @@ public partial class ChunkManager : Node3D
 
     public override void _PhysicsProcess(double delta)
     {
-        if (GetTree().GetFirstNodeInGroup(Player.GroupName) is not Node3D player)
+        var playerPosition = (GetTree().GetFirstNodeInGroup(Player.GroupName) as Node3D)?.GlobalPosition;
+        // Streaming follows whoever is actually looking around: normally the
+        // player, but in editor mode the author has left the body behind in a
+        // free camera (in-game-editor plan Phase 7), and flying out over
+        // unstreamed chunks would show them empty space to place NPCs into.
+        if ((DevConsole.EditorCameraPosition ?? playerPosition) is not { } eye)
         {
             return;
         }
-        var center = ToChunkCoord(player.GlobalPosition);
+        var center = ToChunkCoord(eye);
         foreach (var coord in CoordsAround(center, LoadRadius))
         {
             if (available.ContainsKey(coord) && !loaded.ContainsKey(coord) && !pending.Contains(coord))
@@ -73,7 +78,9 @@ public partial class ChunkManager : Node3D
             }
         }
         PollPendingLoads();
-        UnloadFarChunks(center);
+        // The parked player still falls under gravity, so their ground is
+        // never unloaded however far the editor camera has flown.
+        UnloadFarChunks(center, playerPosition is { } stood ? ToChunkCoord(stood) : center);
     }
 
     // The chunk grid is discovered from the file names in a chunk directory,
@@ -183,12 +190,15 @@ public partial class ChunkManager : Node3D
     private string LevelScenePath() =>
         Owner?.SceneFilePath ?? GetParent()?.SceneFilePath ?? "";
 
-    private void UnloadFarChunks(Vector2I center)
+    // Frees chunks beyond UnloadRadius of *both* centers. The two are the same
+    // coordinate in normal play; they differ only in editor mode, where the
+    // streaming focus is the free camera and `keep` is the parked player.
+    private void UnloadFarChunks(Vector2I center, Vector2I keep)
     {
         List<Vector2I> far = null;
         foreach (var coord in loaded.Keys)
         {
-            if (Mathf.Max(Mathf.Abs(coord.X - center.X), Mathf.Abs(coord.Y - center.Y)) > UnloadRadius)
+            if (ChunkDistance(coord, center) > UnloadRadius && ChunkDistance(coord, keep) > UnloadRadius)
             {
                 (far ??= new()).Add(coord);
             }
@@ -203,4 +213,9 @@ public partial class ChunkManager : Node3D
             loaded.Remove(coord);
         }
     }
+
+    // Chebyshev distance in chunks — the square neighbourhood CoordsAround
+    // walks, so loading and unloading agree on what "near" means.
+    private static int ChunkDistance(Vector2I a, Vector2I b) =>
+        Mathf.Max(Mathf.Abs(a.X - b.X), Mathf.Abs(a.Y - b.Y));
 }

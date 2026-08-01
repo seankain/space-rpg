@@ -1,0 +1,148 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+// One starting-inventory row in the NPC editor. The Godot-facing
+// NpcItemStack resource this maps to lives in Scripts/Data; this is its
+// engine-free twin so the add/merge/validate rules can be tested.
+public sealed class NpcEditItemStack
+{
+    public NpcEditItemStack(uint itemId, uint quantity)
+    {
+        ItemId = itemId;
+        Quantity = quantity;
+    }
+
+    public uint ItemId { get; set; }
+    public uint Quantity { get; set; }
+}
+
+// The editable form behind the in-world NPC editor (NpcEditorPanel): every
+// field the author can change on an NPC, plus the rules for whether the
+// result is savable. Engine-free on purpose — NpcEditorPanel maps an
+// NpcDefinition resource onto one of these, edits it, and maps it back, so
+// the validation that decides whether a .tres gets written is unit-tested
+// without a running game.
+public sealed class NpcEditModel
+{
+    // Filesystem-hostile characters, plus the ones Godot's resource paths use.
+    // An NPC id becomes <id>.tres, so it has to survive being a file name.
+    private static readonly char[] IllegalIdChars =
+        { '/', '\\', ':', '*', '?', '"', '<', '>', '|' };
+
+    // Empty means "no rig" — the placeholder capsule tinted by BodyColor.
+    public const string NoRig = "";
+
+    public string NpcId { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+
+    // Rig wrapper scene basename (Scenes/Characters/Rigs/<name>.tscn), or
+    // NoRig for the capsule.
+    public string RigName { get; set; } = NoRig;
+
+    public float RotationDegreesY { get; set; }
+
+    // Vitals the recruit/battle paths read off the definition. Level 1 with a
+    // small pool matches the template recruits used to be hard-coded with.
+    public uint Level { get; set; } = 1;
+    public uint MaxHealthPoints { get; set; } = 8;
+    public uint MaxMagicPoints { get; set; } = 3;
+
+    public CharacterStats Stats { get; set; } = new()
+    {
+        Strength = 5,
+        Intelligence = 5,
+        Constitution = 5,
+        Dexterity = 5,
+        Wisdom = 5,
+        Charisma = 5,
+    };
+
+    public uint Credits { get; set; }
+
+    public List<NpcEditItemStack> Items { get; } = new();
+
+    // Adds a stack, folding into the row that already carries the item so the
+    // list can't grow two rows of Medkits that disagree.
+    public void AddItem(uint itemId, uint quantity)
+    {
+        if (quantity == 0)
+        {
+            quantity = 1;
+        }
+        if (Items.FirstOrDefault(s => s.ItemId == itemId) is { } existing)
+        {
+            existing.Quantity += quantity;
+            return;
+        }
+        Items.Add(new NpcEditItemStack(itemId, quantity));
+    }
+
+    public void RemoveItem(int index)
+    {
+        if (index >= 0 && index < Items.Count)
+        {
+            Items.RemoveAt(index);
+        }
+    }
+
+    // Every reason this NPC can't be saved, in the order the form shows them;
+    // empty means the .tres can be written. `isIdTaken` answers "does another
+    // NPC already own this id?" — the caller (the panel) asks NpcDatabase and
+    // excludes the NPC being edited, so renaming to your own id is fine.
+    public IReadOnlyList<string> Validate(Func<string, bool> isIdTaken)
+    {
+        var problems = new List<string>();
+        if (string.IsNullOrWhiteSpace(NpcId))
+        {
+            problems.Add("NPC id must not be empty.");
+        }
+        else if (NpcId.Any(char.IsWhiteSpace))
+        {
+            problems.Add("NPC id must not contain spaces — it becomes a file name.");
+        }
+        else if (NpcId.IndexOfAny(IllegalIdChars) >= 0)
+        {
+            problems.Add($"NPC id must not contain any of {new string(IllegalIdChars)}.");
+        }
+        else if (isIdTaken != null && isIdTaken(NpcId))
+        {
+            problems.Add($"An NPC with id '{NpcId}' already exists. Pick a unique id.");
+        }
+
+        if (string.IsNullOrWhiteSpace(DisplayName))
+        {
+            problems.Add("Display name must not be empty.");
+        }
+        if (MaxHealthPoints == 0)
+        {
+            problems.Add("Max health must be at least 1.");
+        }
+
+        for (var i = 0; i < Items.Count; i++)
+        {
+            var stack = Items[i];
+            if (ItemCatalog.Get(stack.ItemId) == null)
+            {
+                problems.Add($"Item row {i + 1}: no item with id {stack.ItemId}.");
+            }
+            if (stack.Quantity == 0)
+            {
+                problems.Add($"Item row {i + 1}: quantity must be at least 1.");
+            }
+        }
+        return problems;
+    }
+
+    // The stat block a recruited/fighting copy of this NPC starts with.
+    // Returned fresh so callers can't write back into the shared definition.
+    public CharacterStats CopyStats() => new()
+    {
+        Strength = Stats.Strength,
+        Intelligence = Stats.Intelligence,
+        Constitution = Stats.Constitution,
+        Dexterity = Stats.Dexterity,
+        Wisdom = Stats.Wisdom,
+        Charisma = Stats.Charisma,
+    };
+}
