@@ -163,7 +163,8 @@ public partial class DevConsole : CanvasLayer
             return CommandResult.Fail($"'{id}' already exists. Open it with 'dialogue open {id}'.");
         }
         ShowDialogueViewer(DialogueGraphEditing.NewEmpty(id));
-        return CommandResult.Ok($"New dialogue '{id}'. Edit it, then 'dialogue save' (or the Save button) to write it.");
+        return CommandResult.Ok(
+            $"New dialogue '{id}'. Edit it, then 'dialogue save' (or the Save button) to write {id}.yarn.");
     }
 
     // Validates and writes the editor's working graph (Phase 4). An optional id

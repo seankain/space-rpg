@@ -10,10 +10,15 @@ using System.Linq;
 // and validation live in Scripts/Dialogue; this is just the file I/O.
 public static class DialogueEditing
 {
-    // Validate then write the graph to its <id>.dialogue.json (or <id>.yarn, if
-    // that is how it was authored) and invalidate the catalog so the next
-    // conversation plays the edit live. Errors block the save; warnings (orphans)
-    // are reported but allowed.
+    // Validate then write the graph to its <id>.yarn and invalidate the catalog
+    // so the next conversation plays the edit live. Errors block the save;
+    // warnings (orphans) are reported but allowed.
+    //
+    // Every save writes Yarn — that is the authoring format (npc-dialogue-yarn.md),
+    // and the editor is one of the two ways content gets written, so it has no
+    // business producing a second format. A conversation still *loads* from a
+    // legacy <id>.dialogue.json; saving it converts it, which means deleting the
+    // JSON, since two files claiming one id is an error the catalog reports.
     public static CommandResult Save(DialogueGraph graph)
     {
         if (graph == null)
@@ -28,7 +33,7 @@ public static class DialogueEditing
         {
             return CommandResult.Fail(
                 "Saving dialogue writes to res:// and only works in the editor/debug player "
-                + "(like the map baker). Author here, then commit the .json.");
+                + "(like the map baker). Author here, then commit the .yarn.");
         }
 
         var issues = DialogueValidation.Validate(graph);
@@ -41,7 +46,9 @@ public static class DialogueEditing
             return CommandResult.Fail("Can't save — fix these first:\n" + string.Join("\n", errors));
         }
 
-        var directory = DialogueCatalog.DialogueDirectory;
+        // A conversation is rewritten where it already lives; a brand-new one
+        // lands in the dialogue root.
+        var directory = DialogueFiles.SaveDirectory(graph, DialogueCatalog.DialogueDirectory);
         if (!DirAccess.DirExistsAbsolute(directory))
         {
             var mkdir = DirAccess.MakeDirRecursiveAbsolute(directory);
@@ -51,15 +58,11 @@ public static class DialogueEditing
             }
         }
 
-        // A conversation is written back in the format it was authored in, so
-        // editing a .yarn script in-game keeps it Yarn instead of leaving a
-        // second file with the same id (npc-dialogue-yarn.md Phase 1).
-        var yarn = graph.SourceFormat == DialogueSourceFormat.Yarn;
-        var path = $"{directory}/{graph.Id}{(yarn ? DialogueCatalog.YarnSuffix : DialogueCatalog.FileSuffix)}";
-        var yarnProblems = new List<string>();
-        var contents = yarn
-            ? YarnGraphWriter.Write(graph, yarnProblems)
-            : DialogueSerialization.ToJson(graph);
+        var path = DialogueFiles.SavePath(graph, DialogueCatalog.DialogueDirectory);
+        // Notes are what the file can't say for itself: anything Yarn couldn't
+        // express, plus trouble with the .json this save replaces.
+        var notes = new List<string>();
+        var contents = YarnGraphWriter.Write(graph, notes);
         {
             using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
             if (file == null)
@@ -69,17 +72,51 @@ public static class DialogueEditing
             file.StoreString(contents);
         }
         // File closed (using scope ended) before the rescan reads it back.
+        var converted = RemoveReplacedJson(graph, directory, notes);
+        graph.SourceFormat = DialogueSourceFormat.Yarn;
+        graph.SourcePath = path;
         DialogueCatalog.Invalidate();
 
-        var warnings = issues.Count(i => i.Severity == DialogueSeverity.Warning) + yarnProblems.Count;
+        var warnings = issues.Count(i => i.Severity == DialogueSeverity.Warning) + notes.Count;
         var note = warnings > 0 ? $"  ({warnings} warning{(warnings == 1 ? "" : "s")})" : "";
-        // Anything Yarn couldn't express is named outright — the author is
-        // standing in front of the console and the file is already written.
-        var wrote = yarnProblems.Count > 0
-            ? "\n" + string.Join("\n", yarnProblems.Select(p => "  - " + p))
+        // Every note is named outright — the author is standing in front of the
+        // console and the file is already written.
+        var wrote = notes.Count > 0
+            ? "\n" + string.Join("\n", notes.Select(p => "  - " + p))
             : "";
         return CommandResult.Ok(
-            $"Saved '{graph.Id}' to {path}.{note} Replay the NPC to see it live.{wrote}");
+            $"Saved '{graph.Id}' to {path}.{converted}{note} Replay the NPC to see it live.{wrote}");
+    }
+
+    // Converting a JSON conversation to Yarn: the file it came from goes, or the
+    // catalog would see two files claiming one id. Only the graph's own source
+    // is deleted — a rival .json that this conversation was not loaded from is
+    // reported instead, because deleting someone else's file is not this
+    // command's call. Returns the note for the success line.
+    private static string RemoveReplacedJson(DialogueGraph graph, string directory, List<string> notes)
+    {
+        var replaced = DialogueFiles.ReplacedJsonPath(graph);
+        if (replaced != null && FileAccess.FileExists(replaced))
+        {
+            var error = DirAccess.RemoveAbsolute(replaced);
+            if (error != Error.Ok)
+            {
+                notes.Add(
+                    $"could not delete the old '{replaced}': {error}. Two files now claim "
+                    + $"'{graph.Id}' — delete it by hand.");
+                return "";
+            }
+            return $" Converted to Yarn — deleted the old {replaced}.";
+        }
+
+        var rival = DialogueFiles.JsonPath(directory, graph.Id);
+        if (rival != replaced && FileAccess.FileExists(rival))
+        {
+            notes.Add(
+                $"'{rival}' also claims '{graph.Id}'. A conversation lives in one file — "
+                + "delete it so the catalog loads this .yarn.");
+        }
+        return "";
     }
 
     // Point an NPC's first role at a conversation and re-save its definition

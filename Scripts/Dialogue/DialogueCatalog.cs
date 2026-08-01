@@ -20,8 +20,8 @@ using System.Collections.Generic;
 public static class DialogueCatalog
 {
     public const string DialogueDirectory = "res://Resources/Dialogue";
-    public const string FileSuffix = ".dialogue.json";
-    public const string YarnSuffix = YarnGraphCompiler.FileSuffix;
+    public const string FileSuffix = DialogueFiles.JsonSuffix;
+    public const string YarnSuffix = DialogueFiles.YarnSuffix;
 
     private static Dictionary<string, DialogueGraph> graphs;
 
@@ -133,6 +133,9 @@ public static class DialogueCatalog
 
     private static void Add(DialogueGraph graph, string path)
     {
+        // Remembered so the editor's save rewrites this file (and, for a .json,
+        // replaces it with the .yarn it converts to) rather than guessing a path.
+        graph.SourcePath = path;
         if (!graphs.TryAdd(graph.Id, graph))
         {
             GD.PushError(
