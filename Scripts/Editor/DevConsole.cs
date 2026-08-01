@@ -339,6 +339,7 @@ public partial class DevConsole : CanvasLayer
 
     public override void _Process(double delta)
     {
+        KeepInputFocused();
         if (!editorActive)
         {
             return;
@@ -390,6 +391,24 @@ public partial class DevConsole : CanvasLayer
         {
             NavigateHistory(1);
             GetViewport().SetInputAsHandled();
+        }
+    }
+
+    // Backstop for the typing-goes-nowhere case: KeepEditingOnTextSubmit covers
+    // Enter, but a click on the log or Escape also ends edit mode, and either
+    // one leaves the console looking ready while ignoring the keyboard. While
+    // the panel is open the command line owns input, so put it back in edit
+    // mode (Edit also takes focus). Skipped while the dialogue editor is up so
+    // its own fields keep the caret.
+    private void KeepInputFocused()
+    {
+        if (!enabled || !Visible || IsDialogueViewerOpen)
+        {
+            return;
+        }
+        if (!input.IsEditing())
+        {
+            input.Edit();
         }
     }
 
@@ -458,7 +477,13 @@ public partial class DevConsole : CanvasLayer
         {
             Input.MouseMode = Input.MouseModeEnum.Visible;
             input.Clear();
-            input.GrabFocus();
+            // Edit rather than GrabFocus: focus alone doesn't put a 4.4+
+            // LineEdit in edit mode, and the console should be typeable the
+            // moment it drops down.
+            input.Edit();
+            // Anything printed while the panel was hidden laid out just now, so
+            // open on the newest line rather than wherever the log was left.
+            ScrollOutputToBottom();
         }
         else
         {
@@ -471,9 +496,11 @@ public partial class DevConsole : CanvasLayer
 
     private void OnCommandSubmitted(string text)
     {
-        // Keep the input ready for the next command regardless of outcome.
+        // Keep the input ready for the next command regardless of outcome; the
+        // caret stays put (KeepEditingOnTextSubmit), and commands that close the
+        // console — `dialogue play` — leave it closed rather than pulling the
+        // keyboard back to a hidden field.
         input.Clear();
-        input.GrabFocus();
         if (string.IsNullOrWhiteSpace(text))
         {
             return;
@@ -531,6 +558,25 @@ public partial class DevConsole : CanvasLayer
         output.AddText(text);
         output.Pop();
         output.Newline();
+        ScrollOutputToBottom();
+    }
+
+    // ScrollFollowing alone isn't enough: RichTextLabel only keeps following
+    // while the view is already pinned to the end, so scrolling back through
+    // the log (or printing while the panel is hidden) strands the newest lines
+    // off-screen. Pin the view to the last line after every print — deferred,
+    // because the text added above only re-flows at the end of the frame.
+    private void ScrollOutputToBottom() => Callable.From(ScrollOutputToEnd).CallDeferred();
+
+    private void ScrollOutputToEnd()
+    {
+        // GetLineCount forces the pending re-flow, so both the line index and
+        // the scrollbar range are current by the time we scroll.
+        var lines = output.GetLineCount();
+        if (lines > 0)
+        {
+            output.ScrollToLine(lines - 1);
+        }
     }
 
     private void BuildUi()
@@ -571,6 +617,11 @@ public partial class DevConsole : CanvasLayer
         {
             PlaceholderText = "Enter command - 'help' for a list",
             ClearButtonEnabled = false,
+            // Godot 4.4+ separates focus from edit mode: by default a LineEdit
+            // leaves edit mode when ui_text_submit fires, so after Enter the
+            // field still holds focus but ignores every keystroke — the user
+            // had to click back in for each command. Stay in edit mode instead.
+            KeepEditingOnTextSubmit = true,
         };
         input.TextSubmitted += OnCommandSubmitted;
         column.AddChild(input);
