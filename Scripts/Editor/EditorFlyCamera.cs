@@ -103,8 +103,10 @@ public partial class EditorFlyCamera : Camera3D
     public override void _PhysicsProcess(double delta)
     {
         // The console owns the keyboard while it is open; flying on WASD typed
-        // into the command line is the same bug Player guards against.
-        if (DevConsole.IsOpen || DevConsole.IsNpcEditorOpen)
+        // into the command line is the same bug Player guards against. So do
+        // the editor forms — the NPC sheet, and the dialogue editor it opens
+        // over itself, which is nothing but text fields.
+        if (DevConsole.IsOpen || DevConsole.IsNpcEditorOpen || DevConsole.IsDialogueViewerOpen)
         {
             return;
         }

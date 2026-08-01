@@ -186,6 +186,104 @@ public class NpcEditorTests
         Assert.True(model.Validate(NoIdsTaken).Count >= 3);
     }
 
+    // --- conversations (the Conversations section) ----------------------------
+
+    [Fact]
+    public void AnNpcWithNoConversationsIsStillSavable()
+    {
+        // A freshly placed NPC has no roles at all; the form must not demand
+        // one before it will write the .tres.
+        var model = Valid();
+        Assert.Empty(model.Dialogues);
+        Assert.Empty(model.Validate(NoIdsTaken));
+    }
+
+    [Fact]
+    public void ARoleWithNoConversationIsFine()
+    {
+        // Empty means small talk, which is what an unauthored role does today.
+        var model = Valid();
+        model.Dialogues.Add(new NpcDialogueLink("Talk", ""));
+        Assert.Empty(model.Validate(NoIdsTaken));
+    }
+
+    [Fact]
+    public void AConversationIdWithSpacesIsRejectedBecauseItBecomesAFileName()
+    {
+        var model = Valid();
+        model.Dialogues.Add(new NpcDialogueLink("Talk", "intro newcomer"));
+        Assert.Contains(model.Validate(NoIdsTaken), p => p.Contains("dialogue id must not contain spaces"));
+    }
+
+    [Theory]
+    [InlineData("intro/newcomer")]
+    [InlineData("intro:newcomer")]
+    public void AConversationIdWithPathCharactersIsRejected(string dialogueId)
+    {
+        var model = Valid();
+        model.Dialogues.Add(new NpcDialogueLink("Talk", dialogueId));
+        Assert.NotEmpty(model.Validate(NoIdsTaken));
+    }
+
+    [Fact]
+    public void TheProblemRowIsNamedSoTheAuthorKnowsWhichConversation()
+    {
+        var model = Valid();
+        model.Dialogues.Add(new NpcDialogueLink("QuestGiver", "fine.id"));
+        model.Dialogues.Add(new NpcDialogueLink("Talk", "bad id"));
+        Assert.Contains(model.Validate(NoIdsTaken), p => p.Contains("row 2"));
+    }
+
+    [Fact]
+    public void ANewConversationIsNamedAfterTheNpc()
+    {
+        Assert.Equal("intro.newcomer", Valid().SuggestDialogueId(_ => false));
+    }
+
+    [Fact]
+    public void ASecondConversationForTheSameNpcGetsANumberedId()
+    {
+        var model = Valid();
+        Assert.Equal("intro.newcomer.2", model.SuggestDialogueId(id => id == "intro.newcomer"));
+        Assert.Equal(
+            "intro.newcomer.3",
+            model.SuggestDialogueId(id => id is "intro.newcomer" or "intro.newcomer.2"));
+    }
+
+    [Fact]
+    public void ASuggestedConversationIdIsAlwaysAValidOne()
+    {
+        var model = Valid();
+        model.Dialogues.Add(new NpcDialogueLink("Talk", model.SuggestDialogueId(_ => false)));
+        Assert.Empty(model.Validate(NoIdsTaken));
+    }
+
+    [Fact]
+    public void AnUnnamedNpcStillGetsAUsableConversationId()
+    {
+        // The picker can be used before the id field is filled in; the
+        // suggestion must not come back empty (it becomes a file name).
+        var model = new NpcEditModel { NpcId = "", DisplayName = "" };
+        Assert.Equal("conversation", model.SuggestDialogueId(_ => false));
+    }
+
+    [Fact]
+    public void AddingAConversationRoleMarksItAsOneTheSaveWillCreate()
+    {
+        // The mapping appends an NpcRole to the definition for exactly these
+        // rows, so a freshly placed NPC can be given something to say.
+        var model = Valid();
+        var link = model.AddDialogueRole("intro.newcomer");
+        Assert.True(link.IsNewRole);
+        Assert.Equal("intro.newcomer", model.Dialogues.Single().DialogueId);
+    }
+
+    [Fact]
+    public void ARoleReadOffTheDefinitionIsNotOneTheSaveCreates()
+    {
+        Assert.False(new NpcDialogueLink("QuestGiver", "intro.hale").IsNewRole);
+    }
+
     // --- generated ids (the Place NPC tool) ----------------------------------
 
     [Fact]

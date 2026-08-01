@@ -84,6 +84,11 @@ public partial class DevConsole : CanvasLayer
     private NpcEditorPanel npcEditor;
     private Npc editedNpc;
 
+    // Set while the dialogue editor is up *in front of* the NPC editor (opened
+    // from a conversation row): closing the dialogue editor puts the NPC form
+    // back rather than dropping the author into the empty level.
+    private bool resumeNpcEditorOnDialogueClose;
+
     // The read-only dialogue viewer (Phase 3), created on first `dialogue open`
     // and reused after; null until then, hidden when closed.
     private DialogueEditorPanel dialogueViewer;
@@ -322,6 +327,14 @@ public partial class DevConsole : CanvasLayer
             return false;
         }
         dialogueViewer.Visible = false;
+        if (resumeNpcEditorOnDialogueClose && npcEditor != null)
+        {
+            resumeNpcEditorOnDialogueClose = false;
+            // The catalog may have gained the conversation that was just
+            // written, so the rows re-read it on the way back in.
+            npcEditor.RefreshDialogues();
+            npcEditor.Visible = true;
+        }
         Input.MouseMode = Visible || editorActive
             ? Input.MouseModeEnum.Visible
             : Input.MouseModeEnum.Captured;
@@ -413,7 +426,10 @@ public partial class DevConsole : CanvasLayer
     // active tool decides what they mean.
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (!editorActive || Visible || IsNpcEditorOpen || toolbar == null)
+        // A click belongs to whatever panel is up: the console, the NPC form,
+        // or the dialogue editor (which the NPC form opens over itself, and
+        // which the `dialogue` verbs can raise mid-editor-mode too).
+        if (!editorActive || Visible || IsNpcEditorOpen || IsDialogueViewerOpen || toolbar == null)
         {
             return;
         }
@@ -519,8 +535,31 @@ public partial class DevConsole : CanvasLayer
                     editedNpc.RotationDegrees = new Vector3(0f, degrees, 0f);
                 }
             },
+            EditDialogueRequested = id => OpenDialogueFromNpcEditor(id, create: false),
+            NewDialogueRequested = id => OpenDialogueFromNpcEditor(id, create: true),
         };
         AddChild(npcEditor);
+    }
+
+    // A conversation row's "Edit dialogue" / "New…" button: swap the NPC form
+    // for the dialogue editor on that conversation. The two panels share a
+    // layer and both want the whole screen, so the NPC form steps aside and
+    // CloseDialogueViewer brings it back — the author is editing one NPC the
+    // whole time, and returns to it with the link still on the form.
+    private void OpenDialogueFromNpcEditor(string id, bool create)
+    {
+        var result = create ? NewDialogue(id) : OpenDialogueViewer(id);
+        Print(result.Message, result.Success ? OkColor : ErrorColor);
+        if (!result.Success)
+        {
+            npcEditor.SetStatus(result.Message, false);
+            return;
+        }
+        var npcId = npcEditor.Definition?.NpcId;
+        resumeNpcEditorOnDialogueClose = npcEditor.Visible;
+        npcEditor.Visible = false;
+        dialogueViewer.SetStatus(
+            $"Editing {npcId}'s conversation. Save writes the .yarn; Close (Esc) goes back to the NPC.", true);
     }
 
     // Save from the NPC editor: validate the form, write the model into the
@@ -562,7 +601,12 @@ public partial class DevConsole : CanvasLayer
             editedNpc = EditorPlacement.Respawn(body, definition);
         }
         // After the re-open, which seeds its own status line.
-        npcEditor.SetStatus(result.Message, true);
+        var warning = npcEditor.MissingDialogueWarning();
+        if (warning != null)
+        {
+            Print(warning, HintColor);
+        }
+        npcEditor.SetStatus(warning == null ? result.Message : $"{result.Message}  {warning}", true);
         toolbar?.SetStatus($"Saved '{definition.NpcId}'.", true);
     }
 
@@ -570,6 +614,10 @@ public partial class DevConsole : CanvasLayer
     private bool CloseNpcEditor()
     {
         editedNpc = null;
+        // Whatever closed the form (a tool switch, leaving editor mode) ends
+        // the trip through the dialogue editor too: closing that panel must not
+        // bring back a form for an NPC nobody is editing any more.
+        resumeNpcEditorOnDialogueClose = false;
         if (npcEditor is not { Visible: true })
         {
             return false;

@@ -17,6 +17,30 @@ public sealed class NpcEditItemStack
     public uint Quantity { get; set; }
 }
 
+// One role's conversation as the NPC editor shows it: which role it belongs to
+// and the DialogueGraph id that role plays. The Godot-facing NpcRole resource
+// this maps to lives in Scripts/Npc/Roles; this is its engine-free twin, so the
+// rules about what a conversation may be called are testable.
+public sealed class NpcDialogueLink
+{
+    public NpcDialogueLink(string roleLabel, string dialogueId)
+    {
+        RoleLabel = roleLabel ?? "";
+        DialogueId = dialogueId ?? "";
+    }
+
+    // How the row is titled — the role's kind ("QuestGiver", "Talk").
+    public string RoleLabel { get; }
+
+    // The conversation the role plays, by DialogueGraph id. Empty means the
+    // role falls back to small talk.
+    public string DialogueId { get; set; }
+
+    // True for a row the author added in the editor: the definition has no such
+    // role yet, so saving creates one.
+    public bool IsNewRole { get; init; }
+}
+
 // The editable form behind the in-world NPC editor (NpcEditorPanel): every
 // field the author can change on an NPC, plus the rules for whether the
 // result is savable. Engine-free on purpose — NpcEditorPanel maps an
@@ -61,6 +85,43 @@ public sealed class NpcEditModel
     public uint Credits { get; set; }
 
     public List<NpcEditItemStack> Items { get; } = new();
+
+    // The NPC's conversations, one row per role, in role order — what the
+    // editor's Conversations section lists and what its "Edit dialogue" button
+    // opens. Rows added here beyond the definition's roles become plain talking
+    // roles when the .tres is written (NpcEditMapping.Apply).
+    public List<NpcDialogueLink> Dialogues { get; } = new();
+
+    // Appends a row for a role this NPC doesn't have yet — the "+ conversation"
+    // button, which is how a freshly placed NPC (no roles at all) gets one.
+    public NpcDialogueLink AddDialogueRole(string dialogueId)
+    {
+        var link = new NpcDialogueLink("Talk", dialogueId) { IsNewRole = true };
+        Dialogues.Add(link);
+        return link;
+    }
+
+    // A free conversation id for a new dialogue on this NPC: the NPC's own id,
+    // then <id>.2, <id>.3 — a conversation is written as <id>.yarn, so naming
+    // it after the NPC keeps the file next to the ones the game ships.
+    // `isTaken` answers "does a conversation already use this id?"; the panel
+    // asks the catalog and the rows already on the form.
+    public string SuggestDialogueId(Func<string, bool> isTaken)
+    {
+        var baseId = string.IsNullOrWhiteSpace(NpcId) ? "conversation" : NpcId;
+        if (isTaken == null || !isTaken(baseId))
+        {
+            return baseId;
+        }
+        for (var suffix = 2; ; suffix++)
+        {
+            var candidate = $"{baseId}.{suffix}";
+            if (!isTaken(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
 
     // Adds a stack, folding into the row that already carries the item so the
     // list can't grow two rows of Medkits that disagree.
@@ -129,6 +190,26 @@ public sealed class NpcEditModel
             if (stack.Quantity == 0)
             {
                 problems.Add($"Item row {i + 1}: quantity must be at least 1.");
+            }
+        }
+
+        for (var i = 0; i < Dialogues.Count; i++)
+        {
+            // A conversation id becomes <id>.yarn, so it lives under the same
+            // file-name rules as an NPC id. Empty is fine — that role just falls
+            // back to small talk.
+            var id = Dialogues[i].DialogueId;
+            if (string.IsNullOrEmpty(id))
+            {
+                continue;
+            }
+            if (id.Any(char.IsWhiteSpace))
+            {
+                problems.Add($"Conversation row {i + 1}: dialogue id must not contain spaces.");
+            }
+            else if (id.IndexOfAny(IllegalIdChars) >= 0)
+            {
+                problems.Add($"Conversation row {i + 1}: dialogue id must not contain any of {new string(IllegalIdChars)}.");
             }
         }
         return problems;
