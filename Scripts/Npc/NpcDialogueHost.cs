@@ -59,31 +59,41 @@ public sealed class NpcDialogueHost : IDialogueEffectHost
 	// only verb here with no consequence beyond what the player sees.
 	public void PlayAnimation(string clip, bool loop) => npc.PlayDialogueAnimation(clip, loop);
 
+	// The stat template every intro joiner shared before NPCs carried their
+	// own sheet. Definitions without a Stats block (every .tres authored
+	// before the in-world NPC editor) still recruit exactly as they did.
+	private static readonly NpcStatBlock DefaultRecruitStats = new()
+	{
+		Level = 1,
+		MaxHealthPoints = 8,
+		MaxMagicPoints = 3,
+		Strength = 6,
+		Intelligence = 4,
+		Constitution = 6,
+		Dexterity = 7,
+		Wisdom = 4,
+		Charisma = 5,
+	};
+
 	// Copy this NPC into the party as the given character id, hand the world
 	// body off to a follower, and despawn it when the conversation closes
-	// (party plan Phase 1/2, relocated from RecruitRole.Join). The stat block
-	// is the recruit template every intro joiner shared.
+	// (party plan Phase 1/2, relocated from RecruitRole.Join). The stats are
+	// the NPC's own sheet when it has one — the editor's stat block is what
+	// the joiner walks in with.
 	public void Recruit(ulong partyCharacterId)
 	{
 		var party = new PartyManager(state.Party);
+		var sheet = npc.Definition?.Stats ?? DefaultRecruitStats;
 		var member = new CharacterEntity
 		{
 			Id = partyCharacterId,
 			Name = npc.DisplayName,
-			Level = 1,
-			HealthPoints = 8,
-			MaxHealthPoints = 8,
-			MagicPoints = 3,
-			MaxMagicPoints = 3,
-			Stats = new CharacterStats
-			{
-				Strength = 6,
-				Intelligence = 4,
-				Constitution = 6,
-				Dexterity = 7,
-				Wisdom = 4,
-				Charisma = 5,
-			},
+			Level = sheet.Level,
+			HealthPoints = sheet.MaxHealthPoints,
+			MaxHealthPoints = sheet.MaxHealthPoints,
+			MagicPoints = sheet.MaxMagicPoints,
+			MaxMagicPoints = sheet.MaxMagicPoints,
+			Stats = sheet.ToCharacterStats(),
 			EquipSlots = new CharacterEquipSlots(),
 			ActiveStatusEffects = new List<ActiveStatusEffect>(),
 		};

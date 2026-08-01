@@ -14,7 +14,7 @@
          The NpcDefinition/NpcItemStack resources and NpcDatabase are
          Godot-facing and excluded; their engine-free core (NpcIndex) stays. -->
     <Compile Include="../Scripts/Data/**/*.cs" LinkBase="GameSource/Data"
-             Exclude="../Scripts/Data/NpcDefinition.cs;../Scripts/Data/NpcItemStack.cs;../Scripts/Data/NpcDatabase.cs" />
+             Exclude="../Scripts/Data/NpcDefinition.cs;../Scripts/Data/NpcItemStack.cs;../Scripts/Data/NpcStatBlock.cs;../Scripts/Data/NpcDatabase.cs" />
     <Compile Include="../Scripts/Save/SaveRepository.cs" Link="GameSource/SaveRepository.cs" />
     <!-- Serializable dialogue graph + runtime: the data model, effect/condition
          vocabulary, and graph->DialogueLine compiler are engine-free. The

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 // A world position split into the chunk that owns it plus the chunk-local
 // offset authored inside that chunk (in-game-editor plan Phase 3).
@@ -44,6 +46,25 @@ public static class PlacementMath
             worldX - chunkX * MapProjection.ChunkSize,
             worldY,
             worldZ - chunkZ * MapProjection.ChunkSize);
+    }
+
+    // A free id for an NPC placed by clicking rather than typed at the console
+    // (`<area>.npc1`, `<area>.npc2`, …), lower-cased so it matches the
+    // committed `intro.vex` style. `taken` is the ids already in the database;
+    // the first unused number wins, so deleting one hands its number back.
+    public static string NextNpcId(string area, IEnumerable<string> taken)
+    {
+        var prefix = string.IsNullOrEmpty(area) ? "npc" : area.ToLowerInvariant() + ".npc";
+        var used = new HashSet<string>(
+            taken ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        for (var n = 1; ; n++)
+        {
+            var candidate = prefix + n.ToString(CultureInfo.InvariantCulture);
+            if (!used.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
     }
 
     // The area folder a placed NPC is saved under: the level scene's basename
