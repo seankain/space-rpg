@@ -130,7 +130,8 @@ public class DialogueMigrationTests
         }
         void CheckCondition(ConditionRef condition, string where)
         {
-            if (condition != null && !KnownConditions.Contains(condition.Id))
+            // BareId, so a negated condition ("!flag") is checked as its verb.
+            if (condition != null && !KnownConditions.Contains(DialogueConditions.BareId(condition.Id)))
             {
                 Problem($"{where} uses unknown condition '{condition.Id}'");
             }

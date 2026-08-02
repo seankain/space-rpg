@@ -2,7 +2,7 @@
 
 Goal: let a conversation branch on *any* piece of current character and world state — starting with the party's credit balance — instead of the seven fixed predicates the vocabulary happens to ship with.
 
-Status: **Phases 1 and 2 done** (queries, comparisons, negation, editor; conditions evaluated when a node is reached). Phase 3 — the demo conversation and the writers' notes — is still design.
+Status: **done** — queries and comparisons (Phase 1), conditions evaluated when a node is reached (Phase 2), and the demo conversation plus the writers' reference (Phase 3).
 
 Depends on: [npc-dialogue-yarn.md](npc-dialogue-yarn.md) Phases 1–4 (the Yarn authoring layer, the condition/effect vocabulary, world flags) and [dialogue-editor.md](dialogue-editor.md) Phase 1 (the graph and its editor).
 
@@ -258,11 +258,13 @@ Following the shape of the phases before it:
 
 One consequence worth knowing: a dangling link or an unknown verb deep in a conversation is now reported when the player *reaches* it rather than at compile, so a test that compiles a conversation and asserts no warnings only covers the first line. The graph validator (`DialogueValidation`, run over every committed conversation) is what catches those at author time.
 
-### Phase 3 — The demo, and the docs
+### Phase 3 — The demo, and the docs *(done)*
 
-The Moss haggling script; the writers' notes in npc-dialogue-yarn.md Phase 5 updated with the condition syntax; `docs/current-progress.md` updated.
+1. **`intro.shopkeeper.yarn` is the demo**, as it was for world flags. Trader Moss keeps a surplus medkit under the counter for 150 credits: the offer is gated on `credits() >= 150`, so a player who can't pay never has it dangled in front of them, and the router on the far side of the payment reads the balance the purchase left behind — "there's more under here, if you're still buying" or "come back when your credits have recovered". A new game starts with 250 credits, which covers it exactly once, so both halves are visible in one playthrough: the offer is there, then it isn't.
+2. **The condition syntax is documented where writers read it** — the Conventions section of [npc-dialogue-yarn.md](npc-dialogue-yarn.md) now separates predicates from queries, lists the operators each takes, says when a condition is evaluated, and explains what is still refused and how to write it instead (`and` as nested `<<if>>`, `or` as `<<elseif>>`). Phase 5's writers'-README item points at it as the thing to lift.
+3. **Tests:** two cases in `Tests/IntroDialogueBranchTests.cs` walk Moss end to end — buy with 250 and get the cleaned-out line, then come back and find the option gone; buy with 400 and get the still-a-customer line. The existing all-committed-conversations guards (round trip through the writer and through JSON, and the validator) cover the new script for free.
 
-**Done when:** an NPC visibly reacts to what's in the player's pocket, before and after they spend it.
+**Done when:** an NPC visibly reacts to what's in the player's pocket, before and after they spend it. ✅ — whether it *reads* right at the counter is the half only a playthrough can answer.
 
 ---
 

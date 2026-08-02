@@ -387,11 +387,46 @@ public class IntroDialogueBranchTests
         Assert.Contains("Back again", second.Text);
         second.OnShown?.Invoke();
         Assert.Equal(new[] { "Waving" }, host.Animations);
-        // Both greetings offer the same two options and share the reply.
+        // Both greetings offer the same options and share the reply.
         Assert.Equal(
             first.Choices.Select(c => c.Label),
             second.Choices.Select(c => c.Label));
         Assert.Contains("Mind the merchandise", Pick(second, "Just looking").Text);
+    }
+
+    [Fact]
+    public void MossOffersTheMedkitOnlyWhileYouCanAffordIt()
+    {
+        // dialogue-state-conditions Phase 3, both halves in one walk: the offer
+        // is gated on the price before you spend, and the line after the payment
+        // reads the balance it left behind. A fresh purse covers it exactly once.
+        var state = new GameState { Credits = 250 };
+        var greet = Play("intro.shopkeeper", state);
+        greet.OnShown?.Invoke();
+
+        var deal = Pick(greet, "Anything under the counter?");
+        Assert.Contains("Hundred and fifty", deal.Text);
+
+        var after = Pick(deal, "Done");
+        Assert.Equal(100u, state.Credits);
+        Assert.Equal(1u, state.Inventory.CountOf(ItemCatalog.MedkitId));
+        Assert.Contains("Come back when your credits have recovered", after.Text);
+
+        // And on the way back in, with 100 left, it isn't on the table at all.
+        var next = Play("intro.shopkeeper", state);
+        Assert.Contains("Back again", next.Text);
+        Assert.DoesNotContain("Anything under the counter?", next.Choices.Select(c => c.Label));
+    }
+
+    [Fact]
+    public void MossNoticesWhenYouCanStillAffordAnother()
+    {
+        // The other side of the same router: 400 in, 150 out, still a customer.
+        var state = new GameState { Credits = 400 };
+        var after = Pick(Pick(Play("intro.shopkeeper", state), "Anything under the counter?"), "Done");
+
+        Assert.Equal(250u, state.Credits);
+        Assert.Contains("if you're still buying", after.Text);
     }
 
     [Fact]
