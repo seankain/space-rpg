@@ -74,9 +74,13 @@ public static class YarnGraphCompiler
 
     // `has_item(1)` / `quest_state(1, "Success")` / `party_has_room()` — a call
     // to one of the DialogueConditions verbs, which is also how the condition
-    // reads as real Yarn (a function call returning a bool). Yarn expressions
-    // the vocabulary can't express ($variables, comparisons, and/or/not) are
-    // reported rather than guessed at. Shared with YarnGraphWriter's inverse.
+    // reads as real Yarn (a function call returning a bool). A query verb is
+    // compared to a literal the same way Yarn compares a function's result
+    // (`credits() >= 200`), and any condition may be negated with `not` or `!`
+    // (dialogue-state-conditions plan Phase 1). What is still refused, by line
+    // number rather than by guesswork: Yarn $variables, arithmetic, and
+    // and/or/xor — a condition is one call, one optional comparison. Shared with
+    // YarnGraphWriter's inverse.
     public static ConditionRef ParseCondition(string text, int line, List<string> problems)
     {
         var source = (text ?? "").Trim();
@@ -92,52 +96,128 @@ public static class YarnGraphCompiler
                 + $"conditions ({string.Join(", ", DialogueConditions.Ids)}).");
             return null;
         }
-        foreach (var operatorText in new[] { "==", "!=", ">=", "<=", ">", "<", "&&", "||", "!" })
-        {
-            if (source.Contains(operatorText, StringComparison.Ordinal))
-            {
-                problems.Add(
-                    $"line {line}: '{operatorText}' isn't supported in a condition — use one call from "
-                    + $"{string.Join(", ", DialogueConditions.Ids)}.");
-                return null;
-            }
-        }
-        foreach (var word in new[] { "not ", "and ", "or " })
-        {
-            if (source.StartsWith(word, StringComparison.OrdinalIgnoreCase)
-                || source.Contains(" " + word, StringComparison.OrdinalIgnoreCase))
-            {
-                problems.Add(
-                    $"line {line}: '{word.Trim()}' isn't supported — a condition is a single call from "
-                    + $"{string.Join(", ", DialogueConditions.Ids)}.");
-                return null;
-            }
-        }
 
-        string name;
-        var args = Array.Empty<string>();
-        var open = source.IndexOf('(');
-        if (open < 0)
+        // `not has_item(1)` / `!has_item(1)`: negation is a prefix, and the only
+        // boolean operator there is. A second `not` inside falls through to the
+        // combinator check below.
+        var negated = false;
+        if (source.StartsWith("not ", StringComparison.OrdinalIgnoreCase)
+            || source.Equals("not", StringComparison.OrdinalIgnoreCase))
         {
-            name = source;
+            negated = true;
+            source = source[3..].Trim();
         }
-        else
+        else if (source.StartsWith("!", StringComparison.Ordinal)
+            && !source.StartsWith("!=", StringComparison.Ordinal))
         {
-            if (!source.EndsWith(")", StringComparison.Ordinal))
-            {
-                problems.Add($"line {line}: condition '{source}' is missing its closing ')'.");
-                return null;
-            }
-            name = source[..open].Trim();
-            args = SplitConditionArgs(source[(open + 1)..^1]);
+            negated = true;
+            source = source[1..].Trim();
         }
-        if (name.Length == 0)
+        if (source.Length == 0)
         {
-            problems.Add($"line {line}: condition '{source}' has no name.");
+            problems.Add($"line {line}: '{(text ?? "").Trim()}' negates nothing.");
             return null;
         }
 
-        var condition = new ConditionRef { Id = name, Args = args };
+        foreach (var combinator in new[] { "&&", "||" })
+        {
+            if (source.Contains(combinator, StringComparison.Ordinal))
+            {
+                problems.Add(
+                    $"line {line}: '{combinator}' isn't supported — a condition is one call, optionally "
+                    + "compared to a literal. Write 'and' as nested <<if>> blocks and 'or' as separate "
+                    + "<<elseif>> clauses.");
+                return null;
+            }
+        }
+        foreach (var word in new[] { "not", "and", "or", "xor" })
+        {
+            if (ContainsWordOutsideQuotes(source, word))
+            {
+                problems.Add(
+                    $"line {line}: '{word}' isn't supported — a condition is one call, optionally "
+                    + "compared to a literal (credits() >= 200) and optionally negated (not has_item(1)). "
+                    + "Write 'and' as nested <<if>> blocks and 'or' as separate <<elseif>> clauses.");
+                return null;
+            }
+        }
+        foreach (var word in new[] { "eq", "neq", "is", "gt", "lt", "gte", "lte" })
+        {
+            if (ContainsWordOutsideQuotes(source, word))
+            {
+                problems.Add(
+                    $"line {line}: write Yarn's '{word}' operator symbolically "
+                    + $"({string.Join(", ", DialogueConditions.Operators)}).");
+                return null;
+            }
+        }
+        var arithmetic = IndexOutsideQuotes(source, "+*/%");
+        if (arithmetic >= 0)
+        {
+            problems.Add(
+                $"line {line}: arithmetic ('{source[arithmetic]}') isn't supported in a condition — "
+                + "compare a query to a literal instead.");
+            return null;
+        }
+
+        // Split off a comparison, if there is one: everything left of the
+        // operator is the call, everything right of it the literal.
+        var left = source;
+        string op = null;
+        string right = null;
+        var at = FindComparison(source, out var found);
+        if (at >= 0)
+        {
+            op = found;
+            left = source[..at].Trim();
+            right = source[(at + found.Length)..].Trim();
+            if (left.Length == 0 || right.Length == 0)
+            {
+                problems.Add($"line {line}: '{source}' is missing one side of its '{found}' comparison.");
+                return null;
+            }
+        }
+
+        // `not credits() >= 200` is stored as `credits() < 200`: same meaning,
+        // and it survives being written back out as unambiguous Yarn (see
+        // DialogueConditions.InvertOperator).
+        if (negated && op != null)
+        {
+            op = DialogueConditions.InvertOperator(op);
+            negated = false;
+        }
+
+        if (!TryParseCall(left, out var name, out var args, out var callProblem))
+        {
+            problems.Add($"line {line}: {callProblem}");
+            return null;
+        }
+
+        if (op != null)
+        {
+            if (!TryLiteral(right, out var literal))
+            {
+                problems.Add(
+                    $"line {line}: '{right}' isn't a literal — the right side of a comparison is a number "
+                    + "or a quoted string.");
+                return null;
+            }
+            args = Append(args, op, literal);
+        }
+        else if (DialogueQueries.IsQuery(name) && args.Length == DialogueQueries.Arity(name) + 1)
+        {
+            // A query written the pre-plan way — party_size(2), stat("Charisma",
+            // 12) — is the elided spelling of the kind's default comparison.
+            // Normalize it into the token so the writer only ever emits one form
+            // and the round trip is exact.
+            args = Append(args[..^1], DialogueConditions.DefaultOperator(name), args[^1]);
+        }
+
+        var condition = new ConditionRef
+        {
+            Id = negated ? DialogueConditions.Negation + name : name,
+            Args = args,
+        };
         if (Array.IndexOf(DialogueConditions.Ids, name) < 0)
         {
             problems.Add(
@@ -148,6 +228,168 @@ public static class YarnGraphCompiler
             problems.Add($"line {line}: {reason}.");
         }
         return condition;
+    }
+
+    // `name(arg, "arg")` or a bare `name`, which is the same as `name()`.
+    private static bool TryParseCall(string source, out string name, out string[] args, out string problem)
+    {
+        name = null;
+        args = Array.Empty<string>();
+        problem = null;
+        var open = source.IndexOf('(');
+        if (open < 0)
+        {
+            name = source;
+        }
+        else
+        {
+            if (!source.EndsWith(")", StringComparison.Ordinal))
+            {
+                problem = $"condition '{source}' is missing its closing ')'.";
+                return false;
+            }
+            name = source[..open].Trim();
+            args = SplitConditionArgs(source[(open + 1)..^1]);
+        }
+        if (name.Length == 0)
+        {
+            problem = $"condition '{source}' has no name.";
+            return false;
+        }
+        return true;
+    }
+
+    // The right side of a comparison: a quoted string, or a bare token (a number,
+    // or an unquoted word like a quest state's name).
+    private static bool TryLiteral(string source, out string value)
+    {
+        value = null;
+        if (source.Length >= 2 && source[0] == '"' && source[^1] == '"')
+        {
+            value = source[1..^1];
+            return !value.Contains('"');
+        }
+        if (source.IndexOfAny(new[] { '(', ')', '"', ' ', '\t' }) >= 0)
+        {
+            return false;
+        }
+        value = source;
+        return true;
+    }
+
+    // The first comparison operator at the top level — outside quotes, and
+    // outside the call's own parentheses. -1 when there isn't one.
+    private static int FindComparison(string source, out string op)
+    {
+        op = null;
+        var depth = 0;
+        var quoted = false;
+        for (var i = 0; i < source.Length; i++)
+        {
+            var c = source[i];
+            if (c == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+            if (quoted)
+            {
+                continue;
+            }
+            if (c == '(')
+            {
+                depth++;
+                continue;
+            }
+            if (c == ')')
+            {
+                depth--;
+                continue;
+            }
+            if (depth != 0)
+            {
+                continue;
+            }
+            foreach (var candidate in DialogueConditions.Operators)
+            {
+                if (i + candidate.Length <= source.Length
+                    && string.CompareOrdinal(source, i, candidate, 0, candidate.Length) == 0)
+                {
+                    op = candidate;
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    // Is `word` present as a whole word outside any quoted argument? Quotes
+    // matter: a flag named "this is fine" must not read as Yarn's `is` operator.
+    private static bool ContainsWordOutsideQuotes(string source, string word)
+    {
+        var quoted = false;
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+            if (quoted || i + word.Length > source.Length)
+            {
+                continue;
+            }
+            if (string.Compare(source, i, word, 0, word.Length, StringComparison.OrdinalIgnoreCase) != 0)
+            {
+                continue;
+            }
+            if (!IsWordBoundary(source, i - 1) || !IsWordBoundary(source, i + word.Length))
+            {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Off either end of the string counts as a boundary; letters, digits and '_'
+    // do not, so "or" doesn't match inside "party_has_room".
+    private static bool IsWordBoundary(string source, int index)
+    {
+        if (index < 0 || index >= source.Length)
+        {
+            return true;
+        }
+        var c = source[index];
+        return !char.IsLetterOrDigit(c) && c != '_';
+    }
+
+    // The first of `chars` that isn't inside a quoted argument, or -1.
+    private static int IndexOutsideQuotes(string source, string chars)
+    {
+        var quoted = false;
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+            if (!quoted && chars.IndexOf(source[i]) >= 0)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static string[] Append(string[] args, string op, string value)
+    {
+        var result = new string[args.Length + 2];
+        Array.Copy(args, result, args.Length);
+        result[^2] = op;
+        result[^1] = value;
+        return result;
     }
 
     // Comma-separated call arguments, honoring double quotes. `f()` has none.

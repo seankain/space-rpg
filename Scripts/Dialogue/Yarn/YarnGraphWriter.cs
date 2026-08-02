@@ -219,7 +219,9 @@ public static class YarnGraphWriter
     }
 
     // The inverse of YarnGraphCompiler.ParseCondition: a call, with string
-    // arguments quoted so the file also reads as valid Yarn. Null for "no
+    // arguments quoted so the file also reads as valid Yarn. A query verb writes
+    // its comparison out in full (`credits() >= 200`) and a negated one takes a
+    // `not` prefix, so the round trip through the token is exact. Null for "no
     // condition", which the caller renders as <<else>> or an ungated option.
     public static string ConditionText(ConditionRef condition)
     {
@@ -227,8 +229,34 @@ public static class YarnGraphWriter
         {
             return null;
         }
-        var builder = new StringBuilder(condition.Id).Append('(');
+        var id = DialogueConditions.BareId(condition.Id);
         var args = condition.Args ?? Array.Empty<string>();
+        string op = null;
+        string value = null;
+        if (DialogueQueries.IsQuery(id)
+            && DialogueConditions.TrySplitComparison(id, args, out var callArgs, out var found, out var right))
+        {
+            args = callArgs;
+            op = found;
+            value = right;
+        }
+
+        // A negated comparison writes as the inverted operator, not as
+        // `not x >= y`, which Yarn would read as `(not x) >= y`. The compiler
+        // folds these on the way in, so only a hand-built token gets here.
+        var negated = DialogueConditions.IsNegated(condition.Id);
+        if (negated && op != null && DialogueConditions.InvertOperator(op) is { } inverted)
+        {
+            op = inverted;
+            negated = false;
+        }
+
+        var builder = new StringBuilder();
+        if (negated)
+        {
+            builder.Append("not ");
+        }
+        builder.Append(id).Append('(');
         for (var i = 0; i < args.Length; i++)
         {
             if (i > 0)
@@ -237,7 +265,13 @@ public static class YarnGraphWriter
             }
             builder.Append(IsNumber(args[i]) ? args[i] : Quote(args[i]));
         }
-        return builder.Append(')').ToString();
+        builder.Append(')');
+        if (op != null)
+        {
+            builder.Append(' ').Append(op).Append(' ')
+                .Append(IsNumber(value) ? value : Quote(value));
+        }
+        return builder.ToString();
     }
 
     private static StringBuilder Indent(StringBuilder builder, int indent) =>

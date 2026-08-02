@@ -2,7 +2,7 @@
 
 Goal: let a conversation branch on *any* piece of current character and world state — starting with the party's credit balance — instead of the seven fixed predicates the vocabulary happens to ship with.
 
-Status: **design**. Nothing here is implemented yet.
+Status: **Phase 1 done** (queries, comparisons, negation, editor, tests). Phases 2 and 3 are still design.
 
 Depends on: [npc-dialogue-yarn.md](npc-dialogue-yarn.md) Phases 1–4 (the Yarn authoring layer, the condition/effect vocabulary, world flags) and [dialogue-editor.md](dialogue-editor.md) Phase 1 (the graph and its editor).
 
@@ -157,10 +157,20 @@ A comparison stays a single flat `ConditionRef`, so nothing in the graph format,
 | `item_count(1) == 0` | `item_count:1:==:0` |
 | `quest(1) != "Success"` | `quest:1:!=:Success` |
 | `not has_item(1)` | `!has_item:1` |
+| `not credits() >= 200` | `credits:<:200` |
+
+That last row is a normalization, not a special case. Yarn's unary `not` binds
+tighter than a comparison, so writing a negated comparison back out as
+`not credits() >= 200` would read upstream as `(not credits()) >= 200` — a
+different expression. A negated comparison is therefore stored as the inverted
+operator, which says the same thing and survives the round trip through the file.
+`not` on the token stays for the predicates, where it is unambiguous. For the
+same reason the editor offers the `not` checkbox on predicates only: a query
+inverts through its operator dropdown.
 
 Two properties make this cheap:
 
-- **No content migration.** A query verb with no trailing operator keeps the current "at least" meaning, so the committed `stat:Charisma:12` and `party_size:2` tokens still parse and still mean what they meant. New content should write the operator; old content doesn't have to be touched.
+- **No content migration.** A query verb with no trailing operator keeps the current "at least" meaning, so the committed `stat:Charisma:12` and `party_size:2` tokens still parse and still mean what they meant. New content should write the operator; old content doesn't have to be touched. The Yarn compiler *normalizes* the elided spelling into an explicit operator as it reads it (`stat("Charisma", 12)` → `stat:Charisma:>=:12`), so the writer has one form to emit and the round trip stays exact; the elided form keeps working wherever it is still stored.
 - **No new separator problems.** `>=` and `!` contain no `:`, so `TokenRef.ToToken`/`SplitToken` are untouched, and `TokenRef.ArgFormatError` already refuses a `:` inside a free-form flag name or value.
 
 Negation is a `!` prefix on the `Id`. `DialogueConditions.Evaluate` strips it, evaluates the rest, and inverts — which finally retires `flag("x", "")` as the way to spell "unset".
@@ -227,11 +237,15 @@ Following the shape of the phases before it:
 
 ## Phases
 
-### Phase 1 — Queries, comparisons, negation
+### Phase 1 — Queries, comparisons, negation *(done)*
 
-`DialogueQueries` with the table above; `DialogueConditions` gains comparison and `!` handling; `ParseCondition`/`ConditionText` learn the syntax; the editor grows the operator and `not` controls; tests as above.
+1. `Scripts/Dialogue/DialogueQueries.cs` — the nine queries in the table above, engine-free and total like the rest of the vocabulary, with `Validate` for author time and `TryNumber`/`TryText` for play time. `stat`'s name vocabulary moved here with it, since `stat` is a query now.
+2. `DialogueConditions` splits into predicates and queries: `Ids` gains the query verbs so the editor and the compiler offer them, `TrySplitComparison` peels the operator and value off a token, and `Evaluate` grew a `bool?` inner result — a condition that *couldn't be evaluated* now reports "couldn't tell" rather than "false", so a negated broken gate still hides its branch instead of opening it.
+3. `YarnGraphCompiler.ParseCondition` learned the comparison and `not`/`!` syntax, normalizing the elided operator and folding a negated comparison into the inverted one; `YarnGraphWriter.ConditionText` is its inverse. What stays refused is refused with a better message — `and`/`or`/`xor` and Yarn's word-form operators (`gte`) and arithmetic now name the supported shape, and the word checks only fire outside quotes, so a flag named `"this is fine"` no longer looks like Yarn's `is`.
+4. The editor's condition row grew a `not` checkbox (predicates only) and, for a query, an operator dropdown and a value field; picking a verb rebuilds the row, which is how those appear.
+5. **Tests:** `Tests/DialogueQueryTests.cs` (every query, every operator, negation including the broken-gate case, the legacy "at least" tokens, validation, and a credit-gated conversation played through `DialogueRuntime`), plus the new syntax, the normalizations and the new rejections in `Tests/YarnDialogueTests.cs`. `Tests/WorldFlagTests.cs` moved to the new messages and the normalized `stat` token.
 
-**Done when:** `<<if credits() >= 200>>` gates an option and a router, in a `.yarn` file and in the in-game editor, and every existing conversation still parses and plays unchanged.
+**Done when:** `<<if credits() >= 200>>` gates an option and a router, in a `.yarn` file and in the in-game editor, and every existing conversation still parses and plays unchanged. ✅ — with the caveat that the editor row is the half no unit test covers.
 
 ### Phase 2 — Lazy condition evaluation
 
@@ -264,4 +278,5 @@ The Moss haggling script; the writers' notes in npc-dialogue-yarn.md Phase 5 upd
 | Yarn source syntax | **Real Yarn** — `credits() >= 200`, `not has_item(1)`. Files stay valid for the upstream toolchain and for a future swap to the upstream compiler. |
 | When conditions are evaluated | **When the node is reached**, not at conversation start, so a conversation can branch on state it just changed. |
 | Failed option conditions | **Still hidden**, not greyed out. Upstream hands the option over with `IsAvailable = false` and lets the presenter choose; matching that is a UI feature, tracked above as out of scope. |
+| How a negation is stored | **Folded into the operator** for a comparison (`not credits() >= 200` is `credits:<:200`), kept as a `!` on the id for a predicate. Yarn's `not` binds tighter than a comparison, so the fold is what keeps a written-out file meaning what the token means. |
 | Compound boolean conditions | **Not supported.** Router branch order is `or`, nested `<<if>>` is `and`. |
