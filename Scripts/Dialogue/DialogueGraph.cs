@@ -96,8 +96,9 @@ public class DialogueNode
     // matches.
     public string NextNodeId { get; set; }
     // Non-empty makes this a router: an ordered list of conditional gotos
-    // evaluated at conversation start (matching when the role code decided the
-    // branch). The runtime redirects through it without displaying the node.
+    // evaluated when the conversation reaches the node, so a router can branch
+    // on state the conversation itself has changed (dialogue-state-conditions
+    // plan Phase 2). The runtime redirects through it without displaying it.
     public List<DialogueBranch> Branches { get; set; }
 }
 

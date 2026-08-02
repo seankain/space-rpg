@@ -177,7 +177,7 @@ public class DialogueGraphTests
     }
 
     [Fact]
-    public void CompileReusesSharedNodesAndSurvivesCycles()
+    public void ACycleIsWalkedRatherThanRecursedThrough()
     {
         var graph = new DialogueGraph
         {
@@ -188,9 +188,17 @@ public class DialogueGraphTests
 
         var root = DialogueRuntime.Compile(graph, Context(new GameState(), out _));
 
-        // The back-edge resolves to the same instance rather than recursing
-        // forever.
-        Assert.Same(root, root.Next.Next);
+        // Nothing is built ahead of the player (state-conditions plan Phase 2),
+        // so a back-edge can't recurse forever — it is a loop the conversation
+        // walks around, building a fresh line each visit so the gates on it are
+        // read again.
+        Assert.Equal("here", root.Text);
+        Assert.Equal("there", root.Next.Text);
+        Assert.Equal("here", root.Next.Next.Text);
+        Assert.NotSame(root, root.Next.Next);
+        // Reading the same link twice gives the one line, so the box and the
+        // input handler never disagree about what is on screen.
+        Assert.Same(root.Next, root.Next);
     }
 
     [Fact]

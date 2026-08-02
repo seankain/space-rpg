@@ -296,4 +296,158 @@ $npc: Clamps are off. Welcome to the deck.
         Assert.Equal(50u, flush.Credits);
         Assert.Equal("Clamps are off. Welcome to the deck.", line.Choices[0].Next.Text);
     }
+
+    // --- Phase 2: conditions read when the node is reached --------------------
+
+    [Fact]
+    public void ABranchAfterAPaymentSeesThePostPaymentBalance()
+    {
+        // The Phase 2 acceptance. Before conditions were resolved lazily, the
+        // `paid` router was evaluated when the conversation started and took the
+        // "still flush" branch no matter what the player had just handed over.
+        var source = @"
+title: toll
+---
+$npc: Berth's two hundred.
+-> Pay <<if credits() >= 200>>
+    <<credits -200>>
+    <<jump paid>>
+===
+
+title: paid
+---
+<<if credits() >= 200>>
+    <<jump rich>>
+<<else>>
+    <<jump broke>>
+<<endif>>
+===
+
+title: rich
+---
+$npc: Still flush, I see.
+===
+
+title: broke
+---
+$npc: That's you cleaned out, then.
+===
+";
+        var problems = new List<string>();
+        var graph = YarnGraphCompiler.Compile("test.toll2", source, problems);
+        Assert.Empty(problems);
+
+        // 250 in, 200 out: the branch on the far side must see 50.
+        var state = new GameState { Credits = 250 };
+        var line = DialogueRuntime.Compile(graph, Context(state, out _));
+        var pay = line.Choices[0];
+        pay.Action();
+        Assert.Equal("That's you cleaned out, then.", pay.Next.Text);
+
+        // And with enough left over it still takes the other branch.
+        var rich = new GameState { Credits = 500 };
+        var richLine = DialogueRuntime.Compile(graph, Context(rich, out _));
+        var richPay = richLine.Choices[0];
+        richPay.Action();
+        Assert.Equal("Still flush, I see.", richPay.Next.Text);
+    }
+
+    [Fact]
+    public void AGateOnALaterNodeSeesWhatAnEarlierLineDid()
+    {
+        // The same promise for a choice gate rather than a router, and for a
+        // line's own effects: DialogueManager runs OnShown before it reads the
+        // choices, so a gate on that line sees what the line just changed.
+        var source = @"
+title: start
+---
+$npc: Here, take this.
+-> Go on
+    <<jump gift>>
+===
+
+title: gift
+---
+<<give_item 1>>
+$npc: Mind how you carry it.
+-> Hand it straight back <<if has_item(1)>>
+    <<take_item 1>>
+    <<stop>>
+-> Keep it
+    <<stop>>
+===
+";
+        var problems = new List<string>();
+        var graph = YarnGraphCompiler.Compile("test.gift", source, problems);
+        Assert.Empty(problems);
+
+        var state = new GameState();
+        var line = DialogueRuntime.Compile(graph, Context(state, out _));
+        var gift = line.Choices[0].Next;
+        // The cube arrives as the line shows; only then are its choices read.
+        gift.OnShown();
+        Assert.Equal(2, gift.Choices.Count);
+        Assert.Equal("Hand it straight back", gift.Choices[0].Label);
+    }
+
+    [Fact]
+    public void ANodeReachedTwiceIsGatedAfreshEachTime()
+    {
+        var source = @"
+title: desk
+---
+$npc: Anything else?
+-> Buy a ration (10cr) <<if credits() >= 10>>
+    <<credits -10>>
+    <<jump desk>>
+-> Nothing
+    <<stop>>
+===
+";
+        var problems = new List<string>();
+        var graph = YarnGraphCompiler.Compile("test.desk", source, problems);
+        Assert.Empty(problems);
+
+        var state = new GameState { Credits = 15 };
+        var line = DialogueRuntime.Compile(graph, Context(state, out _));
+
+        // First time round the ration is affordable...
+        Assert.Equal(2, line.Choices.Count);
+        line.Choices[0].Action();
+        Assert.Equal(5u, state.Credits);
+
+        // ...and coming back to the same node with 5 left, it isn't offered.
+        var again = line.Choices[0].Next;
+        Assert.Single(again.Choices);
+        Assert.Equal("Nothing", again.Choices[0].Label);
+    }
+
+    [Fact]
+    public void EffectsStillRunOnceNoMatterHowOftenTheLineIsRead()
+    {
+        // Laziness changes when conditions are read, never how often effects
+        // fire: the resolved answer is remembered on the line.
+        var source = @"
+title: start
+---
+<<credits 100>>
+$npc: On the house.
+-> Thanks
+    <<stop>>
+===
+";
+        var problems = new List<string>();
+        var graph = YarnGraphCompiler.Compile("test.once", source, problems);
+        Assert.Empty(problems);
+
+        var state = new GameState { Credits = 0 };
+        var line = DialogueRuntime.Compile(graph, Context(state, out _));
+        line.OnShown();
+        Assert.Equal(100u, state.Credits);
+
+        // Re-reading the line's choices (the box renders them, the input
+        // handler checks them) must not re-run anything.
+        Assert.Same(line.Choices, line.Choices);
+        Assert.Equal(100u, state.Credits);
+    }
 }

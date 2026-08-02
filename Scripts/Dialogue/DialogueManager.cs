@@ -87,6 +87,11 @@ public partial class DialogueManager : CanvasLayer, IUiWindow
         speakerLabel.Visible = !string.IsNullOrEmpty(line.Speaker);
         textLabel.Text = line.Text;
 
+        // Before the choices are read, not after: reading them resolves their
+        // gates (dialogue-state-conditions plan Phase 2), and a gate on this
+        // line should see what this line just did.
+        line.OnShown?.Invoke();
+
         foreach (var child in choicesBox.GetChildren())
         {
             child.QueueFree();
@@ -108,8 +113,6 @@ public partial class DialogueManager : CanvasLayer, IUiWindow
             // (arrows + Enter) works without touching the mouse.
             first?.CallDeferred(Control.MethodName.GrabFocus);
         }
-
-        line.OnShown?.Invoke();
     }
 
     private void PickChoice(DialogueChoice choice)

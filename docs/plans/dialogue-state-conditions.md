@@ -2,7 +2,7 @@
 
 Goal: let a conversation branch on *any* piece of current character and world state — starting with the party's credit balance — instead of the seven fixed predicates the vocabulary happens to ship with.
 
-Status: **Phase 1 done** (queries, comparisons, negation, editor, tests). Phases 2 and 3 are still design.
+Status: **Phases 1 and 2 done** (queries, comparisons, negation, editor; conditions evaluated when a node is reached). Phase 3 — the demo conversation and the writers' notes — is still design.
 
 Depends on: [npc-dialogue-yarn.md](npc-dialogue-yarn.md) Phases 1–4 (the Yarn authoring layer, the condition/effect vocabulary, world flags) and [dialogue-editor.md](dialogue-editor.md) Phase 1 (the graph and its editor).
 
@@ -247,11 +247,16 @@ Following the shape of the phases before it:
 
 **Done when:** `<<if credits() >= 200>>` gates an option and a router, in a `.yarn` file and in the in-game editor, and every existing conversation still parses and plays unchanged. ✅ — with the caveat that the editor row is the half no unit test covers.
 
-### Phase 2 — Lazy condition evaluation
+### Phase 2 — Lazy condition evaluation *(done)*
 
-`DialogueLine` resolvers, `DialogueRuntime` built lazily, memo and cycle handling adjusted, ordering test added.
+1. `DialogueLine.Choices`/`.Next` and `DialogueChoice.Next` are backed by a small `Deferred<T>` — a value worked out the first time it is read and remembered after, which assigning the property outright replaces. `DialogueRuntime` fills the resolvers; a hand-built line (`NpcRole`, `Npc`'s role menu, a test) still assigns the values directly and behaves exactly as before.
+2. `DialogueRuntime` builds only the line it is asked for. The cross-visit memo is gone, and with it the reason it existed: nothing recurses ahead of the player, so a back-edge can't loop forever — it is just a loop the conversation walks around, building a fresh line each visit so the gates on it are read again. Routers still resolve on arrival (they display nothing), which is why the router→router cycle guard stays.
+3. `DialogueManager.ShowLine` runs `OnShown` **before** it reads the line's choices, instead of after. Reading the choices is what evaluates their gates now, so a gate on a line has to see what that line just did. Nothing else in the manager changed — it still reads `line.Choices` and `current.Next` exactly as it did.
+4. **Tests:** the Phase 2 acceptance in `Tests/DialogueQueryTests.cs` — pay on a choice and land on a router that sees the new balance; a gate that reads what the line's own effect just gave the player; a node reached twice gated afresh each time; and effects still running once however often a line is read. `Tests/DialogueGraphTests.cs`'s shared-instance test became a walk-the-cycle test, since a back-edge is a fresh line now rather than the same one.
 
-**Done when:** a conversation that spends credits and then branches on the balance takes the branch matching the *post-payment* state, and `Tests/IntroDialogueBranchTests.cs` passes untouched.
+**Done when:** a conversation that spends credits and then branches on the balance takes the branch matching the *post-payment* state, and `Tests/IntroDialogueBranchTests.cs` passes untouched. ✅ — the intro conversations don't depend on the old timing (their state-based routers sit at the entry), so their expectations are unchanged.
+
+One consequence worth knowing: a dangling link or an unknown verb deep in a conversation is now reported when the player *reaches* it rather than at compile, so a test that compiles a conversation and asserts no warnings only covers the first line. The graph validator (`DialogueValidation`, run over every committed conversation) is what catches those at author time.
 
 ### Phase 3 — The demo, and the docs
 
