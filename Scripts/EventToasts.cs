@@ -12,9 +12,6 @@ public partial class EventToasts : CanvasLayer
 {
 	public static EventToasts Instance { get; private set; }
 
-	// Above the dialogue box (50), below the dev console (100).
-	private const int ToastLayer = 60;
-
 	private const double FadeInSeconds = 0.15;
 	private const double HoldSeconds = 2.6;
 	private const double FadeOutSeconds = 0.6;
@@ -30,7 +27,7 @@ public partial class EventToasts : CanvasLayer
 	public override void _Ready()
 	{
 		Instance = this;
-		Layer = ToastLayer;
+		Layer = UiLayers.Toasts;
 		// Battles pause the tree; a victory's toast still has to animate.
 		ProcessMode = ProcessModeEnum.Always;
 		BuildUi();

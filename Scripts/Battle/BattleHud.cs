@@ -23,7 +23,7 @@ public partial class BattleHud : CanvasLayer
 
     public override void _Ready()
     {
-        Layer = 60;
+        Layer = UiLayers.BattleHud;
         BuildUi();
     }
 

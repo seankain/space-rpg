@@ -38,7 +38,6 @@ public partial class LevelManager : Node3D
             // LoadGameMenu already restored the GameState into SaveManager.
             StartLevel(SaveManager.Instance.CurrentState.CurrentLevelPath);
         };
-        LoadingScreen.LoadCompleted += (o,e)=>{Input.MouseMode = Input.MouseModeEnum.Captured;};
     }
 
     // Single entry point for starting a level, whether from a new game or a
@@ -52,49 +51,43 @@ public partial class LevelManager : Node3D
         LoadingScreen.LoadNext(scenePath);
     }
 
+    // Opens the two menus this scene owns. Closing them is not handled here:
+    // UiWindowManager consumes ui_cancel whenever anything is open, so an event
+    // reaching _UnhandledInput means the screen is clear and the key can only
+    // mean "open". Both are bound to actions rather than raw keycodes so they
+    // stay remappable.
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventKey eventKey)
+        if (@event.IsActionPressed("ui_cancel"))
         {
-            if (eventKey.Pressed)
+            // Nothing to pause before a game exists; the pause menu is already
+            // up at boot, and dismissing it would leave a blank screen.
+            if (SaveManager.Instance?.GameInProgress == true)
             {
-                if(eventKey.Keycode == Key.Escape)
-                {
-                ToggleMenu();
-                }
-                if(eventKey.Keycode == Key.Tab)
-                {
-                    ToggleInGameMenu();
-                }
+                GetViewport().SetInputAsHandled();
+                UiWindowManager.Open(Menu);
             }
-
-
+            return;
+        }
+        if (@event.IsActionPressed("Inventory"))
+        {
+            GetViewport().SetInputAsHandled();
+            ToggleInGameMenu();
         }
     }
 
-    private void ToggleMenu()
+    // Inventory is the one action that both opens and closes its menu — unlike
+    // Escape, nothing else consumes it first. It stays inert while another
+    // window is up rather than opening a second menu behind it.
+    private void ToggleInGameMenu()
     {
-        Menu.Visible = !Menu.Visible;
-        if (Menu.Visible)
+        if (UiWindowManager.IsOpen(InGameMenu))
         {
-            Input.MouseMode = Input.MouseModeEnum.Visible;
+            UiWindowManager.Close(InGameMenu);
         }
-        else
+        else if (!UiWindowManager.AnyOpen && SaveManager.Instance?.GameInProgress == true)
         {
-            Input.MouseMode = Input.MouseModeEnum.Captured;
-        }
-    }
-
-        private void ToggleInGameMenu()
-    {
-        this.InGameMenu.Visible = !this.InGameMenu.Visible;
-        if (this.InGameMenu.Visible)
-        {
-            Input.MouseMode = Input.MouseModeEnum.Visible;
-        }
-        else
-        {
-            Input.MouseMode = Input.MouseModeEnum.Captured;
+            UiWindowManager.Open(InGameMenu);
         }
     }
 
@@ -112,8 +105,10 @@ public partial class LevelManager : Node3D
         {
             child.QueueFree();
         }
-        Menu.Visible = true;
+        // The run is over, so nothing that was up belongs on screen any more —
+        // including windows that would normally refuse to close.
+        UiWindowManager.CloseAll();
+        UiWindowManager.Open(Menu);
         Menu.OnLoadGameButtonPressed();
-        Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 }

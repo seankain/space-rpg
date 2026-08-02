@@ -11,10 +11,12 @@ using Godot;
 //
 // Code-built CanvasLayer like DialogueEditorPanel, and split the same way:
 // this class renders and mutates the working model, DevConsole owns the
-// panel's lifecycle, the placement preview, and the file I/O.
-public partial class NpcEditorPanel : CanvasLayer
+// panel's lifecycle, the placement preview, and the file I/O, and
+// UiWindowManager owns its visibility and the pointer.
+public partial class NpcEditorPanel : CanvasLayer, IUiWindow
 {
-    // Raised when the panel asks to close (Close button or Escape).
+    // Raised when the panel asks to close (its Close button). Escape reaches
+    // it through UiWindowManager, which owns the only ui_cancel handler.
     public Action Closed { get; set; }
 
     // Raised by the Save button; DevConsole applies the model and writes.
@@ -78,9 +80,26 @@ public partial class NpcEditorPanel : CanvasLayer
 
     public override void _Ready()
     {
-        Layer = 90; // above the toolbar (80), below the console (100)
+        Layer = UiLayers.EditorPanel;
         Visible = false;
         BuildChrome();
+    }
+
+    public string WindowName => "NPC editor";
+
+    // Wants the whole screen; the dialogue editor shares its layer and opens
+    // over it, which is what hides this form for the duration.
+    public bool Exclusive => true;
+
+    public void SetShown(bool shown)
+    {
+        Visible = shown;
+        // Coming back from the dialogue editor, the catalog may have gained the
+        // conversation that was just written, so the rows re-read it.
+        if (shown && Definition != null)
+        {
+            RefreshDialogues();
+        }
     }
 
     // Open the form on a definition. `isNew` is true for a placement that has
@@ -102,15 +121,6 @@ public partial class NpcEditorPanel : CanvasLayer
     {
         statusLabel.Text = text ?? "";
         statusLabel.AddThemeColorOverride("font_color", ok ? OkColor : ErrorColor);
-    }
-
-    public override void _Input(InputEvent @event)
-    {
-        if (Visible && @event.IsActionPressed("ui_cancel"))
-        {
-            GetViewport().SetInputAsHandled();
-            Closed?.Invoke();
-        }
     }
 
     // --- Form -----------------------------------------------------------------
@@ -142,9 +152,10 @@ public partial class NpcEditorPanel : CanvasLayer
         RefreshValidation();
     }
 
-    // Re-reads the catalog into the conversation rows — DevConsole calls this
-    // when the dialogue editor closes, so a conversation just written shows as
-    // a real one instead of the "(not saved yet)" it was a moment ago.
+    // Re-reads the catalog into the conversation rows — SetShown calls this
+    // when the form is uncovered, so a conversation just written in the
+    // dialogue editor shows as a real one instead of the "(not saved yet)" it
+    // was a moment ago.
     public void RefreshDialogues()
     {
         RebuildDialogueRows();

@@ -30,5 +30,11 @@
     <!-- In-game editor console: the engine-free command registry, tokenizer,
          and builtin commands. The DevConsole node itself is Godot-facing. -->
     <Compile Include="../Scripts/Editor/Commands/**/*.cs" LinkBase="GameSource/Editor/Commands" />
+    <!-- UI window management: the window policy interface, the open-window
+         stack that derives visibility/pointer/gameplay-blocking from it, and
+         the layer table. UiWindowManager (the autoload that applies them to
+         Godot) stays out. -->
+    <Compile Include="../Scripts/Ui/**/*.cs" LinkBase="GameSource/Ui"
+             Exclude="../Scripts/Ui/UiWindowManager.cs" />
   </ItemGroup>
 </Project>

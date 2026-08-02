@@ -54,7 +54,7 @@ public partial class EditorToolbar : CanvasLayer
 
     public override void _Ready()
     {
-        Layer = 80; // below the NPC editor (90) and the console (100)
+        Layer = UiLayers.EditorToolbar;
         BuildUi();
         SelectTool(EditorTool.Navigate);
     }

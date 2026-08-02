@@ -11,11 +11,22 @@ using System.Linq;
 // Victory hands control straight back to the field with battle results
 // written onto the party. Defeat is a game over: the level is torn down and
 // the player is sent to the Load Game menu to restore a previous save.
-public partial class BattleManager : Node
+public partial class BattleManager : Node, IUiWindow
 {
     public static BattleManager Instance { get; private set; }
 
     public static bool BattleInProgress => Instance?.currentBattle != null;
+
+    public string WindowName => "battle";
+
+    // Battle mode takes over the screen; the arena and its HUD are nodes
+    // BattleScene owns, so there is nothing here for the stack to show or hide.
+    public bool Exclusive => true;
+
+    // A battle ends by being fought, not by being cancelled.
+    public bool ClosesOnCancel => false;
+
+    public void SetShown(bool shown) { }
 
     // Keeps the battle (and its UI) running while the paused tree freezes
     // the field underneath it.
@@ -89,7 +100,7 @@ public partial class BattleManager : Node
         currentBattle.Setup(encounter, partyCombatants, theme);
         AddChild(currentBattle);
         currentBattle.BattleCamera.MakeCurrent();
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        UiWindowManager.Open(this);
     }
 
     // Called by BattleScene when every enemy is down and results have been
@@ -104,7 +115,7 @@ public partial class BattleManager : Node
             fieldCamera.MakeCurrent();
         }
         fieldCamera = null;
-        Input.MouseMode = Input.MouseModeEnum.Captured;
+        UiWindowManager.Close(this);
 
         var victoryCallback = onVictory;
         onVictory = null;
@@ -119,6 +130,7 @@ public partial class BattleManager : Node
         onVictory = null;
         fieldCamera = null;
         GetTree().Paused = false;
+        // ShowGameOverLoadMenu clears the stack, this window included.
         LevelManager.Instance?.ShowGameOverLoadMenu();
     }
 

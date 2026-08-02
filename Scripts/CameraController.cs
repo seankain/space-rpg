@@ -44,7 +44,7 @@ public partial class CameraController : Node3D
         // camera captures the pointer while its look button is held, and that
         // turn belongs to it — without this the player's rig would spin along
         // behind the scenes and stay crooked after editor mode ends.
-        if (DevConsole.BlocksGameplay)
+        if (UiWindowManager.BlocksGameplay)
         {
             return;
         }

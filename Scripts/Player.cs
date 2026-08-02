@@ -59,12 +59,12 @@ public partial class Player : CharacterBody3D
 			velocity += GetGravity() * (float)delta;
 		}
 
-		// Conversations, open shop menus, and the dev console/editor mode lock
-		// movement; polled input would otherwise still fire (e.g. Space both
-		// confirms a dialogue choice and jumps, or WASD typed into the console
-		// walks the player).
-		bool inputLocked = DialogueManager.IsDialogueActive || ShopMenu.IsShopOpen
-			|| DevConsole.BlocksGameplay;
+		// Any open window locks movement — menus included, which the old
+		// hand-listed check missed, so the player walked around while the quest
+		// log was up. Polled input ignores focus and SetInputAsHandled, so this
+		// has to be an explicit check (Space both confirms a dialogue choice and
+		// jumps; WASD typed into the console would otherwise walk the player).
+		bool inputLocked = UiWindowManager.BlocksGameplay;
 
 		// Handle Jump.
 		if (!inputLocked && Input.IsActionJustPressed("Jump") && IsOnFloor())

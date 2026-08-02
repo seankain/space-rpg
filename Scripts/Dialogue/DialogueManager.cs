@@ -3,13 +3,13 @@ using System;
 
 // Autoload (registered in project.godot). Owns the "in dialogue" game mode:
 // shows one DialogueLine at a time in a bottom-of-screen box, advances on
-// Interact, and presents choices as focusable buttons. While a conversation
-// is active the mouse is released and gameplay input is expected to check
-// IsDialogueActive (Player movement, Pickup/Npc interaction).
+// Interact, and presents choices as focusable buttons. It opens as a window, so
+// the released mouse and the frozen gameplay underneath both follow from
+// UiWindowManager rather than being arranged here.
 //
 // The UI is built in code so this stays a single-file stub; it gets replaced
 // wholesale by the Yarn Spinner dialogue box (docs/plans/npc-dialogue-yarn.md).
-public partial class DialogueManager : CanvasLayer
+public partial class DialogueManager : CanvasLayer, IUiWindow
 {
     public static DialogueManager Instance { get; private set; }
 
@@ -26,9 +26,30 @@ public partial class DialogueManager : CanvasLayer
     public override void _Ready()
     {
         Instance = this;
-        Layer = 50;
+        Layer = UiLayers.Dialogue;
         BuildUi();
         Visible = false;
+    }
+
+    public string WindowName => "dialogue";
+
+    // A conversation wants the screen: this is what hides the dialogue editor
+    // and the console behind a "play from here" preview, and restores them
+    // when the conversation ends.
+    public bool Exclusive => true;
+
+    // Conversations are advanced, not cancelled. Escape is still swallowed
+    // rather than opening the pause menu behind the dialogue box.
+    public bool ClosesOnCancel => false;
+
+    public void SetShown(bool shown) => Visible = shown;
+
+    public void OnClosed()
+    {
+        current = null;
+        var ended = onEnded;
+        onEnded = null;
+        ended?.Invoke();
     }
 
     // Starts a conversation. onEnded runs after the last line, whichever
@@ -41,9 +62,8 @@ public partial class DialogueManager : CanvasLayer
             return;
         }
         this.onEnded = onEnded;
-        Visible = true;
-        // Release the mouse so choices are clickable; keyboard works too.
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        // Opening releases the mouse so choices are clickable; keyboard works too.
+        UiWindowManager.Open(this);
         ShowLine(first);
     }
 
@@ -110,15 +130,8 @@ public partial class DialogueManager : CanvasLayer
         }
     }
 
-    private void End()
-    {
-        current = null;
-        Visible = false;
-        Input.MouseMode = Input.MouseModeEnum.Captured;
-        var ended = onEnded;
-        onEnded = null;
-        ended?.Invoke();
-    }
+    // Teardown lives in OnClosed so it runs no matter what closed the window.
+    private void End() => UiWindowManager.Close(this);
 
     private void BuildUi()
     {
