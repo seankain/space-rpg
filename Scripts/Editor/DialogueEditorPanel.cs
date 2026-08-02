@@ -515,8 +515,12 @@ public partial class DialogueEditorPanel : CanvasLayer, IUiWindow
 		row.AddChild(dropdown);
 	}
 
-	// Verb dropdown + colon-joined args field for a single optional condition
-	// (a choice's visibility or a branch's guard). "(always)" clears it.
+	// A "not" toggle, a verb dropdown and a colon-joined args field for a single
+	// optional condition (a choice's visibility or a branch's guard). "(always)"
+	// clears it. A verb that is a DialogueQueries query returns a value rather
+	// than a yes/no, so it gets an operator dropdown and a value field too
+	// (dialogue-state-conditions plan Phase 1) — picking one rebuilds the row,
+	// which is how those two controls appear and disappear.
 	private void AddConditionEditor(Node parent, string label, Func<ConditionRef> get, Action<ConditionRef> set)
 	{
 		var row = new HBoxContainer();
@@ -524,47 +528,115 @@ public partial class DialogueEditorPanel : CanvasLayer, IUiWindow
 		parent.AddChild(row);
 		AddText(row, label, MutedColor);
 
+		var current = get();
+		var currentId = current == null ? null : DialogueConditions.BareId(current.Id);
+		var isQuery = DialogueQueries.IsQuery(currentId);
+
+		// A query inverts through its operator (>= becomes <), so "not" is for
+		// the yes/no verbs only — offering both would be two ways to say one
+		// thing, and the one Yarn can't write back out unambiguously.
+		var negate = new CheckBox
+		{
+			Text = "not",
+			TooltipText = isQuery
+				? "a query inverts with its operator, not with 'not'"
+				: "invert this condition",
+			ButtonPressed = current != null && DialogueConditions.IsNegated(current.Id),
+			Disabled = current == null || isQuery,
+		};
+		row.AddChild(negate);
+
 		var verb = new OptionButton();
 		verb.AddItem(NoConditionLabel);
 		foreach (var id in DialogueConditions.Ids)
 		{
 			verb.AddItem(id);
 		}
-		var current = get();
-		verb.Select(current == null ? 0 : Math.Max(0, Array.IndexOf(DialogueConditions.Ids, current.Id) + 1));
+		verb.Select(current == null ? 0 : Math.Max(0, Array.IndexOf(DialogueConditions.Ids, currentId) + 1));
 		row.AddChild(verb);
+
+		// A query's token carries its comparison in the trailing args, so peel
+		// those off before showing the rest as the call's own arguments.
+		var callArgs = current?.Args ?? Array.Empty<string>();
+		string op = null;
+		string value = null;
+		if (isQuery && DialogueConditions.TrySplitComparison(currentId, callArgs, out var split, out var foundOp, out var foundValue))
+		{
+			callArgs = split;
+			op = foundOp;
+			value = foundValue;
+		}
 
 		var args = new LineEdit
 		{
-			PlaceholderText = "args e.g. 1:Success",
-			Text = current?.Args is { Length: > 0 } a ? string.Join(":", a) : "",
+			PlaceholderText = isQuery ? DialogueQueries.Signature(currentId) : "args e.g. 1:Success",
+			Text = callArgs.Length > 0 ? string.Join(":", callArgs) : "",
 			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
 		};
 		row.AddChild(args);
 
-		verb.ItemSelected += index =>
+		OptionButton comparison = null;
+		LineEdit literal = null;
+		if (isQuery)
 		{
-			if (index <= 0)
+			comparison = new OptionButton();
+			foreach (var symbol in DialogueConditions.Operators)
+			{
+				comparison.AddItem(symbol);
+			}
+			// A verb just picked from the dropdown has no operator yet; start it
+			// on the one an elided comparison would have meant.
+			comparison.Select(Math.Max(0, Array.IndexOf(
+				DialogueConditions.Operators, op ?? DialogueConditions.DefaultOperator(currentId))));
+			row.AddChild(comparison);
+
+			literal = new LineEdit
+			{
+				PlaceholderText = "value",
+				Text = value ?? "",
+				CustomMinimumSize = new Vector2(96, 0),
+			};
+			row.AddChild(literal);
+		}
+
+		// Rebuilds the whole token from whatever the row is holding right now,
+		// so there is one write path however the author edited it.
+		void Apply()
+		{
+			if (verb.Selected <= 0)
 			{
 				set(null);
-			}
-			else
-			{
-				var c = get() ?? new ConditionRef();
-				c.Id = DialogueConditions.Ids[(int)index - 1];
-				c.Args = SplitArgs(args.Text);
-				set(c);
-			}
-			RefreshValidation();
-		};
-		args.TextChanged += t =>
-		{
-			if (get() is { } c)
-			{
-				c.Args = SplitArgs(t);
 				RefreshValidation();
+				return;
 			}
+			var id = DialogueConditions.Ids[verb.Selected - 1];
+			var parts = new List<string>(SplitArgs(args.Text));
+			if (comparison != null)
+			{
+				parts.Add(DialogueConditions.Operators[Math.Max(0, comparison.Selected)]);
+				parts.Add(literal.Text);
+			}
+			set(new ConditionRef
+			{
+				Id = negate.ButtonPressed ? DialogueConditions.Negation + id : id,
+				Args = parts.ToArray(),
+			});
+			RefreshValidation();
+		}
+
+		verb.ItemSelected += _ =>
+		{
+			Apply();
+			// The operator/value controls belong to query verbs only.
+			RebuildDetail();
 		};
+		negate.Toggled += _ => Apply();
+		args.TextChanged += _ => Apply();
+		if (comparison != null)
+		{
+			comparison.ItemSelected += _ => Apply();
+			literal.TextChanged += _ => Apply();
+		}
 	}
 
 	// An editable list of effects (a node's OnShown or a choice's effects): each

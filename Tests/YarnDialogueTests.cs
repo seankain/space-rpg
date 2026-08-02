@@ -260,6 +260,13 @@ $npc: Watch your step. #line:0a1b
     [InlineData("<<if $met_hale>>\n<<endif>>", "Yarn variables aren't supported")]
     [InlineData("<<if visited(\"x\")>>\n<<endif>>", "unknown condition 'visited'")]
     [InlineData("<<if has_item(1) && party_has_room()>>\n<<endif>>", "isn't supported")]
+    [InlineData("<<if has_item(1) and party_has_room()>>\n<<endif>>", "'and' isn't supported")]
+    [InlineData("<<if credits() gte 200>>\n<<endif>>", "symbolically")]
+    [InlineData("<<if credits() + 1 >= 200>>\n<<endif>>", "arithmetic")]
+    [InlineData("<<if credits() >= >>\n<<endif>>", "missing one side")]
+    [InlineData("<<if credits() >= two hundred>>\n<<endif>>", "isn't a literal")]
+    [InlineData("<<if not>>\n<<endif>>", "negates nothing")]
+    [InlineData("<<if credits()>>\n<<endif>>", "compared to a value")]
     [InlineData("<<if has_item(1)>>\n$npc: Hi.", "no matching <<endif>>")]
     [InlineData("<<give_item 4>>", "no line of dialogue to run on")]
     [InlineData("-> An option with no line\n    <<stop>>", "must follow a line")]
@@ -268,6 +275,115 @@ $npc: Watch your step. #line:0a1b
     {
         Compile($"title: start\n---\n{body}\n===\n", out var problems);
         Assert.Contains(problems, p => p.Contains(expected, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ComparisonsAndNegationCompileAndWriteBackOut()
+    {
+        // dialogue-state-conditions Phase 1: a query compared to a literal, and a
+        // negated predicate. Both are written the way real Yarn writes them — a
+        // function call in an expression — so the file stays valid upstream.
+        var source = @"
+title: toll
+---
+<<if credits() >= 200>>
+    <<jump berth>>
+<<elseif not flag(""warned"")>>
+    <<jump warn>>
+<<else>>
+    <<jump turned_away>>
+<<endif>>
+===
+
+title: berth
+---
+$npc: Clamps are off.
+-> Buy a spare cell <<if item_count(1) == 0>>
+    <<stop>>
+===
+
+title: warn
+---
+<<set_flag warned>>
+$npc: Two hundred, or you drift.
+===
+
+title: turned_away
+---
+$npc: Drift, then.
+===
+";
+        var graph = CompileClean(source);
+        var router = graph.GetNode("toll");
+        Assert.Equal("credits:>=:200", router.Branches[0].When.ToToken());
+        Assert.Equal("!flag:warned", router.Branches[1].When.ToToken());
+        Assert.Equal("item_count:1:==:0", graph.GetNode("berth").Choices[0].Visible.ToToken());
+
+        // The writer's spelling parses back to the same tokens.
+        var problems = new List<string>();
+        var yarn = YarnGraphWriter.Write(graph, problems);
+        Assert.Empty(problems);
+        Assert.Contains("credits() >= 200", yarn);
+        Assert.Contains("not flag(\"warned\")", yarn);
+        Assert.Contains("item_count(1) == 0", yarn);
+        AssertSameGraph(graph, YarnGraphCompiler.Compile(graph.Id, yarn, problems));
+        Assert.Empty(problems);
+    }
+
+    [Fact]
+    public void ANegatedComparisonFoldsIntoTheOperator()
+    {
+        // Yarn's unary `not` binds tighter than a comparison, so writing
+        // `not credits() >= 200` back out would read upstream as
+        // `(not credits()) >= 200`. Storing the inverted operator says the same
+        // thing and survives the trip through the file.
+        var graph = CompileClean(@"
+title: start
+---
+<<if not credits() >= 200>>
+    <<jump broke>>
+<<endif>>
+$npc: Welcome aboard.
+===
+
+title: broke
+---
+$npc: Come back with money.
+===
+");
+        Assert.Equal("credits:<:200", graph.GetNode("start").Branches[0].When.ToToken());
+
+        // And a hand-built token that still carries the '!' is written the same
+        // unambiguous way, while a negated predicate keeps its `not`.
+        Assert.Equal("credits() < 200", YarnGraphWriter.ConditionText(ConditionRef.Parse("!credits:>=:200")));
+        Assert.Equal("not flag(\"met_hale\")", YarnGraphWriter.ConditionText(ConditionRef.Parse("!flag:met_hale")));
+    }
+
+    [Fact]
+    public void AnElidedOperatorNormalizesToTheDefaultComparison()
+    {
+        // party_size(2) and stat("Charisma", 12) are how the vocabulary was
+        // written before there was an operator; they mean ">=" and normalize to
+        // it, so the writer only ever emits one form.
+        var graph = CompileClean(@"
+title: start
+---
+<<if party_size(2)>>
+    <<jump crew>>
+<<endif>>
+$npc: Just you, then.
+-> Charm them <<if stat(""Charisma"", 12)>>
+    <<stop>>
+===
+
+title: crew
+---
+$npc: Quite the crew.
+===
+");
+        Assert.Equal("party_size:>=:2", graph.GetNode("start").Branches[0].When.ToToken());
+        var line = graph.GetNode(graph.GetNode("start").NextNodeId);
+        Assert.Equal("stat:Charisma:>=:12", line.Choices[0].Visible.ToToken());
     }
 
     [Fact]

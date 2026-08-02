@@ -288,11 +288,14 @@ public class WorldFlagTests
     [Theory]
     [InlineData("flag", "flag takes")]
     [InlineData("flag:", "the flag name is empty")]
-    [InlineData("party_size", "party_size takes")]
-    [InlineData("party_size:lots", "not a whole number")]
-    [InlineData("stat:Charisma", "stat takes")]
+    // party_size and stat became DialogueQueries queries with the state-conditions
+    // plan, so their messages talk about the comparison they now need; the tokens
+    // themselves still read the same (see LegacyAtLeastTokensStillMeanAtLeast).
+    [InlineData("party_size", "must be compared to a value")]
+    [InlineData("party_size:lots", "is not a number")]
+    [InlineData("stat:Charisma", "compared to a value")]
     [InlineData("stat:Charm:10", "is not a stat")]
-    [InlineData("stat:Charisma:high", "not a whole number")]
+    [InlineData("stat:Charisma:high", "is not a number")]
     public void BadConditionArgsAreRejectedByTheValidator(string token, string expected)
     {
         Assert.Contains(expected, DialogueConditions.Validate(ConditionRef.Parse(token)));
@@ -346,7 +349,9 @@ $npc: You again.
 
         var line = graph.GetNode(router.NextNodeId);
         Assert.Equal(new[] { "set_flag:met_hale" }, line.OnShownEffects.Select(e => e.ToToken()));
-        Assert.Equal("stat:Charisma:12", line.Choices[0].Visible.ToToken());
+        // stat is a query now, so the elided "at least" spelling this script uses
+        // normalizes to an explicit comparison in the token.
+        Assert.Equal("stat:Charisma:>=:12", line.Choices[0].Visible.ToToken());
         Assert.Equal(new[] { "set_flag:hale_mood:charmed" }, line.Choices[0].Effects.Select(e => e.ToToken()));
 
         // And they come back out of the writer unchanged.
@@ -354,7 +359,7 @@ $npc: You again.
             "test.flags", YarnGraphWriter.Write(graph, problems), problems);
         Assert.Empty(problems);
         var rewrittenLine = rewritten.GetNode(rewritten.GetNode("greet").NextNodeId);
-        Assert.Equal("stat:Charisma:12", rewrittenLine.Choices[0].Visible.ToToken());
+        Assert.Equal("stat:Charisma:>=:12", rewrittenLine.Choices[0].Visible.ToToken());
         Assert.Equal(
             new[] { "set_flag:hale_mood:charmed" },
             rewrittenLine.Choices[0].Effects.Select(e => e.ToToken()));

@@ -4,6 +4,12 @@
 // Also the demo for world flags (npc-dialogue-yarn.md Phase 3): the first visit
 // sets met_shopkeeper, and every visit after that gets the returning-customer
 // greeting instead — including after a save, quit and reload.
+//
+// And the demo for state queries (dialogue-state-conditions.md Phase 3): the
+// under-the-counter medkit is offered only while the player can afford it, and
+// once they have paid, Moss reads the balance they are left with. Both halves
+// are the same feature from either side — what's in your pocket before you
+// spend it, and after.
 
 title: greet
 ---
@@ -21,6 +27,8 @@ $npc: Welcome in. Best prices on the station — care to see my stock?
 -> Let's trade
     <<open_shop>>
     <<stop>>
+-> Anything under the counter? <<if credits() >= 150>>
+    <<jump under_the_counter>>
 -> Just looking
     <<jump just_looking>>
 ===
@@ -32,8 +40,47 @@ $npc: Back again. Stock's turned over since you were last in — take a look.
 -> Let's trade
     <<open_shop>>
     <<stop>>
+-> Anything under the counter? <<if credits() >= 150>>
+    <<jump under_the_counter>>
 -> Just looking
     <<jump just_looking>>
+===
+
+// Gated on the price, so a player who can't pay never has the offer dangled in
+// front of them — and the option is gone next visit if the medkit is what
+// emptied their account.
+title: under_the_counter
+---
+<<play_anim Use_Item>>
+$npc: Surplus medkit. Hundred and fifty, and I never saw you.
+-> Done
+    <<credits -150>>
+    <<give_item 4>>
+    <<jump paid>>
+-> Not at that price
+    <<jump just_looking>>
+===
+
+// The other half: this router runs after the credits have left the account, so
+// it sees what the purchase actually left behind (Phase 2 — a condition is read
+// when the node is reached, not when the conversation starts).
+title: paid
+---
+<<if credits() >= 150>>
+    <<jump paid_flush>>
+<<else>>
+    <<jump paid_cleaned_out>>
+<<endif>>
+===
+
+title: paid_flush
+---
+$npc: Pleasure doing business. There's more under here, if you're still buying.
+===
+
+title: paid_cleaned_out
+---
+$npc: Pleasure doing business. Come back when your credits have recovered.
 ===
 
 title: just_looking
