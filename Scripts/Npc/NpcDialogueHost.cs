@@ -37,9 +37,11 @@ public sealed class NpcDialogueHost : IDialogueEffectHost
 		}
 	}
 
-	// Open the trading screen for this NPC's Merchant. DialogueManager.End()
-	// recaptures the mouse after the choice action runs, so defer the open a
-	// frame to win that race (same trick the old ShopkeeperRole used).
+	// Open the trading screen for this NPC's Merchant. Deferred a frame so the
+	// conversation finishes tearing down first — the shop opens against a
+	// settled window stack rather than from inside the dialogue's own teardown.
+	// (It no longer races the mouse: UiWindowManager derives the pointer from
+	// whatever is open, so there is no recapture to beat.)
 	public void OpenShop()
 	{
 		if (npc.GetTree().GetFirstNodeInGroup(ShopMenu.GroupName) is not ShopMenu shopMenu)

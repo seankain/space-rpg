@@ -81,16 +81,4 @@ public partial class LoadGameMenu : Control
 		confirmDialog.PopupCentered();
 	}
 
-	public override void _Input(InputEvent @event)
-	{
-		if(!this.Visible){return;}
-		if(@event is InputEventKey keyEvent)
-		{
-			if(keyEvent.Pressed && keyEvent.Keycode == Key.Escape)
-			{
-				GetViewport().SetInputAsHandled();
-				OnExitRequest?.Invoke(this,new());
-			}
-		}
-	}
 }

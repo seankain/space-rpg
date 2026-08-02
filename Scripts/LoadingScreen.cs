@@ -1,9 +1,17 @@
 using Godot;
-using System;
 
-public partial class LoadingScreen : Control
+public partial class LoadingScreen : Control, IUiWindow
 {
-	public event EventHandler LoadCompleted;
+	public string WindowName => "loading screen";
+
+	// Covers whatever it is loading over, and can't be dismissed — it goes away
+	// when the load finishes. Being a window is what recaptures the pointer for
+	// gameplay on the way out, which LevelManager used to do by hand.
+	public bool Exclusive => true;
+
+	public bool ClosesOnCancel => false;
+
+	public void SetShown(bool shown) => Visible = shown;
 
 	[Export]
 	private ProgressBar progressBar;
@@ -18,7 +26,7 @@ public partial class LoadingScreen : Control
 		NextScenePath = nextScenePath;
 		ResourceLoader.LoadThreadedRequest(NextScenePath);
 		progressBar.Value = 0;
-		Show();
+		UiWindowManager.Open(this);
 		isLoading = true;
 	}
 
@@ -38,12 +46,11 @@ public partial class LoadingScreen : Control
 				isLoading = false;
 				var scene = (PackedScene)ResourceLoader.LoadThreadedGet(NextScenePath);
 				GetNode("../LevelRoot").AddChild(scene.Instantiate());
-				Hide();
-				LoadCompleted?.Invoke(this, EventArgs.Empty);
+				UiWindowManager.Close(this);
 				break;
 			default:
 				isLoading = false;
-				Hide();
+				UiWindowManager.Close(this);
 				GD.PushError($"Failed to load scene '{NextScenePath}'.");
 				break;
 		}

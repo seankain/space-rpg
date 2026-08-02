@@ -12,29 +12,31 @@ using Godot;
 //
 // Development aid only: a release build never opens it (enabled is gated on a
 // debug/editor build), matching the map-baker's editor-only workflow.
-public partial class DevConsole : CanvasLayer
+public partial class DevConsole : CanvasLayer, IUiWindow
 {
     public static DevConsole Instance { get; private set; }
 
-    // True while the console panel is showing.
-    public static bool IsOpen => Instance is { enabled: true, Visible: true };
+    // True while the console panel is open. Stack membership rather than
+    // Visible: a "play from here" preview covers the panel without closing it,
+    // and it should still count as open while it is under the dialogue box.
+    public static bool IsOpen => Instance is { enabled: true } && UiWindowManager.IsOpen(Instance);
 
     // True while editor mode is active (the `editor` command). Orthogonal to
     // the console being open.
     public static bool IsEditorActive => Instance is { enabled: true, editorActive: true };
 
-    // True while the read-only dialogue viewer (Phase 3) is showing.
-    public static bool IsDialogueViewerOpen => Instance?.dialogueViewer is { Visible: true };
+    // True while the read-only dialogue viewer (Phase 3) is open.
+    public static bool IsDialogueViewerOpen =>
+        Instance?.dialogueViewer != null && UiWindowManager.IsOpen(Instance.dialogueViewer);
 
-    // True while the in-world NPC editor form is up. The fly camera checks it
-    // so WASD typed into a text field doesn't also fly the view.
-    public static bool IsNpcEditorOpen => Instance?.npcEditor is { Visible: true };
+    // True while the in-world NPC editor form is up.
+    public static bool IsNpcEditorOpen =>
+        Instance?.npcEditor != null && UiWindowManager.IsOpen(Instance.npcEditor);
 
-    // The single flag gameplay checks to freeze normal play — true while the
-    // console is open, editor mode is active, or the dialogue viewer is up.
-    // Guarded cooperatively, the same way Player/Pickup/Npc check
-    // DialogueManager.IsDialogueActive.
-    public static bool BlocksGameplay => IsOpen || IsEditorActive || IsDialogueViewerOpen;
+    // A panel with its own keyboard focus is up over editor mode, so the fly
+    // camera must not read WASD typed into one of its text fields. Editor mode
+    // by itself doesn't count — flying is the point of it.
+    public static bool EditorPanelOpen => IsOpen || IsNpcEditorOpen || IsDialogueViewerOpen;
 
     // The world point the placement marker sits on, or null when editor mode is
     // off or the ray misses. The `here` token (Phase 3) resolves to this.
@@ -84,19 +86,32 @@ public partial class DevConsole : CanvasLayer
     private NpcEditorPanel npcEditor;
     private Npc editedNpc;
 
-    // Set while the dialogue editor is up *in front of* the NPC editor (opened
-    // from a conversation row): closing the dialogue editor puts the NPC form
-    // back rather than dropping the author into the empty level.
-    private bool resumeNpcEditorOnDialogueClose;
-
     // The read-only dialogue viewer (Phase 3), created on first `dialogue open`
     // and reused after; null until then, hidden when closed.
     private DialogueEditorPanel dialogueViewer;
 
+    // Editor mode has no single node whose visibility tracks it, so it joins
+    // the window stack as a policy-only entry: it holds the pointer free and
+    // freezes gameplay for as long as it is on.
+    private readonly EditorModeWindow editorModeWindow = new();
+
+    private sealed class EditorModeWindow : IUiWindow
+    {
+        public string WindowName => "editor mode";
+
+        // The toolbar, HUD, cursor and fly camera are created and freed by
+        // SetEditorMode; there is nothing for the stack to show or hide.
+        public void SetShown(bool shown) { }
+
+        // Editor mode ends with the `editor` command or the toolbar's Exit
+        // button. Escape belongs to whichever panel is open over it.
+        public bool ClosesOnCancel => false;
+    }
+
     public override void _Ready()
     {
         Instance = this;
-        Layer = 100; // above the dialogue box (50) and every menu
+        Layer = UiLayers.Console;
         enabled = OS.IsDebugBuild() || OS.HasFeature("editor");
         BuildUi();
         Visible = false;
@@ -106,6 +121,18 @@ public partial class DevConsole : CanvasLayer
         }
         RegisterBuiltins();
     }
+
+    public string WindowName => "console";
+
+    // The console drops down over whatever is already up rather than replacing
+    // it — reading the log against an open panel is the point.
+    public bool Exclusive => false;
+
+    // The ToggleConsole action (tilde) opens and closes it; Escape is for the
+    // panels raised over it.
+    public bool ClosesOnCancel => false;
+
+    public void SetShown(bool shown) => Visible = shown;
 
     // Feature phases call this to add their verbs (NPC placement, item/quest
     // commands, dialogue editor). No-op registration is safe in a release build.
@@ -227,10 +254,10 @@ public partial class DevConsole : CanvasLayer
     {
         EnsureDialogueViewer();
         dialogueViewer.ShowGraph(workingGraph);
-        dialogueViewer.Visible = true;
-        // Keep the pointer free so the editor stays usable even after the
-        // console is toggled shut to see the panel in full.
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        // Opening keeps the pointer free, so the editor stays usable even after
+        // the console is toggled shut to see the panel in full. Being exclusive,
+        // it also steps in front of the NPC form when opened from one.
+        UiWindowManager.Open(dialogueViewer);
     }
 
     private void EnsureDialogueViewer()
@@ -302,42 +329,23 @@ public partial class DevConsole : CanvasLayer
             return CommandResult.Fail($"Nothing to play from '{startNodeId ?? graph.EntryNodeId}'.");
         }
 
-        // Hide the editor UI (and close the console) so the dialogue box shows
-        // uncovered; DialogueManager blocks gameplay while it plays.
-        dialogueViewer.Visible = false;
-        if (Visible)
-        {
-            Toggle();
-        }
-        DialogueManager.Instance.Start(line, () =>
-        {
-            dialogueViewer.Visible = true;
-            Input.MouseMode = Input.MouseModeEnum.Visible;
-        });
+        // The dialogue box is exclusive, so opening it covers the editor panel
+        // and the console for the duration and uncovers them when it ends — no
+        // hiding and restoring by hand.
+        DialogueManager.Instance.Start(line);
         return CommandResult.Ok($"Playing '{graph.Id}' from '{startNodeId ?? graph.EntryNodeId}'. (preview — scene effects are skipped)");
     }
 
-    // Hides the dialogue viewer and restores the pointer (visible if the
-    // console is still open, captured back to gameplay otherwise). Returns
-    // whether it was open.
+    // Closes the dialogue viewer. Whatever was under it — the NPC form it was
+    // opened from, the console, or nothing — comes back on its own, and the
+    // pointer follows from what is left open. Returns whether it was open.
     public bool CloseDialogueViewer()
     {
-        if (dialogueViewer is not { Visible: true })
+        if (dialogueViewer == null || !UiWindowManager.IsOpen(dialogueViewer))
         {
             return false;
         }
-        dialogueViewer.Visible = false;
-        if (resumeNpcEditorOnDialogueClose && npcEditor != null)
-        {
-            resumeNpcEditorOnDialogueClose = false;
-            // The catalog may have gained the conversation that was just
-            // written, so the rows re-read it on the way back in.
-            npcEditor.RefreshDialogues();
-            npcEditor.Visible = true;
-        }
-        Input.MouseMode = Visible || editorActive
-            ? Input.MouseModeEnum.Visible
-            : Input.MouseModeEnum.Captured;
+        UiWindowManager.Close(dialogueViewer);
         return true;
     }
 
@@ -378,10 +386,10 @@ public partial class DevConsole : CanvasLayer
                 ToolChanged = _ => CloseNpcEditor(),
             };
             AddChild(toolbar);
-            // Editor mode is point-and-click now: the palette, the NPC editor,
-            // and clicking bodies in the level all need a free pointer. The
-            // fly camera captures it only while the look button is held.
-            Input.MouseMode = Input.MouseModeEnum.Visible;
+            // Editor mode is point-and-click: the palette, the NPC editor, and
+            // clicking bodies in the level all need a free pointer. The fly
+            // camera captures it only while the look button is held.
+            UiWindowManager.Open(editorModeWindow);
         }
         else
         {
@@ -394,9 +402,7 @@ public partial class DevConsole : CanvasLayer
             flyCamera = null;
             toolbar?.QueueFree();
             toolbar = null;
-            Input.MouseMode = Visible || IsDialogueViewerOpen
-                ? Input.MouseModeEnum.Visible
-                : Input.MouseModeEnum.Captured;
+            UiWindowManager.Close(editorModeWindow);
         }
     }
 
@@ -429,7 +435,7 @@ public partial class DevConsole : CanvasLayer
         // A click belongs to whatever panel is up: the console, the NPC form,
         // or the dialogue editor (which the NPC form opens over itself, and
         // which the `dialogue` verbs can raise mid-editor-mode too).
-        if (!editorActive || Visible || IsNpcEditorOpen || IsDialogueViewerOpen || toolbar == null)
+        if (!editorActive || EditorPanelOpen || toolbar == null)
         {
             return;
         }
@@ -497,8 +503,7 @@ public partial class DevConsole : CanvasLayer
             $"{PlacementMath.AreaFromScenePath(definition.SpawnScenePath)}"
             + $"   chunk ({definition.ChunkCoords.X}, {definition.ChunkCoords.Y})"
             + $"   local ({local.X:0.0}, {local.Y:0.0}, {local.Z:0.0})");
-        npcEditor.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        UiWindowManager.Open(npcEditor);
     }
 
     private void EnsureNpcEditor()
@@ -543,9 +548,10 @@ public partial class DevConsole : CanvasLayer
 
     // A conversation row's "Edit dialogue" / "New…" button: swap the NPC form
     // for the dialogue editor on that conversation. The two panels share a
-    // layer and both want the whole screen, so the NPC form steps aside and
-    // CloseDialogueViewer brings it back — the author is editing one NPC the
-    // whole time, and returns to it with the link still on the form.
+    // layer and both want the whole screen, so the dialogue editor opens over
+    // the NPC form as an exclusive window — the author is editing one NPC the
+    // whole time, and closing the editor returns to the form with the link
+    // still on it.
     private void OpenDialogueFromNpcEditor(string id, bool create)
     {
         var result = create ? NewDialogue(id) : OpenDialogueViewer(id);
@@ -556,8 +562,6 @@ public partial class DevConsole : CanvasLayer
             return;
         }
         var npcId = npcEditor.Definition?.NpcId;
-        resumeNpcEditorOnDialogueClose = npcEditor.Visible;
-        npcEditor.Visible = false;
         dialogueViewer.SetStatus(
             $"Editing {npcId}'s conversation. Save writes the .yarn; Close (Esc) goes back to the NPC.", true);
     }
@@ -610,19 +614,18 @@ public partial class DevConsole : CanvasLayer
         toolbar?.SetStatus($"Saved '{definition.NpcId}'.", true);
     }
 
-    // Hides the NPC editor, if it is up. Returns whether it was open.
+    // Closes the NPC editor, if it is up. Returns whether it was open. Whatever
+    // closed the form (a tool switch, leaving editor mode) drops it out of the
+    // stack wherever it sits, so a dialogue editor still open over it closes
+    // back to the level rather than to a form for an NPC nobody is editing.
     private bool CloseNpcEditor()
     {
         editedNpc = null;
-        // Whatever closed the form (a tool switch, leaving editor mode) ends
-        // the trip through the dialogue editor too: closing that panel must not
-        // bring back a form for an NPC nobody is editing any more.
-        resumeNpcEditorOnDialogueClose = false;
-        if (npcEditor is not { Visible: true })
+        if (npcEditor == null || !UiWindowManager.IsOpen(npcEditor))
         {
             return false;
         }
-        npcEditor.Visible = false;
+        UiWindowManager.Close(npcEditor);
         return true;
     }
 
@@ -729,7 +732,7 @@ public partial class DevConsole : CanvasLayer
             "flag" when index == 2 => SaveManager.Instance?.CurrentState?.Flags.Keys.ToList()
                 ?? new List<string>(),
             "spawn" or "goto" when index == 1 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
-            "list" when index == 1 => new List<string> { "npcs" },
+            "list" when index == 1 => new List<string> { "npcs", "windows" },
             "dialogue" when index == 1 => new List<string> { "list", "open", "new", "save", "play", "close", "assign" },
             "dialogue" when index == 2 && tokens.Count > 1 && tokens[1].ToLowerInvariant() == "assign"
                 => NpcDatabase.All.Select(d => d.NpcId).ToList(),
@@ -740,30 +743,25 @@ public partial class DevConsole : CanvasLayer
         };
     }
 
+    // The pointer is not touched here: closing the console recaptures it only
+    // if nothing else open still wants it free (a viewer panel, editor mode),
+    // and the stack works that out.
     private void Toggle()
     {
-        Visible = !Visible;
-        if (Visible)
+        if (UiWindowManager.IsOpen(this))
         {
-            Input.MouseMode = Input.MouseModeEnum.Visible;
-            input.Clear();
-            // Edit rather than GrabFocus: focus alone doesn't put a 4.4+
-            // LineEdit in edit mode, and the console should be typeable the
-            // moment it drops down.
-            input.Edit();
-            // Anything printed while the panel was hidden laid out just now, so
-            // open on the newest line rather than wherever the log was left.
-            ScrollOutputToBottom();
+            UiWindowManager.Close(this);
+            return;
         }
-        else
-        {
-            // Don't recapture the pointer out from under an open viewer panel,
-            // or out from under editor mode — which is point-and-click and
-            // captures only while the look button is held.
-            Input.MouseMode = IsDialogueViewerOpen || editorActive
-                ? Input.MouseModeEnum.Visible
-                : Input.MouseModeEnum.Captured;
-        }
+        input.Clear();
+        UiWindowManager.Open(this);
+        // Edit rather than GrabFocus: focus alone doesn't put a 4.4+ LineEdit
+        // in edit mode, and the console should be typeable the moment it drops
+        // down. After the open, so the field is visible when it takes the caret.
+        input.Edit();
+        // Anything printed while the panel was hidden laid out just now, so
+        // open on the newest line rather than wherever the log was left.
+        ScrollOutputToBottom();
     }
 
     private void OnCommandSubmitted(string text)

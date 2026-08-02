@@ -106,7 +106,7 @@ public partial class EditorFlyCamera : Camera3D
         // into the command line is the same bug Player guards against. So do
         // the editor forms — the NPC sheet, and the dialogue editor it opens
         // over itself, which is nothing but text fields.
-        if (DevConsole.IsOpen || DevConsole.IsNpcEditorOpen || DevConsole.IsDialogueViewerOpen)
+        if (DevConsole.EditorPanelOpen)
         {
             return;
         }

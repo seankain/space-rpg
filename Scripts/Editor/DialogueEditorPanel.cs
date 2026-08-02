@@ -12,11 +12,13 @@ using System.Linq;
 // (or the Save button) writes it back through DevConsole/DialogueEditing.
 //
 // Code-built CanvasLayer like the other editor UI. DevConsole owns the panel's
-// lifecycle, mouse, and gameplay lock and performs the file I/O; this class
-// renders and mutates the graph and reports open/save/close through callbacks.
-public partial class DialogueEditorPanel : CanvasLayer
+// lifecycle and performs the file I/O, UiWindowManager owns its visibility,
+// the pointer and the gameplay lock; this class renders and mutates the graph
+// and reports open/save/close through callbacks.
+public partial class DialogueEditorPanel : CanvasLayer, IUiWindow
 {
-	// Raised when the panel asks to close (Close button or Escape).
+	// Raised when the panel asks to close (its Close button). Escape reaches
+	// it through UiWindowManager, which owns the only ui_cancel handler.
 	public Action Closed { get; set; }
 	// Raised by the Save button; DevConsole validates and writes the file.
 	public Action SaveRequested { get; set; }
@@ -69,10 +71,18 @@ public partial class DialogueEditorPanel : CanvasLayer
 
 	public override void _Ready()
 	{
-		Layer = 90; // above the dialogue box (50), below the console (100)
+		Layer = UiLayers.EditorPanel;
 		Visible = false;
 		BuildChrome();
 	}
+
+	public string WindowName => "dialogue editor";
+
+	// Wants the whole screen. Opened from the NPC form, this is what steps in
+	// front of it, and closing uncovers the form again.
+	public bool Exclusive => true;
+
+	public void SetShown(bool shown) => Visible = shown;
 
 	public bool IsShowing => Visible;
 
@@ -120,15 +130,6 @@ public partial class DialogueEditorPanel : CanvasLayer
 		titleLabel.Text = $"Editing:  {graph.Id}";
 		RefreshPicker();
 		RefreshValidation();
-	}
-
-	public override void _Input(InputEvent @event)
-	{
-		if (Visible && @event.IsActionPressed("ui_cancel"))
-		{
-			GetViewport().SetInputAsHandled();
-			Closed?.Invoke();
-		}
 	}
 
 	// --- Picker --------------------------------------------------------------

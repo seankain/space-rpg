@@ -17,13 +17,24 @@ space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and qu
 
 ### Main menu flow (`Scripts/MainMenu.cs`, `Scenes/Menu/MainMenu.tscn`)
 
-The main menu shows New Game / Load Game / Save Game / Options / Quit buttons and swaps between sub-menus by toggling visibility:
+The main menu shows New Game / Load Game / Save Game / Options / Quit buttons and swaps between sub-menus through a single one-of-N `ShowPanel` (exactly one sub-panel is up, or none and the buttons show):
 
 - **New Game** (`Scenes/Menu/NewGameMenu.cs`) — shows a start button. Pressing it fires `MainMenu.OnNewGameStarted`; `LevelManager` creates a fresh `GameState` via `SaveManager.StartNewGame()` and loads the intro level.
 - **Save Game** (`Scripts/SaveGameMenu.cs`) — lists real saves from disk as clickable `SavedGameMenuItem` rows. "New Save" captures the running game and writes a slot; clicking an existing row overwrites it (with confirmation); each row has a delete button (with confirmation).
 - **Load Game** (`Scripts/LoadGameMenu.cs`) — lists the same rows; clicking one restores its `GameState` and loads the saved level, placing the player at the saved position. Corrupt saves show an error dialog instead of crashing.
-- **Options** — button exists but the handler is not wired and there is no options UI.
+- **Options** — no options UI exists yet, so the button is disabled in `_Ready` rather than left live (pressing it used to hide the buttons and show nothing, with no way back).
 - **Quit** — exits the game.
+
+### UI window management (`Scripts/Ui/`)
+
+Every openable UI surface — the pause menu, the in-game menu, the shop, the dialogue box, the loading screen, battle mode, the console, editor mode, and the two editor panels — opens and closes through one autoload instead of being driven by whichever system happens to own it.
+
+- `IUiWindow` — a window described by policy, not by its owner: `ReleasesPointer`, `BlocksGameplay`, `Exclusive` (hides what is underneath), `ClosesOnCancel`, a `RequestClose()` veto hook, plus `SetShown(bool)` and `OnClosed()`. Defaults cover the common case (a full-screen menu that takes the pointer, freezes play, and closes on Escape), so a window states only what differs.
+- `UiWindowStack` — engine-free: the ordered set of open windows and the rules that follow from it. Visibility is derived (everything from the topmost exclusive window up is shown, everything below hidden), as are `ReleasesPointer` and `BlocksGameplay` (aggregated over every open window, covered ones included). Covered here by `Tests/UiWindowStackTests.cs`, the project's first UI tests.
+- `UiWindowManager` — the Godot half: owns the stack, writes `Input.MouseMode` once per change, and handles `ui_cancel` — the only Escape handler in the game. Anything open consumes Escape even when it declines to close, so Escape can never reach past a window to the pause menu underneath. Runs with `ProcessMode.Always` so it still works while a battle pauses the tree.
+- `UiLayers` — the CanvasLayer draw order in one place (dialogue 50, toasts 60, battle HUD 65, editor toolbar 80, editor panels 90, console 100), replacing seven per-node `Layer = N; // above X, below Y` comments.
+
+What this replaced: each closer used to recompute the pointer from the windows it happened to know about (`DevConsole` alone carried three spellings of "is something else open?"), gameplay code ORed three static flags together in six places, Escape was handled at four priorities in three ways, and the dialogue editor's return to the NPC form was a one-entry `resumeNpcEditorOnDialogueClose` boolean. Gameplay now asks `UiWindowManager.BlocksGameplay` and nothing else — which also fixed the player walking around while a menu was open, the pause menu opening behind the in-game menu, and Escape at the title screen blanking the display.
 
 ### Save/load system (`Scripts/Save/`)
 
@@ -37,9 +48,9 @@ There is also a multiplayer-flavored server browser stub (`Scripts/ActiveGamesLi
 
 ### Level loading (`Scripts/LevelManager.cs`, `Scripts/LoadingScreen.cs`)
 
-- `LevelManager` (attached in `Main.tscn`) reacts to new-game and load-game events by calling `StartLevel`, which clears `LevelRoot` and streams the level in via `LoadingScreen`; the mouse is captured when loading completes.
-- `LoadingScreen` uses `ResourceLoader.LoadThreadedRequest` and polls status each frame, driving a progress bar, then instances the loaded scene under `LevelRoot`, hides itself, and raises `LoadCompleted`. Load failures log an error instead of spinning forever.
-- `LevelManager` also handles global input: **Escape** toggles the main menu (and mouse capture), **Tab** toggles the in-game menu.
+- `LevelManager` (attached in `Main.tscn`) reacts to new-game and load-game events by calling `StartLevel`, which clears `LevelRoot` and streams the level in via `LoadingScreen`; the mouse is recaptured when the loading screen closes, because no window is left open.
+- `LoadingScreen` uses `ResourceLoader.LoadThreadedRequest` and polls status each frame, driving a progress bar, then instances the loaded scene under `LevelRoot` and closes itself as a UI window. Load failures log an error instead of spinning forever.
+- `LevelManager` also *opens* the two menus it owns: **Escape** (`ui_cancel`) opens the pause menu, **Tab** (`Inventory`) toggles the in-game menu. Closing them is not its business — `UiWindowManager` consumes `ui_cancel` whenever anything is open, so an event reaching `LevelManager._UnhandledInput` means the screen is clear (see [UI window management](#ui-window-management-scriptsui)).
 - `ChangeLevel(int)` exists for swapping levels from an exported `LevelScenes` array but nothing calls it yet.
 
 ### Level chunking (`Scripts/World/ChunkManager.cs`, `Scenes/Levels/Chunks/`)
@@ -58,7 +69,7 @@ Phase 1 of the [level chunking plan](plans/level-chunking.md) — the world stre
 - `Player.cs` is a `CharacterBody3D` with WASD movement, gravity, and jumping, plus a simple two-state animation switch (Idle/Running) that is noted in-code as a placeholder for a proper `AnimationTree`.
 - `CameraController.cs` provides mouse freelook (tilt clamped). State machine scaffolding exists for snap-to-rear and idle-spin camera behaviors but the `_Process` body driving it is commented out.
 - `Spawn.cs` tracks whether bodies occupy a spawn point via an `Area3D` trigger.
-- `PlayerHud.cs` and `InGameMenu.cs` are empty shells (the in-game menu's Quests, Party, Inventory, Map, and Log tabs are driven by their own `QuestLogMenu`/`PartyMenu`/`InventoryMenu`/`MapMenu`/`EventLogMenu` scripts).
+- `PlayerHud.cs` is an empty shell. `InGameMenu.cs` owns only the window itself (open/close policy); its Quests, Party, Inventory, Map, and Log tabs are driven by their own `QuestLogMenu`/`PartyMenu`/`InventoryMenu`/`MapMenu`/`EventLogMenu` scripts, each refreshing off its own `VisibilityChanged`.
 
 ### NPCs and data-driven dialogue (`Scripts/Npc/`, `Scripts/Dialogue/`)
 
@@ -196,5 +207,4 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 
 - `Spawn.cs` handlers look inverted: `BodyExited` **adds** to the occupier list and `BodyEntered` **removes**, so `IsOccupied` reports the opposite of reality.
 - `ActiveGamesList.AddActiveGameRow` calls `GD.Load` and discards the result.
-- Escape (main menu) and Tab (in-game menu) still work while a dialogue is open, stacking menus over the dialogue box and fighting over the mouse mode.
-- Pressing Escape on the main menu before any game has started hides the menu over an empty scene.
+- `Scenes/PlayerHud.cs` is an empty class with no HUD behind it.

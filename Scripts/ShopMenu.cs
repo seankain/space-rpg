@@ -7,10 +7,11 @@ using System.Collections.Generic;
 // its details and price, and the action button executes the Trade. All
 // controls are declared in the scene and wired here through exports, like
 // InventoryMenu. Opened by an NPC's ShopkeeperRole via Open().
-public partial class ShopMenu : Control
+public partial class ShopMenu : Control, IUiWindow
 {
-	// The open shop menu, if any. Gameplay input (Player movement, Npc /
-	// Pickup / Door interaction) treats an open shop like an active dialogue.
+	// The open shop menu, if any. Gameplay no longer consults this — it asks
+	// UiWindowManager.BlocksGameplay — but a level can hold more than one
+	// ShopMenu, so this still answers "is one of them trading right now".
 	private static ShopMenu current;
 	public static bool IsShopOpen => current != null;
 
@@ -66,6 +67,8 @@ public partial class ShopMenu : Control
 	public override void _Ready()
 	{
 		AddToGroup(GroupName);
+		// Closed until a shopkeeper opens it; the stack owns visibility after.
+		Visible = false;
 		ModeTabs.TabChanged += _ =>
 		{
 			selectedItemId = null;
@@ -77,6 +80,24 @@ public partial class ShopMenu : Control
 		CloseButton.Pressed += Close;
 	}
 
+	public string WindowName => "shop";
+
+	// Full-screen trading UI.
+	public bool Exclusive => true;
+
+	public void SetShown(bool shown) => Visible = shown;
+
+	// Runs however the shop was closed — the Close button, Escape, or a
+	// game-over teardown — so the merchant can't outlive the window.
+	public void OnClosed()
+	{
+		current = null;
+		merchant = null;
+		var closed = onClosed;
+		onClosed = null;
+		closed?.Invoke();
+	}
+
 	public void Open(Merchant merchant, Action onClosed = null)
 	{
 		this.merchant = merchant;
@@ -86,30 +107,11 @@ public partial class ShopMenu : Control
 		ModeTabs.CurrentTab = 0;
 		selectedItemId = null;
 		ResultLabel.Text = "";
-		Visible = true;
-		Input.MouseMode = Input.MouseModeEnum.Visible;
+		UiWindowManager.Open(this);
 		Refresh();
 	}
 
-	public void Close()
-	{
-		Visible = false;
-		current = null;
-		merchant = null;
-		Input.MouseMode = Input.MouseModeEnum.Captured;
-		var closed = onClosed;
-		onClosed = null;
-		closed?.Invoke();
-	}
-
-	public override void _UnhandledInput(InputEvent @event)
-	{
-		if (current == this && @event.IsActionPressed("ui_cancel"))
-		{
-			GetViewport().SetInputAsHandled();
-			Close();
-		}
-	}
+	public void Close() => UiWindowManager.Close(this);
 
 	private void Refresh()
 	{

@@ -62,14 +62,22 @@ public sealed class CancelPlaceCommand : IConsoleCommand
 public sealed class ListCommand : IConsoleCommand
 {
     public string Name => "list";
-    public string Usage => "list npcs [area]";
-    public string Summary => "List known NPC definitions, optionally filtered by area.";
+    public string Usage => "list <npcs [area]|windows>";
+    public string Summary => "List known NPC definitions, or the open UI windows.";
 
     public CommandResult Execute(IReadOnlyList<string> args)
     {
-        if (args.Count == 0 || !string.Equals(args[0], "npcs", System.StringComparison.OrdinalIgnoreCase))
+        if (args.Count == 0)
         {
-            return CommandResult.Fail("Usage: list npcs [area]");
+            return CommandResult.Fail("Usage: list npcs [area] | list windows");
+        }
+        if (string.Equals(args[0], "windows", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return ListWindows();
+        }
+        if (!string.Equals(args[0], "npcs", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return CommandResult.Fail("Usage: list npcs [area] | list windows");
         }
         var rest = new List<string>();
         for (var i = 1; i < args.Count; i++)
@@ -77,5 +85,29 @@ public sealed class ListCommand : IConsoleCommand
             rest.Add(args[i]);
         }
         return EditorPlacement.ListNpcs(rest);
+    }
+
+    // The UI window stack, bottom to top, with the policy each entry carries —
+    // for working out which window is holding the pointer or freezing play.
+    private static CommandResult ListWindows()
+    {
+        var open = UiWindowManager.OpenWindows;
+        if (open.Count == 0)
+        {
+            return CommandResult.Ok("No UI windows open — gameplay has the pointer.");
+        }
+        var lines = new List<string> { $"{open.Count} window(s), bottom to top:" };
+        for (var i = 0; i < open.Count; i++)
+        {
+            var window = open[i];
+            var flags = new List<string>();
+            if (window.Exclusive) { flags.Add("exclusive"); }
+            if (window.ReleasesPointer) { flags.Add("pointer"); }
+            if (window.BlocksGameplay) { flags.Add("blocks-play"); }
+            if (!window.ClosesOnCancel) { flags.Add("no-esc"); }
+            var top = i == open.Count - 1 ? "  <- top" : "";
+            lines.Add($"  {i}. {window.WindowName}   [{string.Join(", ", flags)}]{top}");
+        }
+        return CommandResult.Ok(string.Join("\n", lines));
     }
 }
