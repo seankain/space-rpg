@@ -16,6 +16,7 @@ A 3rd-person adventure RPG built in Godot, with turn-based combat encounters and
 | [plans/quest-system.md](plans/quest-system.md) | Quests: definitions/progress split, QuestManager, journal UI, rewards |
 | [plans/in-game-editor.md](plans/in-game-editor.md) | In-game editor: tilde console + editor mode, NPC placement saved as loadable `.tres`, and item/quest console commands |
 | [plans/dialogue-editor.md](plans/dialogue-editor.md) | Dialogue editor: move dialogue from code to serializable graph data, then edit and save conversation trees in-game |
+| [plans/dialogue-state-conditions.md](plans/dialogue-state-conditions.md) | Branching on character and world state: how Yarn Spinner does it upstream, and a design for value queries (credits, stats, health), comparison operators, and evaluating conditions when a node is reached |
 
 ## Suggested build order
 
