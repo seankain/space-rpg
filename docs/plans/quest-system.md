@@ -58,4 +58,4 @@ Depends on: dialogue plan Phase 4 (quest commands) for the primary way quests st
 |----------|----------------|
 | Where quest logic lives | Definitions are data; transitions happen only through `QuestManager` APIs, driven by dialogue commands and triggers — no quest-specific C# per quest. |
 | Stage progression shape | Linear stage list with explicit scripted advancement first; add conditions/branching in Phase 4 only once real content demands it. |
-| Journal scope | Text-only journal for v1 — no map markers until a map system exists. |
+| Journal scope | Text-only journal for v1 — no map markers until a map system exists. *(The map now exists; markers are planned in [quest-markers.md](quest-markers.md), which also adds the target locations and the tracked quest the journal needs for objective lines.)* |
