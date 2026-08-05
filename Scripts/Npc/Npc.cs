@@ -14,6 +14,11 @@ using System.Linq;
 // fallbacks for hand-placed instances, but the definition wins when present.
 public partial class Npc : CharacterBody3D
 {
+	// Every spawned NPC joins this group, so anything that needs "the live
+	// NPCs" — the quest-marker locator asking where an NPC actually is right
+	// now — can find them without walking the level tree.
+	public const string GroupName = "Npc";
+
 	[Export]
 	public string DisplayName = "NPC";
 
@@ -70,6 +75,7 @@ public partial class Npc : CharacterBody3D
 
 	public override void _Ready()
 	{
+		AddToGroup(GroupName);
 		if (Definition?.Rig is { } rigScene)
 		{
 			AddRig(rigScene);

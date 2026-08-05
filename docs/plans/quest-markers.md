@@ -40,20 +40,22 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 
 **Done when:** unit tests cover the fetch quest flipping its marker as the cube enters the inventory, an un-started/completed quest resolving to nothing, a bad marker failing catalog validation, and an unlocatable target being dropped rather than throwing. *(`Tests/QuestMarkerTests.cs`, 26 cases — the two shipped quests both ways round, target-token round-trips and the malformed forms, every rejection reason, and the fail-closed skip.)*
 
-## Phase 2 — Locating targets: live NPC data and baked world points
+## Phase 2 — Locating targets: live NPC data and baked world points *(done — this slice)*
 
-1. `Scripts/World/QuestTargetLocator.cs` — the Godot-side `IQuestTargetLocator`:
-   - **Npc** → `NpcDatabase.Get(npcId)`; position is `ChunkCoords·64 + LocalPosition` through `MapProjection`, area from the definition's `SpawnScenePath`. If the NPC is currently in the scene tree, its live `GlobalPosition` wins.
-   - **Item** → the baked pickup index (below).
-   - **Point** → the authored coordinates as-is.
+1. `Scripts/World/QuestTargetLocator.cs` — the Godot-side `IQuestTargetLocator`. **The live world outranks recorded data wherever it can reach**, which is both more accurate and what makes the feature demonstrable before anything is re-baked:
+   - **Npc** → the spawned `Npc` node's own `GlobalPosition` when it is in the tree (they wander and patrol, so the authored spawn point is only an approximation), else `NpcDatabase.Get(npcId)` and `ChunkCoords·64 + LocalPosition` through `MapProjection` — readable with every chunk unloaded.
+   - **Item** → the live `Pickup` node when its chunk is streamed in (a collected pickup is *gone*, so the marker goes with it), else the position the bake recorded.
+   - **Point** → the authored coordinates as-is; it names its own area, so it resolves even for an area that isn't running.
+   - `ForCurrentLevel()` resolves the area through `ChunkManager.FindIn(LevelManager.Instance.LevelRoot)`. An interior has no `ChunkManager`: it still gets a locator (live NPCs and pickups are findable) with no area name, so baked lookups are skipped rather than aimed at the wrong area.
 2. Extend the bake to record what a marker can point at, keeping the "scene-authored things are baked, data-owned things are read live" split:
-   - `MapBakeJob.CollectLandmarks` also records every `Pickup` (type `pickup`, carrying its `ItemId`) and any `QuestPoint` node (a trivial `Node3D` marker script authored in a chunk, carrying a name) it walks past.
-   - `MapLandmark` gains `ItemId` and `TargetScenePath`; `MapLandmarksFile.CurrentVersion` → 2. Door entries record their `TargetScenePath`, which is what Phase 4's interior routing matches against.
-   - Pickup/quest-point entries are **not** drawn as ordinary landmarks — the map reads them only when a quest marker asks for one. `MapMenu.AddBakedLandmarks` filters by type instead of drawing everything in the file.
-3. Re-bake and commit `Resources/Maps/**` for `IntroStation` and `World1`; `WorldMapBakeFreshnessTests` will demand it once chunk hashes are re-written.
-4. Round-trip tests for the extended manifest (engine-free, alongside the existing `MapLandmarkTests`), plus a test that every marker authored in `QuestCatalog` names a target that exists in `NpcDatabase`/`ItemCatalog` — the guard against a renamed NPC id silently killing a marker.
+   - `MapBakeJob.CollectLandmarks` also records every `Pickup` (type `pickup`, carrying its `ItemId` and the item's catalog name).
+   - `MapLandmark` gains `ItemId` and `TargetScenePath`; `MapLandmarksFile.CurrentVersion` → 2, with `FindPickup(itemId)` and `FindEntranceTo(scenePath)` as the two lookups its readers actually want. Doors and portals record their `TargetScenePath`, which is what Phase 4's interior routing matches against. A v1 manifest still loads — it simply has no pickups.
+   - Pickup entries are **not** drawn as ordinary landmarks: `MapMenu.AddBakedLandmarks` filters to portals and doors, so a manifest entry is a fact about the world rather than an icon by itself.
+   - Parsing the manifest moved out of `MapMenu` into `MapLandmarkCatalog` (cached per area, `Invalidate()`, missing file reads as empty) now that the map UI and the locator both read it.
+3. Two small seams the locator needs: `Npc` and `Pickup` join node groups (`Npc.GroupName`, `Pickup.GroupName`) so "where is this right now" is a group query rather than a tree walk, and `ChunkManager` exposes `AreaName`, `LevelScenePath()`, and the `FindIn` walk that `MapMenu` had a private copy of.
+4. Round-trip tests for the extended manifest, `quest markers` command tests against a fake locator, and a content guard that every `npc:` marker target names a definition under `Resources/Npcs` — read off disk, since `NpcDatabase` is Godot-facing. That is the check that catches a renamed NPC id silently killing a marker.
 
-**Done when:** a small harness (a console verb, `quest markers <id>`) prints the resolved world positions for a quest's live markers, correct for both the cube on the deck and Hale at his post, with every chunk unloaded.
+**Done when:** `quest markers <id>` prints the resolved world positions for a quest's live markers, correct for both the cube on the deck and Hale at his post. *(Done. Note the repo has **no committed bake at all** — `Resources/Maps/` does not exist — so today every target resolves through the live path, which covers the intro station where both quests play out. Item targets in an unloaded chunk stay unresolvable until someone runs Project → Tools → Bake World Maps and commits the output; NPC targets never needed it.)*
 
 ## Phase 3 — Tracking a quest from the Quests tab
 
@@ -94,7 +96,8 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 |----------|----------------|
 | Where marker data lives | On the quest definition in `QuestCatalog`, beside title/description. Markers are authored content, not scene content; when the catalog moves to JSON (quest plan Phase 1) they move with it. |
 | Marker visibility before stages exist | Reuse `DialogueConditions` restricted to the state-only verbs. A second gating vocabulary would have to be validated, edited, and tested twice, and stages will slot in as one more verb. |
-| Target positions | Split by source of truth, exactly like landmarks: NPCs resolve live through `NpcDatabase` (never stale after an NPC is moved), scene-authored pickups and quest points are collected at bake time (their chunks are usually unloaded). |
+| Target positions | Split by source of truth, exactly like landmarks: NPCs resolve live through `NpcDatabase` (never stale after an NPC is moved), scene-authored pickups are collected at bake time (their chunks are usually unloaded). Within each kind, a node that is actually in the scene tree wins over the recorded position — it is the truth, and it also means an item that has been picked up stops being pointed at. |
+| A `QuestPoint` node to place objectives visually | Not built. A `Point` target carries its own coordinates, so an authored point needs nothing from the bake; add the node only if placing one in the editor becomes the workflow. |
 | Tracked-quest scope | One tracked quest, persisted in `GameState` (save v10). Drawing every active quest at once clutters the map and makes "which marker is which" the UI's problem before there is content to justify it. |
 | Selection vs. explicit tracking | Selecting an in-progress quest tracks it (what the feature request asks for), with a Track toggle to undo and **Show on Map** to jump. Completed/failed selections never track. |
 | Interior targets | Route to the entrance door via the baked `TargetScenePath` rather than drawing a marker at coordinates the current map doesn't cover. "Go through this door" is the actionable instruction. |

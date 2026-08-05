@@ -34,6 +34,33 @@ public partial class ChunkManager : Node3D
         Mathf.RoundToInt(worldPosition.X / ChunkSize),
         Mathf.RoundToInt(worldPosition.Z / ChunkSize));
 
+    // How the map names this area: the basename of the chunk directory, which
+    // is also the Resources/Maps/<Area> the bake writes to.
+    public string AreaName => ChunkDirectory.GetFile();
+
+    // The ChunkManager somewhere under `node`, or null. Interiors and unchunked
+    // scenes have none, which is the "no map for this area" case; shared by the
+    // Map tab and the quest-marker locator so both resolve the area the same way.
+    public static ChunkManager FindIn(Node node)
+    {
+        if (node == null)
+        {
+            return null;
+        }
+        if (node is ChunkManager manager)
+        {
+            return manager;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            if (FindIn(child) is ChunkManager found)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
     // The loaded chunk node at a coordinate, or null if it isn't streamed in.
     // The in-game editor parents a placement preview into the live chunk so it
     // runs like any streamed NPC (in-game-editor plan Phase 3).
@@ -186,8 +213,9 @@ public partial class ChunkManager : Node3D
     }
 
     // The hosting level scene (e.g. Intro.tscn) — the path NpcDefinitions
-    // name in SpawnScenePath.
-    private string LevelScenePath() =>
+    // name in SpawnScenePath. Public because the map UI and the quest-marker
+    // locator key off the same path when they ask NpcDatabase where someone is.
+    public string LevelScenePath() =>
         Owner?.SceneFilePath ?? GetParent()?.SceneFilePath ?? "";
 
     // Frees chunks beyond UnloadRadius of *both* centers. The two are the same

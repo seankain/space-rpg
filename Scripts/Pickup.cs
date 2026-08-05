@@ -5,6 +5,11 @@ using Godot;
 // the party inventory and removes the node from the scene.
 public partial class Pickup : Area3D
 {
+	// Pickups in the loaded chunks join this group, so a quest marker can point
+	// at an item where it is lying right now — and stop pointing at one that
+	// has been collected, since the node is gone with it.
+	public const string GroupName = "Pickup";
+
 	[Export]
 	public uint ItemId;
 
@@ -24,6 +29,7 @@ public partial class Pickup : Area3D
 
 	public override void _Ready()
 	{
+		AddToGroup(GroupName);
 		var item = ItemCatalog.Get(ItemId);
 		prompt = new InteractionPrompt
 		{

@@ -15,7 +15,9 @@ using System.Collections.Generic;
 // Phase 3 hangs landmark icons on the same world layer.
 public partial class MapMenu : Control
 {
-    private const string MapsRoot = "res://Resources/Maps";
+    // Same root the landmark manifests load from, so the images and the data
+    // baked beside them can't drift apart.
+    private const string MapsRoot = MapLandmarkCatalog.MapsRoot;
 
     private const float MinZoom = 0.25f;
     private const float MaxZoom = 4f;
@@ -145,7 +147,7 @@ public partial class MapMenu : Control
         landmarkIcons.Clear();
         hasMap = false;
 
-        var chunkManager = FindChunkManager(LevelManager.Instance?.LevelRoot);
+        var chunkManager = ChunkManager.FindIn(LevelManager.Instance?.LevelRoot);
         if (chunkManager == null)
         {
             fallback.Visible = true;
@@ -153,7 +155,7 @@ public partial class MapMenu : Control
             return;
         }
 
-        var areaName = chunkManager.ChunkDirectory.GetFile(); // basename of the dir
+        var areaName = chunkManager.AreaName;
         var grid = ChunkManager.DiscoverChunks(chunkManager.ChunkDirectory);
         if (grid.Count == 0)
         {
@@ -221,25 +223,20 @@ public partial class MapMenu : Control
     private void BuildLandmarks(string areaName, IEnumerable<Vector2I> coords, ChunkManager chunkManager)
     {
         AddBakedLandmarks(areaName);
-        AddShopkeeperLandmarks(coords, LevelScenePathOf(chunkManager));
+        AddShopkeeperLandmarks(coords, chunkManager.LevelScenePath());
     }
 
     private void AddBakedLandmarks(string areaName)
     {
-        var path = $"{MapsRoot}/{areaName}/landmarks.json";
-        if (!FileAccess.FileExists(path))
+        // A missing manifest (un-baked area) reads as empty. Not everything in
+        // the file is drawn: pickups are recorded there for quest markers to
+        // find, and would mean nothing to a player as a generic icon.
+        foreach (var landmark in MapLandmarkCatalog.ForArea(areaName).Landmarks)
         {
-            // No bake yet, or an area with no scene-authored landmarks.
-            return;
-        }
-        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
-        if (file == null)
-        {
-            GD.PushWarning($"MapMenu: could not read '{path}': {FileAccess.GetOpenError()}");
-            return;
-        }
-        foreach (var landmark in MapLandmarksFile.FromJson(file.GetAsText()).Landmarks)
-        {
+            if (landmark.Type is not (MapLandmark.PortalType or MapLandmark.DoorType))
+            {
+                continue;
+            }
             AddLandmarkIcon(MapLandmarkIcon.KindFromType(landmark.Type), landmark.Name, landmark.X, landmark.Z);
         }
     }
@@ -295,11 +292,6 @@ public partial class MapMenu : Control
         world.AddChild(icon);
         landmarkIcons.Add(icon);
     }
-
-    // Where the level's NPCs are keyed (same rule ChunkManager spawns by): the
-    // level scene root that owns the ChunkManager.
-    private static string LevelScenePathOf(ChunkManager chunkManager) =>
-        chunkManager.Owner?.SceneFilePath ?? chunkManager.GetParent()?.SceneFilePath ?? "";
 
     private void BuildPlayerMarker()
     {
@@ -400,23 +392,4 @@ public partial class MapMenu : Control
         }
     }
 
-    private static ChunkManager FindChunkManager(Node node)
-    {
-        if (node == null)
-        {
-            return null;
-        }
-        if (node is ChunkManager manager)
-        {
-            return manager;
-        }
-        foreach (var child in node.GetChildren())
-        {
-            if (FindChunkManager(child) is ChunkManager found)
-            {
-                return found;
-            }
-        }
-        return null;
-    }
 }

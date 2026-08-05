@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -10,8 +11,14 @@ using System.Text;
 // commands are unit-tested against a fabricated GameState.
 public static class EditorQuestCommands
 {
-    // quest <start|set|stage|advance> <questId> [state|n]
-    public static CommandResult Run(GameState state, IReadOnlyList<string> args)
+    // quest <start|set|stage|advance|markers> <questId> [state|n]
+    //
+    // `locator` is the Godot-side answer to "where is this target?"
+    // (QuestTargetLocator), passed in by the console wrapper so this stays
+    // engine-free; without one, `markers` still lists objectives and says it
+    // has no positions.
+    public static CommandResult Run(
+        GameState state, IReadOnlyList<string> args, IQuestTargetLocator locator = null)
     {
         if (state == null)
         {
@@ -27,6 +34,7 @@ public static class EditorQuestCommands
             "set" => Set(state, args),
             "stage" => Stage(state, args),
             "advance" => Advance(state, args),
+            "markers" => Markers(state, args, locator),
             _ => CommandResult.Fail($"Unknown quest subcommand '{args[0]}'. {UsageText}"),
         };
     }
@@ -102,6 +110,54 @@ public static class EditorQuestCommands
         return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to stage {progress.CurrentStageNumber}.");
     }
 
+    // quest markers <questId>: which of a quest's markers apply right now and
+    // where they resolve to — the way to check marker content without a map
+    // (quest-markers.md Phase 2). Reports what it can't place, since a silent
+    // gap is exactly the bug this verb exists to find.
+    private static CommandResult Markers(
+        GameState state, IReadOnlyList<string> args, IQuestTargetLocator locator)
+    {
+        if (!TryQuest(args, 1, out var id, out var error))
+        {
+            return CommandResult.Fail(error);
+        }
+        var quest = QuestCatalog.Get(id);
+        var problems = new List<string>();
+        var active = QuestMarkerResolver.ActiveMarkers(state, quest, problems.Add);
+        if (active.Count == 0)
+        {
+            var questState = state.GetQuestState(id);
+            return CommandResult.Ok(questState == QUESTSUCCESSSTATE.InProgress
+                ? $"Quest {id} ({quest.Title}) has no active markers right now."
+                : $"Quest {id} ({quest.Title}) is {questState}; only an in-progress quest has markers.");
+        }
+        var builder = new StringBuilder($"Markers for quest {id} ({quest.Title}):");
+        foreach (var marker in active)
+        {
+            builder.Append("\n  ").Append(marker.Label).Append("  [").Append(marker.Target.ToToken()).Append(']');
+            if (locator != null && locator.TryLocate(marker.Target, out var location) && location != null)
+            {
+                builder.Append("  at ")
+                    .Append(location.WorldX.ToString("0.##", CultureInfo.InvariantCulture)).Append(", ")
+                    .Append(location.WorldZ.ToString("0.##", CultureInfo.InvariantCulture));
+                var where = !string.IsNullOrEmpty(location.AreaName) ? location.AreaName : location.ScenePath;
+                if (!string.IsNullOrEmpty(where))
+                {
+                    builder.Append("  in ").Append(where);
+                }
+            }
+            else
+            {
+                builder.Append(locator == null ? "  (no locator: not in a running level)" : "  (not locatable here)");
+            }
+        }
+        foreach (var problem in problems)
+        {
+            builder.Append("\n  ! ").Append(problem);
+        }
+        return CommandResult.Ok(builder.ToString());
+    }
+
     private static bool TryQuest(IReadOnlyList<string> args, int idIndex, out uint id, out string error)
     {
         error = null;
@@ -123,7 +179,7 @@ public static class EditorQuestCommands
         Enum.TryParse(token, ignoreCase: true, out state)
         && Enum.IsDefined(typeof(QUESTSUCCESSSTATE), state);
 
-    private const string UsageText = "Usage: quest <start|set|stage|advance> <questId> [state|n]";
+    private const string UsageText = "Usage: quest <start|set|stage|advance|markers> <questId> [state|n]";
 
     private static CommandResult Usage() => CommandResult.Fail(UsageText);
 
