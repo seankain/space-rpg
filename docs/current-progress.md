@@ -1,6 +1,6 @@
 # Current Progress
 
-_Last updated: 2026-08-01_
+_Last updated: 2026-08-05_
 
 space-rpg is a 3rd-person adventure RPG with turn-based combat encounters and quests. Right now the project is in early prototype stage: the main menu flow, character movement in a demo scene, a working save/load system, interactable NPCs whose dialogue is authored as Yarn Spinner scripts and edited with an in-game dialogue editor (recruitment, a fetch quest, a battle challenge), a playable turn-based battle system, chunk-streamed levels (64×64-unit hand-authored chunks), a party system (roster rules, followers walking behind the leader, a management tab), an in-game menu with a quest log and party inventory management (use/equip/drop), an enterable shop interior with a buy/sell shopkeeper (party credits), an event log that records what the party has done (with corner toasts for pickups and credits), and a set of stubbed data classes exist.
 
@@ -185,8 +185,10 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `Inventory`, `ItemStack` | `Inventory.cs` | Party-shared inventory on `GameState`: list of id+quantity stacks with add/remove/count honoring per-item stack caps. Live — serialized in saves (save version 2; v1 saves load with an empty inventory). |
 | `ItemCatalog` | `ItemCatalog.cs` | Static registry of item definitions keyed by id (saves reference ids only). Ships the Maguffin Cube and Maintenance Keycard quest items plus one sample item per category. |
 | `CharacterEquipSlots`, `EQUIPSLOT` | `EquipSlots.cs` | Per-character equipment: one nullable equipped-item id per slot (head, eyes, hands, chest, legs) with get/set/equip-swap helpers. Live — serialized in saves (save version 4; older saves load with empty slots). |
-| `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags and success states. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
-| `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest and the "Clear the Deck" bounty quest. |
+| `Quest`, `QuestStage`, `QuestPrereqFlag`, `QUESTSUCCESSSTATE` | `Quest.cs` | Quest definitions with prerequisite flags, success states, and the `Markers` list below. `QuestProgress` (quest id + state + stage) is live — stored in `GameState.Quests` (save version 3). |
+| `QuestCatalog` | `QuestCatalog.cs` | Static registry of quest definitions keyed by id (mirrors `ItemCatalog`). Ships the "Return the Maguffin" fetch quest and the "Clear the Deck" bounty quest, both with markers; invalid markers throw at registration. |
+| `QuestMarker`, `QuestMarkerTarget` | `QuestMarker.cs` | Where a quest sends the player ([quest-markers plan](plans/quest-markers.md) Phase 1): a target (`npc:intro.vex`, `item:1`, `point:<area>:<x>:<z>`), an objective label, and an optional `VisibleWhen` condition from the dialogue vocabulary — which is how a marker moves from the Maguffin Cube to Hale the moment it is picked up, with no stage system yet. |
+| `QuestMarkerResolver`, `IQuestTargetLocator` | `QuestMarkerResolver.cs` | Which of a quest's markers apply right now (in-progress quests only, conditions read live against `GameState`), and those markers paired with a world position from a locator port. The locator's Godot implementation over `NpcDatabase` and the map bake is Phase 2; nothing draws markers yet. |
 | `Merchant` | `Merchant.cs` | A trading NPC's side of the shop ledger: name, credits, and stock `Inventory`. Built by `ShopkeeperRole` from the definition's `Credits`/`InitialItems`; not yet persisted. |
 | `Trade` | `Trade.cs` | Engine-free buy/sell rules and execution between the party (`GameState.Credits`/`Inventory`) and a `Merchant`: buy at `Item.Value`, sell at half, quest/zero-value items untradable; returns user-facing result messages. |
 | `GameEvent`, `GameEventKind` | `GameEvent.cs` | One line of the event log: kind, display-ready text, timestamp, and a non-serialized `Notify` flag asking for a toast. Live — stored in `GameState.EventLog` (save version 9). |
@@ -196,7 +198,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 ## Not yet implemented
 
 - Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters; see the [battle plan](plans/battle-system.md)
-- Quest depth — stages/objectives in the journal, rewards; see the [quest plan](plans/quest-system.md)
+- Quest depth — stages/objectives in the journal, rewards; see the [quest plan](plans/quest-system.md). Quest markers are authored and resolvable (above) but nothing tracks a quest or draws them yet — Phases 2–4 of the [quest-markers plan](plans/quest-markers.md)
 - Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state; see the [inventory plan](plans/inventory-system.md)
 - Dialogue/NPC depth — no text interpolation (an NPC can't greet the leader by name) and no portraits or voice ([Yarn plan](plans/npc-dialogue-yarn.md) Phase 5); localization-key text waits on a localization system ([dialogue-editor plan](plans/dialogue-editor.md) Phase 5); `dialogue assign` targets an NPC's first role only; NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
 - Shop depth — merchant stock/credit persistence across visits, buying/selling in quantities, per-merchant price modifiers, more interiors (houses) beyond the prototype shop

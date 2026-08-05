@@ -25,20 +25,20 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 
 ---
 
-## Phase 1 — Marker data model and resolver *(engine-free, no UI)*
+## Phase 1 — Marker data model and resolver *(done — this slice; engine-free, no UI)*
 
 1. `Scripts/Data/QuestMarker.cs` — engine-free, so `Tests/SpaceRpg.Tests.csproj` compiles it through the existing `Scripts/Data/**` glob:
-   - `QuestMarkerTarget`: a kind + reference — `Npc` (`NpcDefinition.NpcId`, e.g. `intro.dockmaster_hale`), `Item` (an `ItemCatalog` id, meaning "the world pickup for this item"), `Point` (an area name plus world X/Z, for "reach the cargo bay" objectives with nothing standing there).
+   - `QuestMarkerTarget`: a kind + reference — `Npc` (`NpcDefinition.NpcId`, e.g. `intro.dockmaster_hale`), `Item` (an `ItemCatalog` id, meaning "the world pickup for this item"), `Point` (an area name plus world X/Z, for "reach the cargo bay" objectives with nothing standing there). Serialized as a flat colon token (`npc:intro.vex`, `item:1`, `point:IntroStation:64:-12.5`), the `TokenRef` habit the dialogue vocabulary set, so the catalog can move to JSON later without a nested shape.
    - `QuestMarker`: target, a short `Label` ("Find the Maguffin Cube"), and an optional `VisibleWhen` `ConditionRef`.
    - `Quest.Markers` — an ordered `List<QuestMarker>` on the definition.
-2. `Scripts/Data/QuestMarkerResolver.cs` — given a `GameState` and a quest id, returns the markers that apply: quest must be `InProgress`, and each marker's `VisibleWhen` must evaluate true. Condition evaluation goes through `DialogueConditions` against a state-only context (add `DialogueContext.ForState(state)` — every verb a marker may use reads `GameState` alone).
-3. Validation at catalog registration: unknown target kind, empty reference, a condition that fails `DialogueConditions.Validate`, or a condition verb outside the state-only subset (anything needing a live NPC or scene host) throws at startup rather than silently hiding a marker.
+2. `Scripts/Data/QuestMarkerResolver.cs` — `ActiveMarkers(state, quest)` returns the markers that apply: quest must be `InProgress`, and each marker's `VisibleWhen` must evaluate true. Conditions go through `DialogueConditions` against a `DialogueContext` carrying `State` and a warning sink and **nothing else** — no speaking NPC, no scene host — so a verb that ever needs either fails closed (warns, hides the marker) exactly as it does mid-conversation. Every verb in today's vocabulary reads `GameState` alone, so no allow-list is needed to get that property. Overloads by quest id and by `Quest` (a caller that already holds the definition, and the seam a test injects broken content through).
+3. Validation at catalog registration: an unknown target kind, an empty or colon-bearing reference, an item id with no catalog entry, a missing label, or a condition that fails `DialogueConditions.Validate` throws — run once after every `Register`, so a marker condition may name any quest without tripping over a half-filled catalog. The resolver re-checks and skips rather than throwing, since a future data-authored catalog can hand it content the registration path never saw.
 4. Author markers for the two shipped quests:
    - **Return the Maguffin** — `Item:1` labelled "Find the Maguffin Cube" while `!has_item:1`; `Npc:intro.dockmaster_hale` labelled "Return the cube to Dockmaster Hale" while `has_item:1`.
    - **Clear the Deck** — `Npc:intro.vex` ("Deal with Vex") while `!npc_defeated:intro.vex`; `Npc:intro.chief_marlow` ("Report back to Chief Marlow") while `npc_defeated:intro.vex`.
-5. Resolution to a *position* is a port, not a dependency: `IQuestTargetLocator` (`TryLocate(target) → area name + world X/Z`), so the resolver and its tests stay engine-free and Phase 2 supplies the Godot implementation.
+5. Resolution to a *position* is a port, not a dependency: `IQuestTargetLocator` (`TryLocate(target) → QuestTargetLocation`: area name, level scene path, world X/Z), so the resolver and its tests stay engine-free and Phase 2 supplies the Godot implementation. `Resolve(...)` pairs each active marker with its location as a `ResolvedQuestMarker` (carrying the quest id and its `SideQuest` flag, so the map can colour markers without a second catalog lookup) and drops what the locator can't place.
 
-**Done when:** unit tests cover the fetch quest flipping its marker as the cube enters the inventory, an un-started/completed quest resolving to nothing, a bad marker failing catalog validation, and an unlocatable target being dropped rather than throwing.
+**Done when:** unit tests cover the fetch quest flipping its marker as the cube enters the inventory, an un-started/completed quest resolving to nothing, a bad marker failing catalog validation, and an unlocatable target being dropped rather than throwing. *(`Tests/QuestMarkerTests.cs`, 26 cases — the two shipped quests both ways round, target-token round-trips and the malformed forms, every rejection reason, and the fail-closed skip.)*
 
 ## Phase 2 — Locating targets: live NPC data and baked world points
 
