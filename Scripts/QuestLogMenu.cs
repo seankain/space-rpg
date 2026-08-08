@@ -231,9 +231,11 @@ public partial class QuestLogMenu : Control
 		ShowDetails(QuestCatalog.Get(questId), state.GetQuestState(questId));
 	}
 
-	// Hands the player to the Map tab, where the tracked quest's markers are.
-	// The tab is found by name rather than by index so reordering the tabs in
-	// the scene can't send the player somewhere else.
+	// Hands the player to the Map tab, framed on the tracked quest's nearest
+	// objective rather than on themselves. The tab is found by its script
+	// rather than by index, so reordering the tabs in the scene can't send the
+	// player somewhere else; switching to it runs MapMenu's own refresh
+	// (VisibilityChanged) before the focus call.
 	private void ShowOnMap()
 	{
 		if (GetParent() is not TabContainer tabs)
@@ -242,9 +244,10 @@ public partial class QuestLogMenu : Control
 		}
 		for (var i = 0; i < tabs.GetTabCount(); i++)
 		{
-			if (tabs.GetTabControl(i) is MapMenu)
+			if (tabs.GetTabControl(i) is MapMenu map)
 			{
 				tabs.CurrentTab = i;
+				map.FocusTrackedObjective();
 				return;
 			}
 		}

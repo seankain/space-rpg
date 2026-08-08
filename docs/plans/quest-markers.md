@@ -71,17 +71,17 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 
 **Done when:** selecting a quest and saving/reloading comes back with the same quest tracked and the same objective lines, and completing a tracked quest clears the tracking. *(Done — `Tests/QuestTrackingTests.cs` covers the rules, the change signal, the save round-trip, and a pre-v10 save loading untracked.)*
 
-## Phase 4 — Markers on the map
+## Phase 4 — Markers on the map *(done — this slice)*
 
-1. `Scripts/QuestMarkerIcon.cs` — a `Control` with `_Draw` beside `MapLandmarkIcon`: a pointed diamond over a dark backing disc, gold for a main quest and pale blue for a side quest, tooltip = the marker's label. `MouseFilter.Pass`, like the landmark icons, so pan/zoom still reach the map underneath.
-2. `MapMenu.BuildQuestMarkers`, run after `BuildLandmarks` so markers sit above landmarks and below the player arrow. It resolves the tracked quest through the Phase 1 resolver + Phase 2 locator and places each marker with `MapProjection`. Icons join the existing counter-scale list so they keep a constant on-screen size at any zoom (rename `landmarkIcons` → `mapIcons`).
-3. Targets that are not in the current area's grid:
-   - **Inside an interior reachable from here** (the shop, and any future house): match the target's area/scene path against the baked door landmarks' `TargetScenePath` and draw the marker on that **door**, labelled "Trader Moss — inside the Supply Shop". This is the routing case that matters today.
-   - **In a different area entirely:** no icon; the map header shows "Objective: <label> — <area>".
-4. The header carries the tracked quest's title and the current objective labels, so the map answers "what am I doing" without flipping back to the Quests tab. **Show on Map** (Phase 3) centres the view on the nearest resolvable marker rather than on the player.
-5. Refresh on `QuestTracking.Changed` as well as `VisibilityChanged` — tab switching already re-runs `Refresh`, but the hook keeps the map honest if tracking changes while it is up (console verb, or a quest completing).
+1. `Scripts/QuestMarkerIcon.cs` — a `Control` with `_Draw` beside `MapLandmarkIcon`: a diamond over a dark backing disc (a different *shape*, so an objective doesn't read as one more landmark), gold for a main quest and pale blue for a side quest, hollow when it marks the way to a target rather than the target itself. Tooltip = the objective text. `MouseFilter.Pass`, like the landmark icons, so pan/zoom still reach the map underneath.
+2. **The routing decision is engine-free**, in `QuestMarkerPlacements` (`Scripts/Data/QuestMarkerPlacement.cs`), not in the UI: given the tracked quest, a locator, the area on screen, and the area's landmarks, it classifies every active marker as `OnMap`, `AtEntrance`, or `Elsewhere`, and composes the text to show. That is the part worth unit-testing; `MapMenu` only draws the answer.
+   - **`AtEntrance`** is the case that matters in a world with interiors: the target is inside a level this map doesn't cover, and a door or portal here leads to it (matched on the `TargetScenePath` the Phase 2 bake records), so the marker goes on that door — "Trader Moss — inside Supply Shop".
+   - **`Elsewhere`** covers another area, and also a target the locator couldn't place at all. No icon, but the objective line still names it ("— in World1", "— not on this map") rather than quietly showing one fewer objective.
+3. `MapMenu.BuildQuestMarkers` runs after `BuildLandmarks` so an objective sits above the door or store it shares a spot with, and before the player arrow, which stays on top. Icons join the counter-scale list (`landmarkIcons` → `mapIcons`) so they keep a constant on-screen size at any zoom.
+4. An objective line beside the area name carries the tracked quest's title and its current objectives, so the map answers "what am I doing" without flipping back to the Quests tab. **Show on Map** (Phase 3) calls `FocusTrackedObjective()`, which frames the drawn objective *nearest the player* — and defers itself if it arrives before the tab has built, rather than being dropped.
+5. Refresh on `QuestTracking.Changed` as well as `VisibilityChanged` — tab switching already re-runs `Refresh`, but the hook keeps the map honest if tracking changes while it is up (the console verb, or a quest completing). Marker positions are resolved per refresh, not per frame: the in-game menu blocks gameplay, so nothing can move while the map is open.
 
-**Done when:** taking "Return the Maguffin", selecting it in the Quests tab, and opening the Map shows a gold marker on the cube's spot; picking the cube up and reopening the map moves the marker to Hale; tracking "Clear the Deck" shows a blue marker on Vex; nothing is tracked → the map looks exactly as it does today.
+**Done when:** taking "Return the Maguffin", selecting it in the Quests tab, and opening the Map shows a gold marker on the cube's spot; picking the cube up and reopening the map moves the marker to Hale; tracking "Clear the Deck" shows a blue marker on Vex; nothing is tracked → the map looks exactly as it did before. *(Code complete and unit-tested at the placement layer; the on-screen check needs a Godot session, and the map itself stays an empty grid until someone bakes and commits `Resources/Maps/**`.)*
 
 ## Phase 5 — Beyond the map tab
 

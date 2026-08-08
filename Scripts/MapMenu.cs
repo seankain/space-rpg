@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 // The Map tab of the in-game menu: a top-down map of the current area,
 // stitched from the per-chunk PNGs the editor bake tool wrote to
@@ -12,7 +13,9 @@ using System.Collections.Generic;
 //
 // The tab's children are built in code (like Npc/Door/Portal build their bits
 // in code) because the Map tab is an otherwise empty Control in the scene.
-// Phase 3 hangs landmark icons on the same world layer.
+// Landmark icons hang on the same world layer, and so do the tracked quest's
+// objectives (quest-markers.md Phase 4) — with the objective text in a line
+// beside the area name, so the map answers "what am I doing" by itself.
 public partial class MapMenu : Control
 {
     // Same root the landmark manifests load from, so the images and the data
@@ -28,15 +31,24 @@ public partial class MapMenu : Control
     private Control clip;
     private Control world;
     private Label header;
+    private Label objectiveLabel;
     private Label fallback;
     private Polygon2D playerMarker;
 
-    // Landmark icons on the world layer, kept so their counter-scale can track
-    // the zoom (they stay a constant on-screen size).
-    private readonly List<Control> landmarkIcons = new();
+    // Landmark and quest-marker icons on the world layer, kept so their
+    // counter-scale can track the zoom (they stay a constant on-screen size).
+    private readonly List<Control> mapIcons = new();
+
+    // Where the tracked quest's drawn objectives are, in map pixels — what
+    // FocusTrackedObjective frames.
+    private readonly List<Vector2> questMarkerPixels = new();
 
     private float zoom = 1f;
     private bool dragging;
+
+    // A "Show on Map" that landed before the map was built (see
+    // FocusTrackedObjective).
+    private bool focusObjectivePending;
 
     // Grid origin of the current map, so world positions project onto the
     // stitched image the same way MapBaker laid it out.
@@ -56,6 +68,20 @@ public partial class MapMenu : Control
                 Refresh();
             }
         };
+        // Switching tabs already re-runs Refresh; this covers tracking that
+        // moves while the map is up (the console's quest track, or a quest
+        // completing).
+        QuestTracking.Changed += OnTrackedQuestChanged;
+    }
+
+    public override void _ExitTree() => QuestTracking.Changed -= OnTrackedQuestChanged;
+
+    private void OnTrackedQuestChanged(uint questId)
+    {
+        if (IsVisibleInTree())
+        {
+            Refresh();
+        }
     }
 
     public override void _Process(double delta)
@@ -76,6 +102,25 @@ public partial class MapMenu : Control
         };
         header.AddThemeFontSizeOverride("font_size", 24);
         AddChild(header);
+
+        // The tracked quest's objectives, so the map answers "what am I doing"
+        // without a trip back to the Quests tab. Right-aligned in the strip
+        // beside the area name, above the map window.
+        objectiveLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            ClipText = true,
+            Visible = false,
+        };
+        objectiveLabel.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight);
+        objectiveLabel.OffsetLeft = -640;
+        objectiveLabel.OffsetTop = 8;
+        objectiveLabel.OffsetRight = -12;
+        objectiveLabel.OffsetBottom = 40;
+        objectiveLabel.GrowHorizontal = GrowDirection.Begin;
+        objectiveLabel.MouseFilter = MouseFilterEnum.Ignore;
+        AddChild(objectiveLabel);
 
         clip = new Control
         {
@@ -144,7 +189,9 @@ public partial class MapMenu : Control
             child.QueueFree();
         }
         playerMarker = null;
-        landmarkIcons.Clear();
+        mapIcons.Clear();
+        questMarkerPixels.Clear();
+        objectiveLabel.Visible = false;
         hasMap = false;
 
         var chunkManager = ChunkManager.FindIn(LevelManager.Instance?.LevelRoot);
@@ -181,6 +228,9 @@ public partial class MapMenu : Control
 
         BuildChunkTiles(grid.Keys, areaName);
         BuildLandmarks(areaName, grid.Keys, chunkManager);
+        // After the landmarks so an objective sits above the door or store it
+        // shares a spot with, and before the player arrow, which stays on top.
+        BuildQuestMarkers(areaName, chunkManager);
         BuildPlayerMarker();
 
         fallback.Visible = false;
@@ -189,6 +239,11 @@ public partial class MapMenu : Control
         zoom = 1f;
         ApplyZoom(1f, clip.Size / 2f);
         CenterOnPlayer();
+        if (focusObjectivePending)
+        {
+            focusObjectivePending = false;
+            FocusTrackedObjective();
+        }
     }
 
     private void BuildChunkTiles(IEnumerable<Vector2I> coords, string areaName)
@@ -274,6 +329,90 @@ public partial class MapMenu : Control
         return false;
     }
 
+    // The tracked quest's objectives (quest-markers.md Phase 4). Which markers
+    // apply and where they belong on *this* map is decided by the engine-free
+    // QuestMarkerPlacements; this only draws the answer and reports the rest in
+    // the objective line.
+    private void BuildQuestMarkers(string areaName, ChunkManager chunkManager)
+    {
+        var state = SaveManager.Instance?.CurrentState;
+        if (state == null || state.TrackedQuestId == 0)
+        {
+            return;
+        }
+        var levelScenePath = chunkManager.LevelScenePath();
+        var placements = QuestMarkerPlacements.ForTrackedQuest(
+            state,
+            new QuestTargetLocator(GetTree(), areaName, levelScenePath),
+            areaName,
+            levelScenePath,
+            MapLandmarkCatalog.ForArea(areaName),
+            GD.PushWarning);
+        if (placements.Count == 0)
+        {
+            return;
+        }
+        foreach (var placement in placements)
+        {
+            if (placement.IsDrawn)
+            {
+                AddQuestMarkerIcon(placement);
+            }
+        }
+        var quest = QuestCatalog.Get(state.TrackedQuestId);
+        objectiveLabel.Text = $"{quest?.Title}: "
+            + string.Join("  •  ", placements.Select(placement => placement.DisplayText));
+        objectiveLabel.Visible = true;
+    }
+
+    private void AddQuestMarkerIcon(QuestMarkerPlacement placement)
+    {
+        const float half = QuestMarkerIcon.Diameter / 2f;
+        var pixel = new Vector2(
+            MapProjection.WorldToPixelX(placement.WorldX, minChunkX),
+            MapProjection.WorldToPixelY(placement.WorldZ, minChunkZ));
+        var icon = new QuestMarkerIcon
+        {
+            SideQuest = placement.SideQuest,
+            IsEntrance = placement.Kind == QuestMarkerPlacementKind.AtEntrance,
+            Position = pixel - new Vector2(half, half),
+            Scale = Vector2.One / zoom,
+            TooltipText = placement.DisplayText,
+        };
+        world.AddChild(icon);
+        mapIcons.Add(icon);
+        questMarkerPixels.Add(pixel);
+    }
+
+    // Frames the objective nearest the player instead of the player — what the
+    // Quests tab's "Show on Map" asks for. Falls back to the player when the
+    // tracked quest has nothing drawn on this map.
+    public void FocusTrackedObjective()
+    {
+        if (!hasMap)
+        {
+            // Asked before this tab has built itself: hold the request rather
+            // than dropping it, and honour it at the end of the next Refresh.
+            focusObjectivePending = true;
+            return;
+        }
+        if (questMarkerPixels.Count == 0)
+        {
+            CenterOnPlayer();
+            return;
+        }
+        var from = PlayerPixel() ?? questMarkerPixels[0];
+        var nearest = questMarkerPixels[0];
+        foreach (var pixel in questMarkerPixels)
+        {
+            if (pixel.DistanceSquaredTo(from) < nearest.DistanceSquaredTo(from))
+            {
+                nearest = pixel;
+            }
+        }
+        world.Position = clip.Size / 2f - nearest * zoom;
+    }
+
     private void AddLandmarkIcon(MapLandmarkIcon.LandmarkKind kind, string name, float worldX, float worldZ)
     {
         const float half = MapLandmarkIcon.Diameter / 2f;
@@ -290,7 +429,7 @@ public partial class MapMenu : Control
             TooltipText = name,
         };
         world.AddChild(icon);
-        landmarkIcons.Add(icon);
+        mapIcons.Add(icon);
     }
 
     private void BuildPlayerMarker()
@@ -334,21 +473,23 @@ public partial class MapMenu : Control
         {
             return;
         }
-        Vector2 focus;
-        if (GetTree().GetFirstNodeInGroup(Player.GroupName) is Player player)
+        // No player in the scene (e.g. viewing between transitions): frame the
+        // whole area instead.
+        world.Position = clip.Size / 2f - (PlayerPixel() ?? mapPixelSize / 2f) * zoom;
+    }
+
+    // The player's position in map pixels, or null when there is no player in
+    // the scene.
+    private Vector2? PlayerPixel()
+    {
+        if (GetTree().GetFirstNodeInGroup(Player.GroupName) is not Player player)
         {
-            var pos = player.GlobalPosition;
-            focus = new Vector2(
-                MapProjection.WorldToPixelX(pos.X, minChunkX),
-                MapProjection.WorldToPixelY(pos.Z, minChunkZ));
+            return null;
         }
-        else
-        {
-            // No player in the scene (e.g. viewing between transitions): frame
-            // the whole area instead.
-            focus = mapPixelSize / 2f;
-        }
-        world.Position = clip.Size / 2f - focus * zoom;
+        var pos = player.GlobalPosition;
+        return new Vector2(
+            MapProjection.WorldToPixelX(pos.X, minChunkX),
+            MapProjection.WorldToPixelY(pos.Z, minChunkZ));
     }
 
     private void OnMapGuiInput(InputEvent @event)
@@ -386,7 +527,7 @@ public partial class MapMenu : Control
         // Landmarks live on the scaled world layer; counter-scale them so they
         // keep a constant on-screen size (the player marker does the same in
         // UpdatePlayerMarker).
-        foreach (var icon in landmarkIcons)
+        foreach (var icon in mapIcons)
         {
             icon.Scale = Vector2.One / zoom;
         }
