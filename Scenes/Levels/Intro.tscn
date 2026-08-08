@@ -3,14 +3,15 @@
 [ext_resource type="Script" uid="uid://bm2d1ryqpf2ur" path="res://Scenes/Levels/Level.cs" id="1_eue8q"]
 [ext_resource type="PackedScene" uid="uid://dwmuot2vcojgs" path="res://Scenes/Player.tscn" id="2_bd37o"]
 [ext_resource type="Script" uid="uid://bw7g01snbvbif" path="res://Scenes/Levels/Spawn.cs" id="2_biobi"]
-[ext_resource type="Script" path="res://Scripts/World/ChunkManager.cs" id="3_chunks"]
+[ext_resource type="Script" uid="uid://cevdyk7xpak0r" path="res://Scripts/World/ChunkManager.cs" id="3_chunks"]
+[ext_resource type="Texture2D" uid="uid://ce85ss0aajpjt" path="res://ThirdParty/Space Skybox Pack/nebula/jettelly_space_nebulas_black_UP.png" id="3_r0mdn"]
+[ext_resource type="PackedScene" uid="uid://cfr3eqm4gbqav" path="res://ThirdParty/sci-_fi__future_building_2_simple_dome.glb" id="6_bepgf"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bd37o"]
-sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_bepgf"]
+panorama = ExtResource("3_r0mdn")
 
 [sub_resource type="Sky" id="Sky_r0mdn"]
-sky_material = SubResource("ProceduralSkyMaterial_bd37o")
+sky_material = SubResource("PanoramaSkyMaterial_bepgf")
 
 [sub_resource type="Environment" id="Environment_bepgf"]
 background_mode = 2
@@ -39,6 +40,8 @@ script = ExtResource("2_biobi")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1753888, 0)
 shape = SubResource("BoxShape3D_ff37e")
 
-[node name="ChunkManager" type="Node3D" parent="."]
+[node name="ChunkManager" type="Node3D" parent="." unique_id=29087889]
 script = ExtResource("3_chunks")
-ChunkDirectory = "res://Scenes/Levels/Chunks/IntroStation"
+
+[node name="Dome" parent="." unique_id=1992000820 instance=ExtResource("6_bepgf")]
+transform = Transform3D(50, 0, 0, 0, 50, 0, 0, 0, 50, -3.2980618, 1.3349466, 10.450388)
