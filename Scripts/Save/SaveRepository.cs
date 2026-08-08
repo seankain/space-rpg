@@ -30,7 +30,11 @@ public class SaveRepository
     // v9: GameState gained EventLog, the running history the in-game menu's
     //     Log tab shows. Pre-v9 saves load with an empty log — history starts
     //     from the moment the old save is picked back up.
-    public const int CurrentSaveVersion = 9;
+    // v10: GameState gained TrackedQuestId, the quest whose markers the map
+    //      draws (quest-markers.md Phase 3). Pre-v10 saves load with nothing
+    //      tracked — the property default covers it, so there is no migration
+    //      step; the player picks a quest again in the journal.
+    public const int CurrentSaveVersion = 10;
 
     private const string MetaFileName = "meta.json";
     private const string StateFileName = "state.json";

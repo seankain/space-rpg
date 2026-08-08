@@ -57,18 +57,19 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 
 **Done when:** `quest markers <id>` prints the resolved world positions for a quest's live markers, correct for both the cube on the deck and Hale at his post. *(Done. Note the repo has **no committed bake at all** — `Resources/Maps/` does not exist — so today every target resolves through the live path, which covers the intro station where both quests play out. Item targets in an unloaded chunk stay unresolvable until someone runs Project → Tools → Bake World Maps and commits the output; NPC targets never needed it.)*
 
-## Phase 3 — Tracking a quest from the Quests tab
+## Phase 3 — Tracking a quest from the Quests tab *(done — this slice)*
 
-1. `GameState.TrackedQuestId` (`uint`, `0` = none) — save version 10; pre-v10 saves load with nothing tracked (property default, no migration step). Set through `GameState.SetTrackedQuest(id)`, which refuses a quest that is not `InProgress` and clears itself when the tracked quest leaves `InProgress` (so completing a quest retires its markers — hook the existing quest-state move in `DialogueEffects.MoveQuest`).
-2. `QuestLogMenu`: selecting an in-progress quest tracks it. The details panel gains
-   - an objective line listing the current marker labels (from the Phase 1 resolver — the first thing the journal has said about *what to do next*),
-   - a **Track / Tracked** toggle for untracking without leaving the tab,
-   - a **Show on Map** button, which switches the parent `TabContainer` to the Map tab.
-   `Refresh` re-selects the tracked quest instead of clearing the selection, so reopening the menu shows what the player is following.
-3. A static `QuestTracking.Changed` hook (the `GameEventLog.Recorded` pattern — `GameState` instances are swapped out on load, so per-instance subscriptions go stale) for the Map tab and any future HUD.
-4. Console: `quest track <id>` / `quest untrack` in `EditorQuestCommands`, and the tracked quest shown in `quests` output. Engine-free, tested with the sibling verbs.
+1. `GameState.TrackedQuestId` (`uint`, `0` = none) — save version 10; pre-v10 saves load with nothing tracked (property default, no migration step). Set through `GameState.SetTrackedQuest(id)`, which refuses a quest that is not `InProgress` and returns whether it took. The clearing rule lives in `GameState.SetQuestState` rather than in `DialogueEffects.MoveQuest`: *every* path a quest can move by — dialogue effects, console verbs, a future `QuestManager` — goes through it, so a completed quest can't leave markers behind whichever way it was completed.
+2. `QuestLogMenu`: selecting an in-progress quest tracks it (a completed one is only read, and leaves tracking alone). The details panel gains
+   - an objective list from the Phase 1 resolver — the first thing the journal has said about *what to do next*,
+   - a **Track / Tracked** button for re-tracking without leaving the tab,
+   - a **Show on Map** button, which switches the parent `TabContainer` to the tab whose control is the `MapMenu` (found by type, so reordering tabs can't send the player elsewhere).
+   `Refresh` re-selects the tracked quest instead of clearing the selection, and the tracked row wears a `▸`. Re-labelling rows after tracking moves is deliberately *not* a `Refresh` — rebuilding re-selects, which re-tracks, which would loop.
+   These three controls are built in code and appended to the details column the scene already declares, the same choice `MapMenu` makes for its whole tab; the `.tscn` is untouched.
+3. A static `QuestTracking.Changed` hook (the `GameEventLog.Recorded` pattern — `GameState` instances are swapped out on load, so per-instance subscriptions go stale) for the Map tab and any future HUD. Nothing subscribes until Phase 4.
+4. Console: `quest track <id>` / `quest untrack`, and `quests` marks the tracked quest with a leading `>`. Engine-free, tested with the sibling verbs.
 
-**Done when:** selecting a quest and saving/reloading comes back with the same quest tracked and the same objective lines, and completing a tracked quest clears the tracking.
+**Done when:** selecting a quest and saving/reloading comes back with the same quest tracked and the same objective lines, and completing a tracked quest clears the tracking. *(Done — `Tests/QuestTrackingTests.cs` covers the rules, the change signal, the save round-trip, and a pre-v10 save loading untracked.)*
 
 ## Phase 4 — Markers on the map
 

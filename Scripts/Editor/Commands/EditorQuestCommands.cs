@@ -35,6 +35,8 @@ public static class EditorQuestCommands
             "stage" => Stage(state, args),
             "advance" => Advance(state, args),
             "markers" => Markers(state, args, locator),
+            "track" => Track(state, args),
+            "untrack" => Untrack(state),
             _ => CommandResult.Fail($"Unknown quest subcommand '{args[0]}'. {UsageText}"),
         };
     }
@@ -52,7 +54,11 @@ public static class EditorQuestCommands
             var progress = state.Quests.FirstOrDefault(p => p.QuestId == quest.Id);
             var questState = progress?.State ?? QUESTSUCCESSSTATE.Unstarted;
             var stage = progress?.CurrentStageNumber ?? 0;
-            builder.Append('\n').Append("  ").Append(quest.Id).Append("  ")
+            builder.Append('\n')
+                // A leading marker for the tracked quest, so the list answers
+                // "which one am I following?" without a second verb.
+                .Append(quest.Id == state.TrackedQuestId ? "> " : "  ")
+                .Append(quest.Id).Append("  ")
                 .Append(quest.Title).Append("  [").Append(quest.SideQuest ? "side" : "main").Append("]  ")
                 .Append(questState).Append(", stage ").Append(stage);
         }
@@ -108,6 +114,29 @@ public static class EditorQuestCommands
         var progress = state.GetOrAddQuestProgress(id);
         progress.CurrentStageNumber += 1;
         return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to stage {progress.CurrentStageNumber}.");
+    }
+
+    // quest track <questId>: follow a quest, the console equivalent of picking
+    // it in the journal — the map draws the tracked quest's markers.
+    private static CommandResult Track(GameState state, IReadOnlyList<string> args)
+    {
+        if (!TryQuest(args, 1, out var id, out var error))
+        {
+            return CommandResult.Fail(error);
+        }
+        if (!state.SetTrackedQuest(id))
+        {
+            return CommandResult.Fail(
+                $"Quest {id} ({QuestCatalog.Get(id).Title}) is {state.GetQuestState(id)}; "
+                + "only an in-progress quest can be tracked.");
+        }
+        return CommandResult.Ok($"Now tracking quest {id}: {QuestCatalog.Get(id).Title}.");
+    }
+
+    private static CommandResult Untrack(GameState state)
+    {
+        state.SetTrackedQuest(0);
+        return CommandResult.Ok("No quest tracked.");
     }
 
     // quest markers <questId>: which of a quest's markers apply right now and
@@ -179,7 +208,8 @@ public static class EditorQuestCommands
         Enum.TryParse(token, ignoreCase: true, out state)
         && Enum.IsDefined(typeof(QUESTSUCCESSSTATE), state);
 
-    private const string UsageText = "Usage: quest <start|set|stage|advance|markers> <questId> [state|n]";
+    private const string UsageText =
+        "Usage: quest <start|set|stage|advance|markers|track> <questId> [state|n], or quest untrack";
 
     private static CommandResult Usage() => CommandResult.Fail(UsageText);
 

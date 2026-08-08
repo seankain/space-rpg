@@ -78,6 +78,42 @@ public class QuestMarkerCommandTests
     }
 
     [Fact]
+    public void TrackFollowsAQuestAndUntrackStops()
+    {
+        var state = InProgress(FetchQuest);
+
+        Assert.True(EditorQuestCommands.Run(state, Args("track", FetchQuest.ToString())).Success);
+        Assert.Equal(FetchQuest, state.TrackedQuestId);
+
+        Assert.True(EditorQuestCommands.Run(state, Args("untrack")).Success);
+        Assert.Equal(0u, state.TrackedQuestId);
+    }
+
+    [Fact]
+    public void TrackRefusesAQuestThatIsNotInProgress()
+    {
+        var state = new GameState();
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.Success);
+
+        var result = EditorQuestCommands.Run(state, Args("track", FetchQuest.ToString()));
+
+        Assert.False(result.Success);
+        Assert.Contains("only an in-progress quest can be tracked", result.Message);
+        Assert.Equal(0u, state.TrackedQuestId);
+    }
+
+    [Fact]
+    public void TheQuestListMarksTheTrackedQuest()
+    {
+        var state = InProgress(FetchQuest);
+        state.SetTrackedQuest(FetchQuest);
+
+        var listed = EditorQuestCommands.List(state).Message;
+
+        Assert.Contains($"> {FetchQuest}  {QuestCatalog.Get(FetchQuest).Title}", listed);
+    }
+
+    [Fact]
     public void RejectsAnUnknownQuestId()
     {
         Assert.False(EditorQuestCommands.Run(new GameState(), Args("markers", "99999")).Success);

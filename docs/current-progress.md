@@ -158,7 +158,8 @@ Prototype of interior dwellings the player can walk into, plus the first merchan
 
 First slice of the [quest plan](plans/quest-system.md)'s Phase 3 journal:
 
-- `QuestLogMenu` — drives the Quests tab of the in-game menu (Tab): every quest the player has picked up, grouped into Main Quests / Side Quests (in progress) and Completed / Failed sections in one list; selecting a quest shows its title, main/side + status line, and description. Shows a "no quests yet" hint until the first quest is taken. Stage subtitles/objectives wait on the quest plan's stage work.
+- `QuestLogMenu` — drives the Quests tab of the in-game menu (Tab): every quest the player has picked up, grouped into Main Quests / Side Quests (in progress) and Completed / Failed sections in one list; selecting a quest shows its title, main/side + status line, and description. Shows a "no quests yet" hint until the first quest is taken. Stage subtitles wait on the quest plan's stage work.
+- **Tracking a quest** ([quest-markers plan](plans/quest-markers.md) Phase 3) — selecting an in-progress quest also *tracks* it: the details panel lists its current objectives (the labels of whichever markers apply right now), offers a **Track** button and a **Show on Map** button that jumps to the Map tab, and the tracked row wears a `▸`. The tracked quest id lives on `GameState` (save version 10; pre-v10 saves load with nothing tracked), so it survives a reload and is there for the map and a future HUD compass; `GameState.SetQuestState` clears it when the tracked quest stops being in progress, whichever path completed it. Selecting a finished quest only reads it. The three added controls are built in code onto the tab's existing details column. In the console: `quest track <id>` / `quest untrack`, and `quests` marks the tracked one. Nothing draws the markers yet — that is Phase 4.
 
 ### World map (`Scripts/MapMenu.cs`, `Scripts/World/`, `Scripts/Editor/MapBakeJob.cs`)
 
@@ -184,7 +185,7 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | Class | File | Purpose |
 |-------|------|---------|
 | `SaveData` | `SaveData.cs` | Save-slot metadata: version, slot id, number, creation/save time, location name + id. |
-| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, `Quests` progress, defeated NPCs, the `Flags` world-flag store, and the `EventLog` history (with get/set/record helpers for each). |
+| `GameState` | `GameState.cs` | Serializable root of a saved game: current level path, location, player transform, interior return point, party `Credits`, the `List<CharacterEntity>` party, the shared `Inventory`, `Quests` progress, the `TrackedQuestId`, defeated NPCs, the `Flags` world-flag store, and the `EventLog` history (with get/set/record helpers for each). |
 | `CharacterEntity` | `CharacterEntity.cs` | Character record: id, name, chunk id, position (`System.Numerics.Vector3`), level, XP, HP/MP, stats, equip slots, active status effects. |
 | `PartyManager` | `PartyManager.cs` | Roster rules over `GameState.Party`: leader at index 0, max size 4, add/remove/reorder. Live — used by recruiting and the Party tab. |
 | `CharacterStats` | `CharacterStats.cs` | Classic six-stat block (STR/INT/CON/DEX/WIS/CHA). |
@@ -201,12 +202,13 @@ These are plain C# classes (not Godot nodes/resources) sketching the future game
 | `Trade` | `Trade.cs` | Engine-free buy/sell rules and execution between the party (`GameState.Credits`/`Inventory`) and a `Merchant`: buy at `Item.Value`, sell at half, quest/zero-value items untradable; returns user-facing result messages. |
 | `GameEvent`, `GameEventKind` | `GameEvent.cs` | One line of the event log: kind, display-ready text, timestamp, and a non-serialized `Notify` flag asking for a toast. Live — stored in `GameState.EventLog` (save version 9). |
 | `GameEventLog` | `GameEventLog.cs` | Capped, newest-first-readable history on `GameState` with a static `Recorded` hook for the Log tab and toast layer. Live. |
+| `QuestTracking` | `QuestTracking.cs` | Static `Changed` hook announcing which quest the player is following (the value itself is `GameState.TrackedQuestId`), for views that outlive a `GameState` — same reason `GameEventLog.Recorded` is static. |
 | `ActiveStatusEffect`, `STATUSEFFECT` | `StatusEffect.cs` | Timed status effects (poison, sleep, confusion). |
 
 ## Not yet implemented
 
 - Battle depth — defend/flee, status effects in battle, equipment-driven damage/defense, per-character powers, random encounters; see the [battle plan](plans/battle-system.md)
-- Quest depth — stages/objectives in the journal, rewards; see the [quest plan](plans/quest-system.md). Quest markers are authored and resolvable (above) but nothing tracks a quest or draws them yet — Phases 2–4 of the [quest-markers plan](plans/quest-markers.md)
+- Quest depth — stages/objectives in the journal, rewards; see the [quest plan](plans/quest-system.md). Quest markers are authored, resolvable, and trackable from the journal (above), but nothing draws them on the map yet — Phase 4 of the [quest-markers plan](plans/quest-markers.md)
 - Inventory depth — unequipping without a replacement (equipping over a slot swaps the old item back), drop-as-world-pickup, stat deltas before equipping, pickup persistence in world state; see the [inventory plan](plans/inventory-system.md)
 - Dialogue/NPC depth — no text interpolation (an NPC can't greet the leader by name) and no portraits or voice ([Yarn plan](plans/npc-dialogue-yarn.md) Phase 5); localization-key text waits on a localization system ([dialogue-editor plan](plans/dialogue-editor.md) Phase 5); `dialogue assign` targets an NPC's first role only; NPC world-state persistence beyond party/quest data; see the [NPC plan](plans/npc-system.md)
 - Shop depth — merchant stock/credit persistence across visits, buying/selling in quantities, per-merchant price modifiers, more interiors (houses) beyond the prototype shop

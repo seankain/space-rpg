@@ -725,7 +725,7 @@ public partial class DevConsole : CanvasLayer, IUiWindow
         return command switch
         {
             "give" or "takeitem" when index == 1 => ItemCatalog.All.Select(i => i.Id.ToString()).ToList(),
-            "quest" when index == 1 => new List<string> { "start", "set", "stage", "advance", "markers" },
+            "quest" when index == 1 => new List<string> { "start", "set", "stage", "advance", "markers", "track", "untrack" },
             "quest" when index == 2 => QuestCatalog.All.Select(q => q.Id.ToString()).ToList(),
             "flag" when index == 1 => new List<string> { "set", "clear", "get" },
             // Only flags that exist can be completed; a new one is typed out.

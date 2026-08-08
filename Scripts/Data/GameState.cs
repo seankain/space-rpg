@@ -115,8 +115,42 @@ public class GameState
         return progress;
     }
 
-    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state) =>
+    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
+    {
         GetOrAddQuestProgress(questId).State = state;
+        // A quest that is no longer in progress has nowhere left to send the
+        // player. Clearing here rather than at each caller covers every path a
+        // quest can move by — dialogue effects, console verbs, a future
+        // QuestManager — so a completed quest can't leave markers on the map.
+        if (questId == TrackedQuestId && state != QUESTSUCCESSSTATE.InProgress)
+        {
+            SetTrackedQuest(0);
+        }
+    }
+
+    // The quest the player is following: its markers are what the map draws
+    // (quest-markers.md Phase 3). Saved, so tracking survives a reload and is
+    // available to a HUD compass later; 0 means nothing is tracked.
+    public uint TrackedQuestId {get;set;}
+
+    // Tracks a quest, or clears tracking with 0. Refuses a quest that isn't in
+    // progress — the journal only offers the option for one that is, and a
+    // hand-edited save shouldn't produce markers for a finished quest. Returns
+    // whether the tracked quest ended up as asked.
+    public bool SetTrackedQuest(uint questId)
+    {
+        if (questId != 0 && GetQuestState(questId) != QUESTSUCCESSSTATE.InProgress)
+        {
+            return false;
+        }
+        if (TrackedQuestId == questId)
+        {
+            return true;
+        }
+        TrackedQuestId = questId;
+        QuestTracking.NotifyChanged(questId);
+        return true;
+    }
 
     public bool IsNpcDefeated(string npcId) => DefeatedNpcs.Contains(npcId);
 
