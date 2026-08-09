@@ -89,20 +89,88 @@ public class QuestTrackingTests : IDisposable
         QuestTracking.Changed += Listener;
         try
         {
-            state.SetTrackedQuest(FetchQuest);
-            // Re-tracking the same quest is not a change; the views that
-            // rebuild on this signal shouldn't churn.
+            // Already tracking the fetch quest (taking it started that), so
+            // this is not a change; the views that rebuild on the signal
+            // shouldn't churn.
             state.SetTrackedQuest(FetchQuest);
             state.SetTrackedQuest(BountyQuest);
-            // Completing the tracked quest clears tracking, which is a change.
+            // Finishing the tracked quest hands over to the one still open.
             state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.Success);
+            // And finishing that one leaves nothing to follow.
+            state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.Success);
         }
         finally
         {
             QuestTracking.Changed -= Listener;
         }
 
-        Assert.Equal(new[] { FetchQuest, BountyQuest, 0u }, announced);
+        Assert.Equal(new[] { BountyQuest, FetchQuest, 0u }, announced);
+    }
+
+    [Fact]
+    public void TakingAQuestWhileFollowingNoneTracksIt()
+    {
+        // The reason the map has anything on it for a player who never opened
+        // the journal: taking a quest is enough.
+        var state = new GameState();
+
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+
+        Assert.Equal(FetchQuest, state.TrackedQuestId);
+    }
+
+    [Fact]
+    public void TakingASecondQuestDoesNotStealTracking()
+    {
+        var state = new GameState();
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+
+        state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.InProgress);
+
+        Assert.Equal(FetchQuest, state.TrackedQuestId);
+    }
+
+    [Fact]
+    public void FinishingTheTrackedQuestHandsOverToOneStillInProgress()
+    {
+        var state = new GameState();
+        state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.InProgress);
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+        Assert.Equal(BountyQuest, state.TrackedQuestId);
+
+        state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.Success);
+
+        Assert.Equal(FetchQuest, state.TrackedQuestId);
+    }
+
+    [Fact]
+    public void FinishingTheLastOpenQuestLeavesNothingTracked()
+    {
+        var state = new GameState();
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+        state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.InProgress);
+
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.Success);
+        state.SetQuestState(BountyQuest, QUESTSUCCESSSTATE.Success);
+
+        Assert.Equal(0u, state.TrackedQuestId);
+    }
+
+    // Handover prefers a main quest over a side quest, matching the journal's
+    // own ordering. Not directly testable yet: with two shipped quests, a
+    // handover never has more than one candidate to choose between.
+
+    [Fact]
+    public void UntrackingSticksUntilAnotherQuestMoves()
+    {
+        var state = new GameState();
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+
+        state.SetTrackedQuest(0);
+        // Unrelated progress edits leave the player's choice alone.
+        state.GetOrAddQuestProgress(FetchQuest).CurrentStageNumber = 2;
+
+        Assert.Equal(0u, state.TrackedQuestId);
     }
 
     [Fact]

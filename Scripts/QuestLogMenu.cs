@@ -212,10 +212,15 @@ public partial class QuestLogMenu : Control
 			? "Objectives:\n" + string.Join("\n", objectives.Select(label => "  • " + label))
 			: "";
 
+		// A toggle, not a one-way switch: tracking starts by itself when a quest
+		// is taken, so there has to be a way to turn the markers back off.
+		var tracked = quest != null && state?.TrackedQuestId == quest.Id;
 		trackButton.Visible = trackable;
-		trackButton.Disabled = state?.TrackedQuestId == quest?.Id;
-		trackButton.Text = trackButton.Disabled ? TrackedText : TrackText;
-		showOnMapButton.Visible = trackable;
+		trackButton.Text = tracked ? TrackedText : TrackText;
+		trackButton.TooltipText = tracked
+			? "Stop showing this quest's objectives on the map"
+			: "Show this quest's objectives on the map";
+		showOnMapButton.Visible = trackable && tracked;
 	}
 
 	private void OnTrackPressed()
@@ -226,7 +231,8 @@ public partial class QuestLogMenu : Control
 			return;
 		}
 		var questId = shownQuestId.Value;
-		state.SetTrackedQuest(questId);
+		// Tracking the quest already being tracked means "stop".
+		state.SetTrackedQuest(state.TrackedQuestId == questId ? 0 : questId);
 		UpdateRowLabels();
 		ShowDetails(QuestCatalog.Get(questId), state.GetQuestState(questId));
 	}

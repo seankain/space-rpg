@@ -336,8 +336,20 @@ public partial class MapMenu : Control
     private void BuildQuestMarkers(string areaName, ChunkManager chunkManager)
     {
         var state = SaveManager.Instance?.CurrentState;
-        if (state == null || state.TrackedQuestId == 0)
+        if (state == null)
         {
+            return;
+        }
+        if (state.TrackedQuestId == 0)
+        {
+            // Silent when there is nothing to follow, but a player who has
+            // untracked their quests shouldn't be left wondering where the
+            // markers went.
+            if (state.Quests.Any(progress => progress.State == QUESTSUCCESSSTATE.InProgress))
+            {
+                objectiveLabel.Text = "No quest tracked — pick one in the Quests tab";
+                objectiveLabel.Visible = true;
+            }
             return;
         }
         var levelScenePath = chunkManager.LevelScenePath();

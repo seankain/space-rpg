@@ -108,6 +108,9 @@ public class QuestMarkerPlacementTests
     {
         var state = new GameState();
         state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+        // Taking a quest tracks it, so untrack explicitly to get the
+        // "following nothing" case.
+        state.SetTrackedQuest(0);
 
         Assert.Empty(QuestMarkerPlacements.ForTrackedQuest(
             state, new FakeLocator(), Area, LevelScene, new MapLandmarksFile()));

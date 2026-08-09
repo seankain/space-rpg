@@ -41,7 +41,7 @@ _subresources={
 "animations": {
 "Jump_Full_Long": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Long.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Long.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://bgbpyvvdxnnp6",
 "settings/loop_mode": 0,
@@ -2097,7 +2097,7 @@ _subresources={
 },
 "Jump_Full_Short": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Short.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Full_Short.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://c11bbfbefvlbn",
 "settings/loop_mode": 0,
@@ -4153,7 +4153,7 @@ _subresources={
 },
 "Jump_Idle": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Idle.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Idle.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://o6rjwka3otrq",
 "settings/loop_mode": 0,
@@ -6209,7 +6209,7 @@ _subresources={
 },
 "Jump_Land": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Land.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Land.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://cxbwmmv3hw7dl",
 "settings/loop_mode": 0,
@@ -8265,7 +8265,7 @@ _subresources={
 },
 "Jump_Start": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Start.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Jump_Start.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://b40rdvw5fkdkf",
 "settings/loop_mode": 0,
@@ -10321,7 +10321,7 @@ _subresources={
 },
 "Running_A": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_A.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_A.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://1dnkt6q1dvva",
 "settings/loop_mode": 0,
@@ -12377,7 +12377,7 @@ _subresources={
 },
 "Running_B": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_B.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Running_B.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://qf5o5poqrtt",
 "settings/loop_mode": 0,
@@ -14433,7 +14433,7 @@ _subresources={
 },
 "T-Pose": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/T-Pose.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/T-Pose.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://b63wnelni7bh3",
 "settings/loop_mode": 0,
@@ -16489,7 +16489,7 @@ _subresources={
 },
 "Walking_A": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_A.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_A.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://b06n8kafqjw3k",
 "settings/loop_mode": 0,
@@ -18545,7 +18545,7 @@ _subresources={
 },
 "Walking_B": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_B.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_B.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://dc0vjx7nrhbkp",
 "settings/loop_mode": 0,
@@ -20601,7 +20601,7 @@ _subresources={
 },
 "Walking_C": {
 "save_to_file/enabled": true,
-"save_to_file/fallback_path": "res://ThirdParty/KayKits/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_C.res",
+"save_to_file/fallback_path": "res://ThirdParty/KayKit_Adventurers_2.0_FREE/Animations/gltf/Export/Walking_C.res",
 "save_to_file/keep_custom_tracks": "",
 "save_to_file/path": "uid://d1ykldcymwqf8",
 "settings/loop_mode": 0,

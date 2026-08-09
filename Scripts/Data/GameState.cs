@@ -118,14 +118,43 @@ public class GameState
     public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
     {
         GetOrAddQuestProgress(questId).State = state;
-        // A quest that is no longer in progress has nowhere left to send the
-        // player. Clearing here rather than at each caller covers every path a
-        // quest can move by — dialogue effects, console verbs, a future
-        // QuestManager — so a completed quest can't leave markers on the map.
-        if (questId == TrackedQuestId && state != QUESTSUCCESSSTATE.InProgress)
+        // Tracking follows the quest log on its own, so a player who takes a
+        // quest and opens the map sees where to go without first knowing to
+        // pick a row in the journal. Handled here rather than at each caller,
+        // so every path a quest can move by — dialogue effects, console verbs,
+        // a future QuestManager — behaves the same.
+        if (state == QUESTSUCCESSSTATE.InProgress)
         {
-            SetTrackedQuest(0);
+            // Taking a quest while following none follows it; taking a second
+            // one never steals the player's choice.
+            if (TrackedQuestId == 0)
+            {
+                SetTrackedQuest(questId);
+            }
+            return;
         }
+        if (questId == TrackedQuestId)
+        {
+            // The tracked quest is over: hand tracking to another quest that is
+            // still in progress, or clear it when that was the last one. Either
+            // way a finished quest can't leave markers on the map.
+            SetTrackedQuest(NextQuestToTrack(questId));
+        }
+    }
+
+    // Which quest should take over tracking: main quests before side quests
+    // (the journal's own order), each in the order they were picked up. 0 when
+    // nothing is in progress.
+    private uint NextQuestToTrack(uint excludingQuestId)
+    {
+        var candidates = Quests
+            .Where(progress => progress.State == QUESTSUCCESSSTATE.InProgress
+                && progress.QuestId != excludingQuestId
+                && QuestCatalog.Get(progress.QuestId) != null)
+            .ToList();
+        var next = candidates.FirstOrDefault(progress => !QuestCatalog.Get(progress.QuestId).SideQuest)
+            ?? candidates.FirstOrDefault();
+        return next?.QuestId ?? 0;
     }
 
     // The quest the player is following: its markers are what the map draws
