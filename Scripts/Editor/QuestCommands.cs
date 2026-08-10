@@ -11,11 +11,15 @@ using System.Collections.Generic;
 public sealed class QuestCommand : IConsoleCommand
 {
     public string Name => "quest";
-    public string Usage => "quest <start|set|stage|advance> <questId> [state|n]";
-    public string Summary => "Start, set the state of, or advance a quest.";
+    public string Usage => "quest <start|set|stage|advance|markers|track> <questId> [state|n]";
+    public string Summary => "Start, set the state of, advance, track, or show the markers of a quest.";
 
+    // The locator is built per call: it answers against whichever level is
+    // running, and there may be none (title screen) — `markers` then says so
+    // rather than pretending a target is missing.
     public CommandResult Execute(IReadOnlyList<string> args) =>
-        EditorQuestCommands.Run(SaveManager.Instance?.CurrentState, args);
+        EditorQuestCommands.Run(
+            SaveManager.Instance?.CurrentState, args, QuestTargetLocator.ForCurrentLevel());
 }
 
 public sealed class QuestsCommand : IConsoleCommand

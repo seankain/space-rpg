@@ -9,6 +9,11 @@ public class Quest
     public bool SideQuest {get;set;}
     public List<QuestPrereqFlag> PrereqQuests {get;set;}
     public QUESTSUCCESSSTATE SuccessState;
+    // Where this quest sends the player, in authored order (quest-markers.md
+    // Phase 1). Which of them apply at a given moment is decided by each
+    // marker's condition, not by this list's order; the map draws the ones the
+    // player's tracked quest resolves to.
+    public List<QuestMarker> Markers {get;set;} = new();
 
 }
 

@@ -61,7 +61,7 @@ Goal: fill the empty **Map** tab in the in-game menu with a top-down map of the 
 
 1. **Fog of war:** record visited chunk coordinates per area in `GameState` (aligns with the save plan's world-state section); unvisited chunks render darkened or hidden. Landmarks appear once their chunk has been visited.
 2. **Minimap HUD:** a small always-on corner map reusing the same baked textures and `MapProjection` — the bake investment pays twice.
-3. **Quest markers:** when the quest system gains target locations, draw them through the same landmark-icon path.
+3. **Quest markers:** when the quest system gains target locations, draw them through the same landmark-icon path — planned in [quest-markers.md](quest-markers.md).
 
 ## Decisions to settle early
 

@@ -115,8 +115,71 @@ public class GameState
         return progress;
     }
 
-    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state) =>
+    public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
+    {
         GetOrAddQuestProgress(questId).State = state;
+        // Tracking follows the quest log on its own, so a player who takes a
+        // quest and opens the map sees where to go without first knowing to
+        // pick a row in the journal. Handled here rather than at each caller,
+        // so every path a quest can move by — dialogue effects, console verbs,
+        // a future QuestManager — behaves the same.
+        if (state == QUESTSUCCESSSTATE.InProgress)
+        {
+            // Taking a quest while following none follows it; taking a second
+            // one never steals the player's choice.
+            if (TrackedQuestId == 0)
+            {
+                SetTrackedQuest(questId);
+            }
+            return;
+        }
+        if (questId == TrackedQuestId)
+        {
+            // The tracked quest is over: hand tracking to another quest that is
+            // still in progress, or clear it when that was the last one. Either
+            // way a finished quest can't leave markers on the map.
+            SetTrackedQuest(NextQuestToTrack(questId));
+        }
+    }
+
+    // Which quest should take over tracking: main quests before side quests
+    // (the journal's own order), each in the order they were picked up. 0 when
+    // nothing is in progress.
+    private uint NextQuestToTrack(uint excludingQuestId)
+    {
+        var candidates = Quests
+            .Where(progress => progress.State == QUESTSUCCESSSTATE.InProgress
+                && progress.QuestId != excludingQuestId
+                && QuestCatalog.Get(progress.QuestId) != null)
+            .ToList();
+        var next = candidates.FirstOrDefault(progress => !QuestCatalog.Get(progress.QuestId).SideQuest)
+            ?? candidates.FirstOrDefault();
+        return next?.QuestId ?? 0;
+    }
+
+    // The quest the player is following: its markers are what the map draws
+    // (quest-markers.md Phase 3). Saved, so tracking survives a reload and is
+    // available to a HUD compass later; 0 means nothing is tracked.
+    public uint TrackedQuestId {get;set;}
+
+    // Tracks a quest, or clears tracking with 0. Refuses a quest that isn't in
+    // progress — the journal only offers the option for one that is, and a
+    // hand-edited save shouldn't produce markers for a finished quest. Returns
+    // whether the tracked quest ended up as asked.
+    public bool SetTrackedQuest(uint questId)
+    {
+        if (questId != 0 && GetQuestState(questId) != QUESTSUCCESSSTATE.InProgress)
+        {
+            return false;
+        }
+        if (TrackedQuestId == questId)
+        {
+            return true;
+        }
+        TrackedQuestId = questId;
+        QuestTracking.NotifyChanged(questId);
+        return true;
+    }
 
     public bool IsNpcDefeated(string npcId) => DefeatedNpcs.Contains(npcId);
 

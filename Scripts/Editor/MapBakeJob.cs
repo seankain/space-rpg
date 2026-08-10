@@ -150,20 +150,32 @@ public static class MapBakeJob
         GD.Print($"MapBaker: baked {path.GetFile()} — {label}");
     }
 
-    // Scene-authored landmarks only: portals and entrance doors. Stores are
-    // NPC data (ShopkeeperRole) and the map UI reads those live from
+    // Scene-authored map data only: portals, entrance doors, and world pickups.
+    // Stores are NPC data (ShopkeeperRole) and the map UI reads those live from
     // NpcDatabase — see docs/plans/world-map.md.
     private static void CollectLandmarks(Node3D chunk, Node node, Vector2I coord, MapLandmarksFile into)
     {
         switch (node)
         {
             case Portal portal:
-                into.Landmarks.Add(MakeLandmark(MapLandmark.PortalType, portal.TargetDisplayName, chunk, portal, coord));
+                into.Landmarks.Add(MakeLandmark(
+                    MapLandmark.PortalType, portal.TargetDisplayName, chunk, portal, coord,
+                    targetScenePath: portal.TargetScenePath));
                 break;
             // Exit doors (ReturnsToPrevious) belong to interiors, not chunks;
             // skip them if one ever appears.
             case Door { ReturnsToPrevious: false } door:
-                into.Landmarks.Add(MakeLandmark(MapLandmark.DoorType, door.TargetDisplayName, chunk, door, coord));
+                into.Landmarks.Add(MakeLandmark(
+                    MapLandmark.DoorType, door.TargetDisplayName, chunk, door, coord,
+                    targetScenePath: door.TargetScenePath));
+                break;
+            // Not drawn on the map: recorded so a quest marker can point at an
+            // item still lying in a chunk that isn't streamed in
+            // (quest-markers.md Phase 2).
+            case Pickup pickup:
+                into.Landmarks.Add(MakeLandmark(
+                    MapLandmark.PickupType, ItemCatalog.Get(pickup.ItemId)?.Name ?? "", chunk, pickup, coord,
+                    itemId: pickup.ItemId));
                 break;
         }
         foreach (var child in node.GetChildren())
@@ -172,7 +184,9 @@ public static class MapBakeJob
         }
     }
 
-    private static MapLandmark MakeLandmark(string type, string name, Node3D chunk, Node3D node, Vector2I coord)
+    private static MapLandmark MakeLandmark(
+        string type, string name, Node3D chunk, Node3D node, Vector2I coord,
+        uint itemId = 0, string targetScenePath = null)
     {
         // The chunk sits at the viewport origin during capture, so positions
         // relative to it are chunk-local — exactly what MapProjection expects.
@@ -183,6 +197,8 @@ public static class MapBakeJob
             Name = name,
             X = MapProjection.ChunkToWorldX(coord.X, local.X),
             Z = MapProjection.ChunkToWorldZ(coord.Y, local.Z),
+            ItemId = itemId,
+            TargetScenePath = targetScenePath ?? "",
         };
     }
 
