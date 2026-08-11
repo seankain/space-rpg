@@ -93,7 +93,7 @@ Depends on: [world-map.md](world-map.md) Phases 1–3 (baked chunk images, `MapP
 2. **World-space beacon:** a floating marker over the target in the 3D world when the player is within a chunk or two, reusing `InteractionPrompt`'s billboard/no-depth-test approach.
 3. **HUD compass / minimap:** the tracked quest's nearest marker as an edge bearing on the minimap from world-map Phase 5 — the reason tracking lives in `GameState` rather than in the menu.
 4. **Show all active quests** as a map toggle, once more than a handful of quests exist and one tracked quest stops being enough.
-5. **Stage-driven markers:** when the quest plan's Phase 1 stages land, markers move from "conditions on state" to "markers per stage", with `VisibleWhen` kept for within-stage variation. The resolver's signature does not change.
+5. **Stage-driven markers:** stages landed with the quest plan's Phase 1, and the verb this item anticipated exists — `quest_stage(1) >= 2` is an ordinary condition, so a marker can gate on a stage today with no resolver change. The remaining half is content: moving the shipped markers from "conditions on state" to "markers per stage" is worth doing once something advances those stages in play (quest-system.md Phase 2 item 3), not before.
 
 ## Decisions to settle early
 
