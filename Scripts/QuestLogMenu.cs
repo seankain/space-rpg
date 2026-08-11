@@ -47,6 +47,24 @@ public partial class QuestLogMenu : Control
 				Refresh();
 			}
 		};
+		// The tab can be open while the world keeps running (the in-game menu
+		// doesn't pause the tree), so follow quest moves live rather than only
+		// rebuilding when the tab is opened — a QuestTrigger the player walks
+		// through with the journal up now updates it.
+		QuestManager.Moved += OnQuestMoved;
+	}
+
+	public override void _ExitTree()
+	{
+		QuestManager.Moved -= OnQuestMoved;
+	}
+
+	private void OnQuestMoved(QuestMove move)
+	{
+		if (IsInstanceValid(this) && IsVisibleInTree())
+		{
+			Refresh();
+		}
 	}
 
 	private void BuildTrackingControls()

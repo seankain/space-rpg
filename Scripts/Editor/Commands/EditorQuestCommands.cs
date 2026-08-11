@@ -80,13 +80,23 @@ public static class EditorQuestCommands
         return CommandResult.Ok(builder.ToString());
     }
 
+    // quest start <questId>: take a quest the way the game does, prerequisites
+    // and all — which is what makes this different from `quest set <id>
+    // inprogress`, the raw setter that ignores them.
     private static CommandResult Start(GameState state, IReadOnlyList<string> args)
     {
         if (!TryQuest(args, 1, out var id, out var error))
         {
             return CommandResult.Fail(error);
         }
-        state.SetQuestState(id, QUESTSUCCESSSTATE.InProgress);
+        if (state.GetQuestState(id) == QUESTSUCCESSSTATE.InProgress)
+        {
+            return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) is already in progress.");
+        }
+        if (QuestManager.StartQuest(state, id) is { } refusal)
+        {
+            return CommandResult.Fail($"Can't start quest {id}: {refusal}. Use 'quest set' to force it.");
+        }
         return CommandResult.Ok($"Started quest {id}: {QuestCatalog.Get(id).Title} (InProgress).");
     }
 
@@ -100,7 +110,10 @@ public static class EditorQuestCommands
         {
             return CommandResult.Fail("Usage: quest set <questId> <unstarted|inprogress|success|failed>");
         }
-        state.SetQuestState(id, target);
+        // Deliberately past QuestManager.StartQuest's prerequisite check: this
+        // is the verb for putting the game where a developer wants to test
+        // from, so it says what happened and asks nothing.
+        QuestManager.SetState(state, id, target);
         return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) set to {target}.");
     }
 
@@ -140,7 +153,11 @@ public static class EditorQuestCommands
             return CommandResult.Fail(
                 $"Usage: quest stage <questId> <stageNumber|{DialogueEffects.NextStageArg}>");
         }
-        if (!state.SetQuestStage(id, target))
+        if (state.GetQuestStage(id) == target)
+        {
+            return CommandResult.Ok($"Quest {id} ({quest.Title}) is already on stage {target}.");
+        }
+        if (!QuestManager.SetStage(state, id, target))
         {
             return CommandResult.Fail(
                 $"Quest {id} ({quest.Title}) has no stage {target}; it has {quest.Stages.Count}.");
@@ -160,19 +177,15 @@ public static class EditorQuestCommands
             return CommandResult.Fail(error);
         }
         var current = state.GetQuestState(id);
-        var next = current switch
+        if (!QuestManager.AdvanceState(state, id))
         {
-            QUESTSUCCESSSTATE.Unstarted => QUESTSUCCESSSTATE.InProgress,
-            QUESTSUCCESSSTATE.InProgress => QUESTSUCCESSSTATE.Success,
-            _ => current,
-        };
-        if (next == current)
-        {
+            // Either it is finished, or it is unstarted with a prerequisite in
+            // the way — `quest start` is the verb that explains which.
             return CommandResult.Fail(
                 $"Quest {id} ({QuestCatalog.Get(id).Title}) is {current}; there is nowhere further to advance it.");
         }
-        state.SetQuestState(id, next);
-        return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to {next}.");
+        return CommandResult.Ok(
+            $"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to {state.GetQuestState(id)}.");
     }
 
     // quest track <questId>: follow a quest, the console equivalent of picking

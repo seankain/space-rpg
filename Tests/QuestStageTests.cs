@@ -336,6 +336,24 @@ public class QuestStageTests : IDisposable
     }
 
     [Fact]
+    public void SetStageIsSilentWhenTheQuestIsAlreadyOnThatStage()
+    {
+        // A conversation the player is replaying says it again; that is not a
+        // bad edit, and warns no more than a state move that changes nothing
+        // logs a line.
+        var state = new GameState();
+        state.SetQuestState(FetchQuest, QUESTSUCCESSSTATE.InProgress);
+        state.SetQuestStage(FetchQuest, 2);
+        var entries = state.EventLog.Entries.Count;
+        var context = Context(state, out var warnings);
+
+        DialogueEffects.Run(EffectRef.Parse("set_stage:1:2"), context);
+
+        Assert.Empty(warnings);
+        Assert.Equal(entries, state.EventLog.Entries.Count);
+    }
+
+    [Fact]
     public void SetStageWarnsRatherThanMovingWhenItCannot()
     {
         var state = new GameState();

@@ -295,58 +295,54 @@ public static class DialogueEffects
             return;
         }
         var raw = effect.Arg(1);
-        var before = context.State.GetQuestStage(questId);
-        bool moved;
         if (raw == NextStageArg)
         {
-            moved = context.State.AdvanceQuestStage(questId);
+            if (!QuestManager.AdvanceStage(context.State, questId))
+            {
+                context.Warn(
+                    $"Dialogue effect 'set_stage' could not advance quest {questId}: "
+                    + "it is on its last stage, or has none.");
+            }
+            return;
         }
-        else if (uint.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var stageNumber))
-        {
-            moved = context.State.SetQuestStage(questId, stageNumber);
-        }
-        else
+        if (!uint.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var stageNumber))
         {
             context.Warn($"Dialogue effect 'set_stage' expected a stage number or '{NextStageArg}', got '{raw}'.");
             return;
         }
-        if (!moved)
+        // A quest already on that stage is a conversation the player is
+        // replaying, not a bad edit: silent, the same way a state move that
+        // changes nothing writes no log line.
+        if (context.State.GetQuestStage(questId) == stageNumber)
         {
-            // Either the stage doesn't exist or the quest is already on its
-            // last one. Both are worth saying: a conversation replayed from the
-            // end shouldn't look like it did something.
-            context.Warn($"Dialogue effect 'set_stage' could not move quest {questId} to stage '{raw}'.");
             return;
         }
-        var stage = context.State.GetCurrentStage(questId);
-        if (context.State.GetQuestStage(questId) != before && stage != null)
+        if (!QuestManager.SetStage(context.State, questId, stageNumber))
         {
-            // The player's "what now" line, logged and toasted the way a quest
-            // state move is — a new objective is the same kind of news.
-            context.State.RecordEvent(GameEventKind.Quest,
-                $"New objective: {stage.SubtitleText}", notify: true);
+            context.Warn($"Dialogue effect 'set_stage' could not move quest {questId} to stage {stageNumber}.");
         }
     }
 
-    // Applies a quest state change and logs it, but only when it actually
-    // moves: a conversation the player replays shouldn't fill the log with
-    // "started" lines for a quest they already have.
+    // Hands a quest state change to QuestManager, which applies it, logs it,
+    // and tells anything watching — and which is also where a quest the party
+    // isn't eligible for yet is refused. A move that changes nothing (a
+    // conversation the player is replaying) is the manager's no-op, not a log
+    // line.
     private static void MoveQuest(DialogueContext context, uint questId, QUESTSUCCESSSTATE target)
     {
-        if (context.State.GetQuestState(questId) == target)
+        if (target != QUESTSUCCESSSTATE.InProgress)
         {
+            QuestManager.SetState(context.State, questId, target);
             return;
         }
-        context.State.SetQuestState(questId, target);
-        var title = QuestCatalog.Get(questId)?.Title ?? $"quest {questId}";
-        var line = target switch
+        // Starting is the one transition with a gate on it. A conversation that
+        // offers a quest whose prerequisites aren't met is a content bug — the
+        // choice should have been hidden with `quest_state` — so say so rather
+        // than starting it anyway or failing silently.
+        if (QuestManager.StartQuest(context.State, questId) is { } refusal)
         {
-            QUESTSUCCESSSTATE.InProgress => $"Started the quest '{title}'.",
-            QUESTSUCCESSSTATE.Success => $"Completed the quest '{title}'.",
-            QUESTSUCCESSSTATE.Failed => $"Failed the quest '{title}'.",
-            _ => $"Abandoned the quest '{title}'.",
-        };
-        context.State.RecordEvent(GameEventKind.Quest, line, notify: true);
+            context.Warn($"Dialogue could not start quest {questId}: {refusal}.");
+        }
     }
 
     // credits:<amount> adds (or, with a negative amount, spends) party credits,

@@ -19,6 +19,8 @@ size = Vector3(1.2, 1.2, 1.2)
 script = ExtResource("1_pickup")
 ItemId = 1
 Quantity = 1
+QuestId = 1
+QuestStage = 2
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_cube")

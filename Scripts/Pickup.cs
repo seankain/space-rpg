@@ -16,6 +16,20 @@ public partial class Pickup : Area3D
 	[Export]
 	public uint Quantity = 1;
 
+	// Optional: collecting this moves QuestId to at least QuestStage — the
+	// pickup half of QuestTrigger (quest-system.md Phase 2), for a fetch quest
+	// whose next beat is "you have the thing". Set on the item's own scene, so
+	// every copy of the cube carries the same meaning. 0 for either means the
+	// pickup touches no quest.
+	//
+	// Idempotent like the trigger: a quest already at that stage or past it
+	// doesn't move, so a second copy of the item changes nothing.
+	[Export]
+	public uint QuestId;
+
+	[Export]
+	public uint QuestStage;
+
 	// Idle spin so pickups read as collectible; 0 to disable.
 	[Export]
 	public float SpinRadiansPerSecond = 1.0f;
@@ -88,6 +102,12 @@ public partial class Pickup : Area3D
 		state.RecordEvent(GameEventKind.Item,
 			Quantity > 1 ? $"Picked up {item.Name} x{Quantity}." : $"Picked up {item.Name}.",
 			notify: true);
+		// After the pickup line, so the log reads in the order it happened:
+		// found the cube, then "take it back to Hale".
+		if (QuestId != 0 && QuestStage != 0)
+		{
+			QuestManager.ReachStage(state, QuestId, QuestStage);
+		}
 		QueueFree();
 	}
 }
