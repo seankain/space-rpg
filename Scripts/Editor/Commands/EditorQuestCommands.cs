@@ -13,6 +13,11 @@ public static class EditorQuestCommands
 {
     // quest <start|set|stage|advance|markers> <questId> [state|n]
     //
+    // "advance" moves the success state and "stage" moves the stage, in both
+    // this vocabulary and the dialogue one (advance_quest / set_stage): the two
+    // words meant different things in the two places until stages landed
+    // (quest-system.md Phase 1).
+    //
     // `locator` is the Godot-side answer to "where is this target?"
     // (QuestTargetLocator), passed in by the console wrapper so this stays
     // engine-free; without one, `markers` still lists objectives and says it
@@ -60,7 +65,17 @@ public static class EditorQuestCommands
                 .Append(quest.Id == state.TrackedQuestId ? "> " : "  ")
                 .Append(quest.Id).Append("  ")
                 .Append(quest.Title).Append("  [").Append(quest.SideQuest ? "side" : "main").Append("]  ")
-                .Append(questState).Append(", stage ").Append(stage);
+                .Append(questState);
+            // Stages are optional, so say nothing about them for a quest that
+            // declares none rather than reporting a meaningless "stage 0".
+            if (quest.HasStages)
+            {
+                builder.Append(", stage ").Append(stage).Append(" of ").Append(quest.Stages.Count);
+                if (quest.GetStage(stage) is { } current)
+                {
+                    builder.Append(": ").Append(current.SubtitleText);
+                }
+            }
         }
         return CommandResult.Ok(builder.ToString());
     }
@@ -89,31 +104,75 @@ public static class EditorQuestCommands
         return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) set to {target}.");
     }
 
+    // quest stage <questId> <n|next>: jump to a declared stage, or step to the
+    // one after the current stage. Bounded by the definition — a stage the
+    // quest doesn't declare is a typo, and writing it would leave the journal
+    // showing a beat with no text.
     private static CommandResult Stage(GameState state, IReadOnlyList<string> args)
     {
         if (!TryQuest(args, 1, out var id, out var error))
         {
             return CommandResult.Fail(error);
         }
-        if (args.Count < 3 || !uint.TryParse(args[2], out var stage))
+        var quest = QuestCatalog.Get(id);
+        if (args.Count < 3)
         {
-            return CommandResult.Fail("Usage: quest stage <questId> <stageNumber>");
+            return CommandResult.Fail($"Usage: quest stage <questId> <stageNumber|{DialogueEffects.NextStageArg}>");
         }
-        // Deliberately unvalidated against a stage list: no quest declares
-        // QuestStages yet. Follow-up in quest-system.md is to bound n once they do.
-        state.GetOrAddQuestProgress(id).CurrentStageNumber = stage;
-        return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) stage set to {stage}.");
+        if (!quest.HasStages)
+        {
+            return CommandResult.Fail($"Quest {id} ({quest.Title}) declares no stages.");
+        }
+        var raw = args[2];
+        uint target;
+        if (string.Equals(raw, DialogueEffects.NextStageArg, StringComparison.OrdinalIgnoreCase))
+        {
+            target = quest.NextStageNumber(state.GetQuestStage(id));
+            if (target == 0)
+            {
+                return CommandResult.Fail(
+                    $"Quest {id} ({quest.Title}) is already on its last stage "
+                    + $"({state.GetQuestStage(id)} of {quest.Stages.Count}).");
+            }
+        }
+        else if (!uint.TryParse(raw, out target))
+        {
+            return CommandResult.Fail(
+                $"Usage: quest stage <questId> <stageNumber|{DialogueEffects.NextStageArg}>");
+        }
+        if (!state.SetQuestStage(id, target))
+        {
+            return CommandResult.Fail(
+                $"Quest {id} ({quest.Title}) has no stage {target}; it has {quest.Stages.Count}.");
+        }
+        return CommandResult.Ok(
+            $"Quest {id} ({quest.Title}) stage set to {target} of {quest.Stages.Count}: "
+            + $"{quest.GetStage(target).SubtitleText}");
     }
 
+    // quest advance <questId>: one step along Unstarted -> InProgress ->
+    // Success, the console twin of the dialogue vocabulary's advance_quest.
+    // Stages move with `quest stage`, not with this.
     private static CommandResult Advance(GameState state, IReadOnlyList<string> args)
     {
         if (!TryQuest(args, 1, out var id, out var error))
         {
             return CommandResult.Fail(error);
         }
-        var progress = state.GetOrAddQuestProgress(id);
-        progress.CurrentStageNumber += 1;
-        return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to stage {progress.CurrentStageNumber}.");
+        var current = state.GetQuestState(id);
+        var next = current switch
+        {
+            QUESTSUCCESSSTATE.Unstarted => QUESTSUCCESSSTATE.InProgress,
+            QUESTSUCCESSSTATE.InProgress => QUESTSUCCESSSTATE.Success,
+            _ => current,
+        };
+        if (next == current)
+        {
+            return CommandResult.Fail(
+                $"Quest {id} ({QuestCatalog.Get(id).Title}) is {current}; there is nowhere further to advance it.");
+        }
+        state.SetQuestState(id, next);
+        return CommandResult.Ok($"Quest {id} ({QuestCatalog.Get(id).Title}) advanced to {next}.");
     }
 
     // quest track <questId>: follow a quest, the console equivalent of picking
@@ -209,7 +268,7 @@ public static class EditorQuestCommands
         && Enum.IsDefined(typeof(QUESTSUCCESSSTATE), state);
 
     private const string UsageText =
-        "Usage: quest <start|set|stage|advance|markers|track> <questId> [state|n], or quest untrack";
+        "Usage: quest <start|set|stage|advance|markers|track> <questId> [state|n|next], or quest untrack";
 
     private static CommandResult Usage() => CommandResult.Fail(UsageText);
 

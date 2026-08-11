@@ -14,10 +14,14 @@ public static class DialogueEffects
     // without reaching into the switch.
     public static readonly string[] Ids =
     {
-        "give_item", "take_item", "set_quest", "advance_quest",
+        "give_item", "take_item", "set_quest", "advance_quest", "set_stage",
         "credits", "recruit", "start_battle", "open_shop", "set_flag",
         "play_anim",
     };
+
+    // The stage argument that means "the next one", so a conversation can push
+    // a quest along without naming a number that content edits would age out.
+    public const string NextStageArg = "next";
 
     // Static check for the editor's pre-save validation (dialogue-editor plan
     // Phase 4): does this effect name a known verb with args that parse against
@@ -77,6 +81,35 @@ public static class DialogueEffects
                 }
                 return QuestCatalog.Get(advanceQuestId) == null
                     ? $"advance_quest: no quest with id {advanceQuestId}"
+                    : null;
+            case "set_stage":
+                if (a.Length != 2)
+                {
+                    return $"set_stage takes <questId> <stageNumber|{NextStageArg}>";
+                }
+                if (!uint.TryParse(a[0], out var stageQuestId))
+                {
+                    return $"set_stage: quest id '{a[0]}' is not a whole number";
+                }
+                var stagedQuest = QuestCatalog.Get(stageQuestId);
+                if (stagedQuest == null)
+                {
+                    return $"set_stage: no quest with id {stageQuestId}";
+                }
+                if (!stagedQuest.HasStages)
+                {
+                    return $"set_stage: quest {stageQuestId} declares no stages";
+                }
+                if (a[1] == NextStageArg)
+                {
+                    return null;
+                }
+                if (!uint.TryParse(a[1], out var stageNumber))
+                {
+                    return $"set_stage: stage '{a[1]}' is not a whole number or '{NextStageArg}'";
+                }
+                return stagedQuest.GetStage(stageNumber) == null
+                    ? $"set_stage: quest {stageQuestId} has no stage {stageNumber}"
                     : null;
             case "credits":
                 if (a.Length != 1)
@@ -156,6 +189,9 @@ public static class DialogueEffects
                 break;
             case "advance_quest":
                 AdvanceQuest(effect, context);
+                break;
+            case "set_stage":
+                SetStage(effect, context);
                 break;
             case "credits":
                 Credits(effect, context);
@@ -246,6 +282,50 @@ public static class DialogueEffects
             var current => current,
         };
         MoveQuest(context, questId, next);
+    }
+
+    // set_stage <questId> <n|next> moves a quest along its authored stages —
+    // the scripted advancement stages ship with (quest-system.md Phase 1).
+    // Distinct from advance_quest, which moves the success state: a quest is
+    // finished by set_quest/advance_quest, never by running out of stages.
+    private static void SetStage(EffectRef effect, DialogueContext context)
+    {
+        if (!TryUInt(effect, 0, context, out var questId))
+        {
+            return;
+        }
+        var raw = effect.Arg(1);
+        var before = context.State.GetQuestStage(questId);
+        bool moved;
+        if (raw == NextStageArg)
+        {
+            moved = context.State.AdvanceQuestStage(questId);
+        }
+        else if (uint.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var stageNumber))
+        {
+            moved = context.State.SetQuestStage(questId, stageNumber);
+        }
+        else
+        {
+            context.Warn($"Dialogue effect 'set_stage' expected a stage number or '{NextStageArg}', got '{raw}'.");
+            return;
+        }
+        if (!moved)
+        {
+            // Either the stage doesn't exist or the quest is already on its
+            // last one. Both are worth saying: a conversation replayed from the
+            // end shouldn't look like it did something.
+            context.Warn($"Dialogue effect 'set_stage' could not move quest {questId} to stage '{raw}'.");
+            return;
+        }
+        var stage = context.State.GetCurrentStage(questId);
+        if (context.State.GetQuestStage(questId) != before && stage != null)
+        {
+            // The player's "what now" line, logged and toasted the way a quest
+            // state move is — a new objective is the same kind of news.
+            context.State.RecordEvent(GameEventKind.Quest,
+                $"New objective: {stage.SubtitleText}", notify: true);
+        }
     }
 
     // Applies a quest state change and logs it, but only when it actually

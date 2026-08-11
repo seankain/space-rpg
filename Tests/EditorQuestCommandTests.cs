@@ -55,19 +55,55 @@ public class EditorQuestCommandTests
     public void StageWritesCurrentStageNumber()
     {
         var state = NewState();
-        var result = EditorQuestCommands.Run(state, Args("stage", QuestId.ToString(), "3"));
+        var result = EditorQuestCommands.Run(state, Args("stage", QuestId.ToString(), "2"));
         Assert.True(result.Success);
-        Assert.Equal(3u, StageOf(state, QuestId));
+        Assert.Equal(2u, StageOf(state, QuestId));
+    }
+
+    // Stage numbers are bounded by the definition now that quests declare
+    // stages (quest-system.md Phase 1): a typo is refused rather than written.
+    [Fact]
+    public void StageRejectsAStageTheQuestDoesNotHave()
+    {
+        var state = NewState();
+        var beyondLast = (uint)QuestCatalog.Get(QuestId).Stages.Count + 1;
+        var result = EditorQuestCommands.Run(state, Args("stage", QuestId.ToString(), beyondLast.ToString()));
+        Assert.False(result.Success);
+        Assert.Empty(state.Quests);
     }
 
     [Fact]
-    public void AdvanceIncrementsStageFromZero()
+    public void StageNextStepsThroughTheStagesAndStopsAtTheLast()
     {
         var state = NewState();
-        EditorQuestCommands.Run(state, Args("advance", QuestId.ToString()));
-        Assert.Equal(1u, StageOf(state, QuestId));
-        EditorQuestCommands.Run(state, Args("advance", QuestId.ToString()));
-        Assert.Equal(2u, StageOf(state, QuestId));
+        var stageCount = QuestCatalog.Get(QuestId).Stages.Count;
+
+        for (var expected = 1; expected <= stageCount; expected++)
+        {
+            Assert.True(EditorQuestCommands.Run(state, Args("stage", QuestId.ToString(), "next")).Success);
+            Assert.Equal((uint)expected, StageOf(state, QuestId));
+        }
+
+        // The last stage is the end of the ladder: finishing is a state move.
+        Assert.False(EditorQuestCommands.Run(state, Args("stage", QuestId.ToString(), "next")).Success);
+        Assert.Equal((uint)stageCount, StageOf(state, QuestId));
+    }
+
+    // `advance` moves the success state, matching the dialogue vocabulary's
+    // advance_quest; stages moved with it before stages were real.
+    [Fact]
+    public void AdvanceStepsTheStateAndStopsAtSuccess()
+    {
+        var state = NewState();
+
+        Assert.True(EditorQuestCommands.Run(state, Args("advance", QuestId.ToString())).Success);
+        Assert.Equal(QUESTSUCCESSSTATE.InProgress, state.GetQuestState(QuestId));
+
+        Assert.True(EditorQuestCommands.Run(state, Args("advance", QuestId.ToString())).Success);
+        Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(QuestId));
+
+        Assert.False(EditorQuestCommands.Run(state, Args("advance", QuestId.ToString())).Success);
+        Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(QuestId));
     }
 
     [Fact]

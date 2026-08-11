@@ -191,10 +191,11 @@ public partial class QuestLogMenu : Control
 		UpdateTrackingControls(quest, state);
 	}
 
-	// The objective lines and the two buttons, all driven by the marker
-	// resolver: an in-progress quest lists where it wants the player to go
-	// (positions aren't needed here — the Map tab resolves those), and a
-	// finished one offers no tracking.
+	// The current-stage line, the objective lines, and the two buttons. The
+	// stage comes from the quest's own progress (quest-system.md Phase 1) and
+	// the objectives from the marker resolver: an in-progress quest lists where
+	// it wants the player to go (positions aren't needed here — the Map tab
+	// resolves those), and a finished one offers no tracking.
 	private void UpdateTrackingControls(Quest quest, QUESTSUCCESSSTATE questState)
 	{
 		if (objectivesLabel == null)
@@ -207,10 +208,20 @@ public partial class QuestLogMenu : Control
 			? new List<string>()
 			: QuestMarkerResolver.ActiveMarkers(state, quest).Select(marker => marker.Label).ToList();
 
-		objectivesLabel.Visible = objectives.Count > 0;
-		objectivesLabel.Text = objectives.Count > 0
-			? "Objectives:\n" + string.Join("\n", objectives.Select(label => "  • " + label))
-			: "";
+		// Only while it is being played: a stage is where the player is up to,
+		// which says nothing useful about a quest already won or lost.
+		var lines = new List<string>();
+		if (trackable && state?.GetCurrentStage(quest.Id) is { } stage)
+		{
+			lines.Add($"Current: {stage.SubtitleText}");
+		}
+		if (objectives.Count > 0)
+		{
+			lines.Add("Objectives:");
+			lines.AddRange(objectives.Select(label => "  • " + label));
+		}
+		objectivesLabel.Visible = lines.Count > 0;
+		objectivesLabel.Text = string.Join("\n", lines);
 
 		// A toggle, not a one-way switch: tracking starts by itself when a quest
 		// is taken, so there has to be a way to turn the markers back off.

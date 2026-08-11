@@ -26,7 +26,7 @@ public static class DialogueConditions
     {
         "quest_state", "has_item", "npc_defeated", "party_has_room",
         "flag", "party_size", "stat",
-        "credits", "item_count", "health", "max_health", "level", "quest", "flag_value",
+        "credits", "item_count", "health", "max_health", "level", "quest", "quest_stage", "flag_value",
     };
 
     // Two-character forms come first: the Yarn parser scans this list in order,
