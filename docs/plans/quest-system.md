@@ -6,7 +6,7 @@ Depends on: dialogue plan Phase 4 (quest commands) for the primary way quests st
 
 ## Where we are
 
-*(Reviewed against the tree at `872c474`, then updated as Phases 1 and 2 landed.)* The plan's own phases have been worked on out of order: the parts the [quest-markers plan](quest-markers.md) needed were built first. **Quests start, advance, complete, save, display, run on authored stages, and move through one place that reads prerequisites — what is left is rewards and depth.**
+*(Reviewed against the tree at `872c474`, then updated as Phases 1–3 landed.)* The plan's own phases have been worked on out of order: the parts the [quest-markers plan](quest-markers.md) needed were built first. **Quests start, advance, complete, save, display, run on authored stages, move through one place that reads prerequisites, and are visible without opening a menu — what is left is Phase 4's rewards and depth.**
 
 What exists:
 
@@ -15,8 +15,9 @@ What exists:
 - **Transitions** all run through `QuestManager` (`StartQuest`, `SetState`, `CompleteQuest`, `FailQuest`, `AdvanceState`, `SetStage`, `AdvanceStage`, `ReachStage`), whoever asked for them: dialogue (`<<set_quest 1 Success>>`, `<<advance_quest 1>>`, `<<set_stage 1 next>>`), the developer console (`quest start|set|stage|advance`, `quests`), and world beats (`QuestTrigger`, a quest-carrying `Pickup`). The manager checks prerequisites, writes the `GameEventKind.Quest` log line with `notify` set — so any move raises a corner toast through `EventToasts` — and announces itself on the static `QuestManager.Moved` hook.
 - **Reads** are `GameState.GetQuestState` / `GetQuestStage` / `GetCurrentStage`, exposed to authoring as the `quest_state(1, "Success")` predicate and the `quest(1)` / `quest_stage(1)` queries.
 - **Journal**: `QuestLogMenu` drives the Quests tab — Main / Side / Completed / Failed sections, a details panel with the current stage's subtitle, an objective list, a Track toggle, and Show on Map.
+- **In the world**: `QuestHud` (autoload) draws the tracked quest's title and current objective in the bottom-left corner while the player is playing, and `QuestGiverIndicator` floats a "!" over an NPC who has a quest to offer. Both read the engine-free `QuestObjectives` / `QuestManager.AvailableFrom`, and the link they need — `Quest.GiverNpcId` — is authored on the definition.
 - **Markers and tracking**: `Quest.Markers`, `QuestMarkerResolver`, `QuestTargetLocator`, `QuestMarkerPlacements`, `GameState.TrackedQuestId` (save version 10) and the static `QuestTracking.Changed` hook — all four phases of [quest-markers.md](quest-markers.md), which is where the journal's objective lines come from.
-- **Catalog validation** is `QuestCatalog.Problems`, run over every definition in the static constructor and reported as one message: bad markers, stage numbers that don't run 1..n in order, a stage with no subtitle, and prerequisites that name a missing quest, the quest itself, or the same quest twice.
+- **Catalog validation** is `QuestCatalog.Problems`, run over every definition in the static constructor and reported as one message: bad markers, stage numbers that don't run 1..n in order, a stage with no subtitle, prerequisites that name a missing quest, the quest itself, or the same quest twice, and a giver id that couldn't be an NpcId.
 
 - **World beats** are `QuestTrigger` (an Area3D: the player walks in, the quest reaches the stage that place stands for) and the same two fields on `Pickup` (collecting the Maguffin Cube puts quest 1 on stage 2, which is the fetch quest's middle beat). Both ask for "at least this stage" on a quest in progress, so they are idempotent and no trigger stores anything in the save.
 
@@ -60,13 +61,18 @@ It is a **static engine-free class taking the `GameState`**, not an autoload hol
 
 **Done when:** the fetch-quest loop from the dialogue plan drives quest state through `QuestManager` and survives save/load at every stage. ***Met*** — Hale's conversation starts it (stage 1), the cube's pickup advances it (stage 2), his turn-in completes it, every step through the manager, and `Tests/QuestStageTests.cs` covers the stage half of the round trip. "Clear the Deck" still can't reach its second stage in play; its beat is a battle win, which is Phase 4's auto-checked objectives rather than a fourth kind of hook.
 
-## Phase 3 — Journal UI and player feedback *(mostly done)*
+## Phase 3 — Journal UI and player feedback *(done)*
 
 1. ~~**Journal tab** in `InGameMenu`~~ — **done** (`QuestLogMenu`): active quests in Main / Side sections per the `SideQuest` flag, plus Completed and Failed, each row showing title, and a details panel with status, description, and — for a quest still in progress — a "Current: …" line carrying the stage subtitle. The objective lines below it come from the markers plan's resolver, not from stages; the two say the same thing for the shipped content and will diverge once a quest has more beats than markers.
-2. **HUD notifications:** **done by a different route than planned.** Quest moves are recorded as `GameEventKind.Quest` entries with `notify` set, and the generic `EventToasts` autoload turns any notifying entry into a corner toast — so there is no quest-specific subscription to write. Still outstanding: the "tracked quest objective line" on `PlayerHud`, which is an empty shell; the Map tab carries that line instead.
-3. Mark quest-relevant NPCs (indicator over quest givers with an available quest — reads prereq-satisfied, unstarted quests targeting that NPC). **Not started**, but half-unblocked: `QuestManager.PrereqProblem` is the "could the party take this?" check it needed. What is still missing is a link from a quest to the NPC that offers it. `NpcRole.RequiredQuestId` gates whether a role is *available*, which is the opposite direction and not a substitute.
+2. ~~**HUD notifications**~~ — **done, by two routes**. Quest moves are recorded as `GameEventKind.Quest` entries with `notify` set, and the generic `EventToasts` autoload turns any notifying entry into a corner toast, so there is no quest-specific toast subscription to write. The standing objective line is `QuestHud`, a second autoload built in code the way the toasts are: the tracked quest's title and its current objective, bottom-left, hidden whenever gameplay is blocked (a conversation, a menu, a battle).
+   - Not on `PlayerHud`, where this list expected it: that shell is a `Control` in `Scenes/` that nothing instances, and the objective line needs its own `CanvasLayer` to sit under the dialogue box. `PlayerHud` is left for player vitals, which is what a HUD attached to the player scene is for.
+   - What it says is `QuestObjectives`, engine-free: the current stage's subtitle when the quest has stages, else its live marker labels. The journal has room for both and shows both; the HUD has one line, so the choice had to live somewhere testable rather than being worded a third way in a third scene.
+   - It follows `QuestManager.Moved` and `QuestTracking.Changed`, and compares tracked-quest/stage/blocked per frame for the two cases with no signal — a save loaded under it, and a window opening over it.
+3. ~~Mark quest-relevant NPCs~~ — **done**: `Quest.GiverNpcId` is the missing link, authored on the definition (Hale gives the fetch quest, Marlow the bounty), validated at registration for shape and checked against the `.tres` files on disk by the test suite the way marker NPC targets are. `QuestManager.AvailableFrom(state, npcId)` answers "what can this NPC offer right now" — authored giver, not started, prerequisites met — and `QuestGiverIndicator`, added to every spawned NPC, shows a "!" while that list isn't empty and refreshes on every quest move.
+   - The mark only ever says "there is something here", never which quest: a title floating over a stranger's head gives away a beat the conversation should land.
+   - The link is authored rather than derived from a conversation's `set_quest` verbs — dialogue moves between NPCs freely, and a quest is offered by whoever the writer says offers it.
 
-**Done when:** a player can follow the fetch quest end-to-end using only the journal and HUD cues. *(Reachable today — journal objectives, map markers, and toasts cover it — with no on-NPC indicator to point the player at the quest in the first place.)*
+**Done when:** a player can follow the fetch quest end-to-end using only the journal and HUD cues. ***Met*** — the "!" over Hale points at the quest before it exists, the HUD line carries the current objective through the middle of it, toasts announce each move, and the journal and map are there for the detail.
 
 ## Phase 4 — Rewards and depth *(not started)*
 
@@ -79,11 +85,11 @@ It is a **static engine-free class taking the `GameState`**, not an autoload hol
 
 ## Suggested next slice
 
-Phases 1 and 2 are in, so what remains is Phase 4's depth and the two Phase 3 leftovers. In order:
+Phases 1–3 are in; everything left is Phase 4. In order:
 
-- **Rewards on the definition** (Phase 4 item 1) — the last thing authored in dialogue that ought to belong to the quest, and `QuestManager.Moved` is the hook it subscribes to. The XP half waits on the build plan's `GrantXp`; items and credits don't.
-- **Auto-checked objectives** (Phase 4 item 2) — the third and last way a stage can move, and the one "Clear the Deck" needs. A stage gains a `ReachedWhen` `ConditionRef` re-used from the marker vocabulary, evaluated when the state it reads changes.
-- **The quest-giver indicator** (Phase 3 item 3) — now only needs a quest→NPC link; the prerequisite check it was waiting for exists.
+- **Rewards on the definition** (item 1) — the last thing authored in dialogue that ought to belong to the quest, and `QuestManager.Moved` is the hook a grant subscribes to. The XP half waits on the build plan's `GrantXp`; items and credits don't.
+- **Auto-checked objectives** (item 2) — the third and last way a stage can move, and the one "Clear the Deck" needs to reach its second beat. A stage gains a `ReachedWhen` `ConditionRef` re-used from the marker vocabulary, evaluated when the state it reads changes; that also closes the ordering gap under Phase 2 item 3.
+- **A quest chain** (item 4) — prerequisites are validated, enforced and unexercised. One authored chain would be the first content to prove them.
 
 ## Decisions to settle early
 
@@ -91,5 +97,5 @@ Phases 1 and 2 are in, so what remains is Phase 4's depth and the two Phase 3 le
 |----------|----------------|
 | Where quest logic lives | Definitions are data; transitions happen only through `QuestManager` APIs, driven by dialogue commands and triggers — no quest-specific C# per quest. *(Held, and now literally: `QuestManager` exists and every dialogue verb, console verb and world beat goes through it. Storage and tracking stay on `GameState`, which is what the markers plan relies on.)* |
 | Stage progression shape | Linear stage list with explicit scripted advancement first; add conditions/branching in Phase 4 only once real content demands it. *(Held: `Quest.Stages` is a linear list numbered 1..n, moved only by `set_stage` / `quest stage`. The two vocabularies coexist as hoped — a stage is scripted, and `quest_stage(1) >= 2` gates a marker or a branch the same way any other condition does.)* |
-| Journal scope | Text-only journal for v1 — no map markers until a map system exists. *(Superseded: the map exists and markers shipped — [quest-markers.md](quest-markers.md), all four phases — which is also where the journal's objective lines and the tracked quest came from.)* |
+| Journal scope | Text-only journal for v1 — no map markers until a map system exists. *(Superseded twice: the map exists and markers shipped — [quest-markers.md](quest-markers.md), all four phases — which is also where the journal's objective lines and the tracked quest came from; and the quest now reaches outside the menu entirely, as a HUD line and a mark over its giver's head.)* |
 | Catalog format | Static C# registry for now, mirroring `ItemCatalog`; JSON authoring (Phase 1 item 1) is still wanted, and markers move with the definitions when it happens. |
