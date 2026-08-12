@@ -8,6 +8,16 @@ public class Quest
     public string Description{get;set;}
     public bool SideQuest {get;set;}
     public List<QuestPrereqFlag> PrereqQuests {get;set;}
+    // The NpcDefinition.NpcId of whoever offers this quest ("intro.vex"), or
+    // empty for one nobody hands out (quest-system.md Phase 3). This is the
+    // quest naming its giver, which is the direction the journal and the
+    // on-NPC indicator need; NpcRole.RequiredQuestId points the other way and
+    // answers a different question.
+    //
+    // Authored, not derived: a conversation could in principle be scanned for
+    // a `set_quest` verb, but a quest is offered by whoever the writer says
+    // offers it, and dialogue moves between NPCs freely.
+    public string GiverNpcId {get;set;} = "";
     // Where this quest sends the player, in authored order (quest-markers.md
     // Phase 1). Which of them apply at a given moment is decided by each
     // marker's condition, not by this list's order; the map draws the ones the

@@ -22,6 +22,7 @@ public static class QuestCatalog
             Description = "Dockmaster Hale lost his prized Maguffin Cube somewhere on the station. Find it and bring it back to him.",
             SideQuest = false,
             PrereqQuests = new List<QuestPrereqFlag>(),
+            GiverNpcId = "intro.dockmaster_hale",
             // The same two beats the markers below describe, as the journal's
             // "what am I doing right now" line. Nothing advances this one in
             // play yet: the beat it turns on is picking the cube up, which is a
@@ -54,6 +55,7 @@ public static class QuestCatalog
             Description = "Chief Marlow wants Vex, the thug shaking down couriers on the plaza, taught a lesson. Defeat him and report back for a maintenance keycard.",
             SideQuest = true,
             PrereqQuests = new List<QuestPrereqFlag>(),
+            GiverNpcId = "intro.chief_marlow",
             Stages =
             {
                 QuestStage.Create(1, "Deal with Vex",
@@ -128,6 +130,33 @@ public static class QuestCatalog
         foreach (var problem in PrereqProblems(quest, knownIds))
         {
             yield return problem;
+        }
+        foreach (var problem in GiverProblems(quest))
+        {
+            yield return problem;
+        }
+    }
+
+    // A giver is optional — plenty of quests will start from a trigger or
+    // another quest — but a value that couldn't be an NpcId is a typo rather
+    // than "nobody offers this", and it would show up only as an indicator
+    // that never appears. Whether the named NPC exists is checked against the
+    // .tres files on disk by the test suite, the same place a marker's npc:
+    // target is: NpcDatabase is Godot-facing and this layer can't see it.
+    private static IEnumerable<string> GiverProblems(Quest quest)
+    {
+        var giver = quest.GiverNpcId;
+        if (string.IsNullOrEmpty(giver))
+        {
+            yield break;
+        }
+        if (string.IsNullOrWhiteSpace(giver))
+        {
+            yield return "giver npc id is blank";
+        }
+        else if (giver.IndexOf(QuestMarkerTarget.Separator) >= 0)
+        {
+            yield return $"giver npc id '{giver}' can't contain '{QuestMarkerTarget.Separator}'";
         }
     }
 

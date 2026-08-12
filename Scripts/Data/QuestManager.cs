@@ -86,6 +86,30 @@ public static class QuestManager
         return null;
     }
 
+    // What this NPC has to offer right now: the quests they are authored as the
+    // giver of, that the party hasn't taken, and whose prerequisites are met
+    // (quest-system.md Phase 3). What the indicator over a quest-giver's head
+    // reads, and the reason `PrereqProblem` is public — asking "could they take
+    // this?" must not start anything.
+    public static IReadOnlyList<Quest> AvailableFrom(GameState state, string npcId)
+    {
+        var available = new List<Quest>();
+        if (state == null || string.IsNullOrEmpty(npcId))
+        {
+            return available;
+        }
+        foreach (var quest in QuestCatalog.All)
+        {
+            if (string.Equals(quest.GiverNpcId, npcId, StringComparison.Ordinal)
+                && state.GetQuestState(quest.Id) == QUESTSUCCESSSTATE.Unstarted
+                && PrereqProblem(state, quest) == null)
+            {
+                available.Add(quest);
+            }
+        }
+        return available;
+    }
+
     // ----- State -----
 
     // Applies a quest state change, logs it, and announces it. False when
