@@ -119,7 +119,7 @@ The design below adds the missing half: **value-returning queries plus a real co
 Split the vocabulary in two, along the line Yarn already draws:
 
 - **Predicates** return a bool and stand alone: `has_item`, `flag`, `npc_defeated`, `quest_state`, `party_has_room`, `visited`.
-- **Queries** return a number or a string and must be compared: `credits`, `party_size`, `stat`, `item_count`, `health`, `level`, `quest`, `flag_value`.
+- **Queries** return a number or a string and must be compared: `credits`, `party_size`, `stat`, `item_count`, `health`, `level`, `quest`, `quest_stage`, `flag_value`.
 
 A condition is then one of three shapes:
 
@@ -140,6 +140,7 @@ A condition is then one of three shapes:
 | `health()` / `max_health()` | number | leader's `HealthPoints` / `MaxHealthPoints` |
 | `level()` | number | leader's `Level` |
 | `quest(<questId>)` | string | `GetQuestState` name (`"InProgress"`) |
+| `quest_stage(<id>)` | number | `GameState.GetQuestStage` |
 | `flag_value(<name>)` | string | `GameState.GetFlag` |
 
 Numbers compare with `== != > < >= <=`; strings with `==` / `!=`, case-insensitively, matching how `flag` compares today. Stat names stay the existing `DialogueConditions.StatNames` list, and `stat(name)` as a query supersedes `stat(name, atLeast)` as a predicate.

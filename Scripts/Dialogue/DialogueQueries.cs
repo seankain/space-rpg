@@ -28,7 +28,7 @@ public static class DialogueQueries
     public static readonly string[] Ids =
     {
         "credits", "party_size", "item_count", "stat",
-        "health", "max_health", "level", "quest", "flag_value",
+        "health", "max_health", "level", "quest", "quest_stage", "flag_value",
     };
 
     // The stats stat(...) can read, spelled as CharacterStats names. Charisma is
@@ -49,7 +49,7 @@ public static class DialogueQueries
     // How many arguments the call itself takes, ahead of the comparison's
     // operator and value: credits() none, item_count(3) one.
     public static int Arity(string id) =>
-        id is "item_count" or "stat" or "quest" or "flag_value" ? 1 : 0;
+        id is "item_count" or "stat" or "quest" or "quest_stage" or "flag_value" ? 1 : 0;
 
     // The call's shape, for a validator message.
     public static string Signature(string id) => id switch
@@ -57,6 +57,7 @@ public static class DialogueQueries
         "item_count" => "item_count(<itemId>)",
         "stat" => $"stat(<{string.Join("|", StatNames)}>)",
         "quest" => "quest(<questId>)",
+        "quest_stage" => "quest_stage(<questId>)",
         "flag_value" => "flag_value(<flag>)",
         _ => $"{id}()",
     };
@@ -68,6 +69,7 @@ public static class DialogueQueries
         "item_count" => "item_count(1) >= 2",
         "stat" => "stat(\"Charisma\") >= 12",
         "quest" => "quest(1) == \"Success\"",
+        "quest_stage" => "quest_stage(1) >= 2",
         "flag_value" => "flag_value(\"hale_mood\") == \"angry\"",
         "credits" => "credits() >= 200",
         _ => $"{id}() >= 1",
@@ -103,12 +105,13 @@ public static class DialogueQueries
                     ? $"stat: '{a[0]}' is not a stat ({string.Join(", ", StatNames)})"
                     : null;
             case "quest":
+            case "quest_stage":
                 if (!uint.TryParse(a[0], out var questId))
                 {
-                    return $"quest: quest id '{a[0]}' is not a whole number";
+                    return $"{id}: quest id '{a[0]}' is not a whole number";
                 }
                 return QuestCatalog.Get(questId) == null
-                    ? $"quest: no quest with id {questId}"
+                    ? $"{id}: no quest with id {questId}"
                     : null;
             case "flag_value":
                 if (string.IsNullOrWhiteSpace(a[0]))
@@ -151,6 +154,18 @@ public static class DialogueQueries
                 return true;
             case "stat":
                 return TryStat(a, context, out value);
+            case "quest_stage":
+                // Which beat of a quest the player is on, 0 for one they
+                // haven't started (quest-system.md Phase 1) — so
+                // `quest_stage(1) >= 2` is "past the first beat", and reads
+                // false for a quest not yet taken rather than needing a
+                // quest_state guard beside it.
+                if (!TryUInt(id, a, 0, context, out var stageQuestId))
+                {
+                    return false;
+                }
+                value = state.GetQuestStage(stageQuestId);
+                return true;
             case "health":
             case "max_health":
             case "level":

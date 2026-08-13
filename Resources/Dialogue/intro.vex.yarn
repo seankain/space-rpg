@@ -1,7 +1,21 @@
-// Vex — the deck tough. "Settle it" launches a real turn-based battle and, on
-// the player's win, despawns him for good (recorded in DefeatedNpcs).
+// Vex — the deck tough, and the bounty's two ways out (quest-system.md Phase 4).
+// "Settle it" launches a real turn-based battle and, on the player's win,
+// despawns him for good (recorded in DefeatedNpcs). "Buy him off" costs credits
+// and leaves him standing — the flag is what everyone else reads afterwards.
+//
+// Only the paid route touches the quest directly: putting him down reaches
+// stage 2 by itself, because the stage's condition is npc_defeated.
 
 title: greet
+---
+<<if flag("vex_paid")>>
+    <<jump paid_greet>>
+<<else>>
+    <<jump challenge>>
+<<endif>>
+===
+
+title: challenge
 ---
 // Blade out for the whole confrontation: a looping gesture holds until the
 // conversation closes (or the fight starts).
@@ -10,6 +24,49 @@ $npc: This is my stretch of deck, groundsider. Turn around, or we settle it righ
 -> Settle it
     <<start_battle despawn>>
     <<stop>>
+-> Marlow sent me. Name your price. <<if credits() >= 120>>
+    <<jump haggle>>
 -> Walk away
     $npc: Smart. Keep walking.
+===
+
+title: haggle
+---
+$npc: Marlow. Of course. A hundred and twenty and I take my business two decks down — and he hears whatever you like.
+-> Pay him the 120
+    <<credits -120>>
+    <<set_flag vex_paid>>
+    <<jump paid_off>>
+-> Keep the credits
+    $npc: Then stop wasting my afternoon.
+===
+
+// Whether that also moved the bounty along depends on whether the player has
+// taken it yet; paying Vex before talking to Marlow is a perfectly good order
+// to do this in, and Marlow's own offer picks the flag up later.
+title: paid_off
+---
+<<if quest_state(2, "InProgress")>>
+    <<jump paid_off_bounty>>
+<<else>>
+    <<jump paid_off_early>>
+<<endif>>
+===
+
+title: paid_off_bounty
+---
+<<set_stage 2 2>>
+<<play_anim Use_Item>>
+$npc: Pleasure. Tell the chief the plaza's his — I was bored of it anyway.
+===
+
+title: paid_off_early
+---
+<<play_anim Use_Item>>
+$npc: Pleasure. I'll be somewhere warmer by the next shift.
+===
+
+title: paid_greet
+---
+$npc: We're square, groundsider. I don't work this stretch any more.
 ===

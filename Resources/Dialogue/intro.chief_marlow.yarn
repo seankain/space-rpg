@@ -1,6 +1,12 @@
-// Chief Marlow — the "Clear the Deck" bounty (quest 2): put Vex down, report
-// back, get paid a Maintenance Keycard (item 5). The offer and turn-in both
-// check npc_defeated, so beating Vex before taking the bounty still pays out.
+// Chief Marlow — the "Clear the Deck" bounty (quest 2): get Vex off the plaza,
+// report back, get paid. The payment is the quest's reward now, not a give_item
+// here (quest-system.md Phase 4) — there are two ways to finish this and only
+// one of them used to run through this conversation's turn-in line.
+//
+// The two routes are read here the same way the quest's stage condition and
+// Vex's own conversation read them — npc_defeated, or the flag his payoff sets
+// — rather than through the stage they both reach: a turn-in should depend on
+// the world, not on a summary of it. Marlow has an opinion about which.
 
 title: entry
 ---
@@ -16,7 +22,9 @@ title: entry
 title: inprogress
 ---
 <<if npc_defeated("intro.vex")>>
-    <<jump turnin>>
+    <<jump beaten_turnin>>
+<<elseif flag("vex_paid")>>
+    <<jump bought_turnin>>
 <<else>>
     <<jump inprogress_waiting>>
 <<endif>>
@@ -26,6 +34,8 @@ title: offer
 ---
 <<if npc_defeated("intro.vex")>>
     <<jump offer_downed>>
+<<elseif flag("vex_paid")>>
+    <<jump offer_bought>>
 <<else>>
     <<jump offer_pending>>
 <<endif>>
@@ -33,7 +43,7 @@ title: offer
 
 title: already_done
 ---
-$npc: Deck's been quiet since you put Vex on the plates. Keep that keycard handy — it opens more doors than you'd think.
+$npc: Deck's been quiet since you dealt with Vex. Keep that keycard handy — it opens more doors than you'd think.
 ===
 
 title: inprogress_waiting
@@ -43,10 +53,10 @@ $npc: Vex is still strutting around the plaza like he owns it. The keycard's you
 
 title: offer_pending
 ---
-$npc: See that red-suited thug by the plaza? Vex. He's been shaking down every courier on this deck and my hands are tied. Put him down a peg and there's a maintenance keycard in it for you.
+$npc: See that red-suited thug by the plaza? Vex. He's been shaking down every courier on this deck and my hands are tied. Get him off my plaza and there's a maintenance keycard in it for you.
 -> I'll handle Vex
     <<set_quest 2 InProgress>>
-    $npc: Watch yourself — he doesn't fight fair, and he keeps a drone at his back. Come see me when it's done.
+    $npc: I don't much mind how. Watch yourself either way — he doesn't fight fair, and he keeps a drone at his back.
 -> Not my problem
     <<jump declined>>
 ===
@@ -56,7 +66,17 @@ title: offer_downed
 $npc: Word is somebody already put Vex on the deck plates. That was you, wasn't it? I was about to post a bounty on him — say the word and it's yours.
 -> That was me
     <<set_quest 2 InProgress>>
-    <<jump turnin>>
+    <<jump beaten_turnin>>
+-> Not my problem
+    <<jump declined>>
+===
+
+title: offer_bought
+---
+$npc: Word is Vex packed up and took his business two decks down, and that credits changed hands over it. Yours?
+-> Mine
+    <<set_quest 2 InProgress>>
+    <<jump bought_turnin>>
 -> Not my problem
     <<jump declined>>
 ===
@@ -66,10 +86,18 @@ title: declined
 $npc: Then keep your credits out of his reach, and don't say I didn't warn you.
 ===
 
-title: turnin
+// The keycard itself comes from the quest's reward, so it arrives on either
+// route without this conversation handing it over.
+title: beaten_turnin
 ---
 <<play_anim Use_Item>>
-<<give_item 5>>
 <<set_quest 2 Success>>
 $npc: So the deck finally goes quiet. A deal's a deal — here's the maintenance keycard. It'll open doors most people never get to see.
+===
+
+title: bought_turnin
+---
+<<play_anim Use_Item>>
+<<set_quest 2 Success>>
+$npc: Bought him off. Not how I'd have done it, and he'll be somebody else's problem by morning — but the plaza's quiet and a deal's a deal. Keycard's yours.
 ===

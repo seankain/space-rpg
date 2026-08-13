@@ -20,6 +20,11 @@ public partial class SaveManager : Node
         repository = new SaveRepository(
             ProjectSettings.GlobalizePath("user://saves"),
             warning => GD.PushWarning(warning));
+        // Condition-driven quest stages re-check themselves whenever the party
+        // does something worth logging (quest-system.md Phase 4). The watcher
+        // is engine-free and the running state lives here, so it takes a lookup
+        // rather than an instance — loading a save replaces the state.
+        QuestObjectiveWatcher.Install(() => CurrentState);
     }
 
     public GameState StartNewGame(CharacterCreationData creation)
@@ -87,6 +92,10 @@ public partial class SaveManager : Node
         {
             NpcDatabase.MigrateLegacyDefeatedNames(CurrentState);
         }
+        // A save written before a stage condition existed — or one saved with
+        // the condition already true — catches up here rather than waiting for
+        // the party's next logged move.
+        QuestObjectiveWatcher.Evaluate(CurrentState, GD.PushWarning);
         return CurrentState;
     }
 

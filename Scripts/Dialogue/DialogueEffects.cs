@@ -14,10 +14,14 @@ public static class DialogueEffects
     // without reaching into the switch.
     public static readonly string[] Ids =
     {
-        "give_item", "take_item", "set_quest", "advance_quest",
+        "give_item", "take_item", "set_quest", "advance_quest", "set_stage",
         "credits", "recruit", "start_battle", "open_shop", "set_flag",
         "play_anim",
     };
+
+    // The stage argument that means "the next one", so a conversation can push
+    // a quest along without naming a number that content edits would age out.
+    public const string NextStageArg = "next";
 
     // Static check for the editor's pre-save validation (dialogue-editor plan
     // Phase 4): does this effect name a known verb with args that parse against
@@ -77,6 +81,35 @@ public static class DialogueEffects
                 }
                 return QuestCatalog.Get(advanceQuestId) == null
                     ? $"advance_quest: no quest with id {advanceQuestId}"
+                    : null;
+            case "set_stage":
+                if (a.Length != 2)
+                {
+                    return $"set_stage takes <questId> <stageNumber|{NextStageArg}>";
+                }
+                if (!uint.TryParse(a[0], out var stageQuestId))
+                {
+                    return $"set_stage: quest id '{a[0]}' is not a whole number";
+                }
+                var stagedQuest = QuestCatalog.Get(stageQuestId);
+                if (stagedQuest == null)
+                {
+                    return $"set_stage: no quest with id {stageQuestId}";
+                }
+                if (!stagedQuest.HasStages)
+                {
+                    return $"set_stage: quest {stageQuestId} declares no stages";
+                }
+                if (a[1] == NextStageArg)
+                {
+                    return null;
+                }
+                if (!uint.TryParse(a[1], out var stageNumber))
+                {
+                    return $"set_stage: stage '{a[1]}' is not a whole number or '{NextStageArg}'";
+                }
+                return stagedQuest.GetStage(stageNumber) == null
+                    ? $"set_stage: quest {stageQuestId} has no stage {stageNumber}"
                     : null;
             case "credits":
                 if (a.Length != 1)
@@ -156,6 +189,9 @@ public static class DialogueEffects
                 break;
             case "advance_quest":
                 AdvanceQuest(effect, context);
+                break;
+            case "set_stage":
+                SetStage(effect, context);
                 break;
             case "credits":
                 Credits(effect, context);
@@ -248,25 +284,65 @@ public static class DialogueEffects
         MoveQuest(context, questId, next);
     }
 
-    // Applies a quest state change and logs it, but only when it actually
-    // moves: a conversation the player replays shouldn't fill the log with
-    // "started" lines for a quest they already have.
-    private static void MoveQuest(DialogueContext context, uint questId, QUESTSUCCESSSTATE target)
+    // set_stage <questId> <n|next> moves a quest along its authored stages —
+    // the scripted advancement stages ship with (quest-system.md Phase 1).
+    // Distinct from advance_quest, which moves the success state: a quest is
+    // finished by set_quest/advance_quest, never by running out of stages.
+    private static void SetStage(EffectRef effect, DialogueContext context)
     {
-        if (context.State.GetQuestState(questId) == target)
+        if (!TryUInt(effect, 0, context, out var questId))
         {
             return;
         }
-        context.State.SetQuestState(questId, target);
-        var title = QuestCatalog.Get(questId)?.Title ?? $"quest {questId}";
-        var line = target switch
+        var raw = effect.Arg(1);
+        if (raw == NextStageArg)
         {
-            QUESTSUCCESSSTATE.InProgress => $"Started the quest '{title}'.",
-            QUESTSUCCESSSTATE.Success => $"Completed the quest '{title}'.",
-            QUESTSUCCESSSTATE.Failed => $"Failed the quest '{title}'.",
-            _ => $"Abandoned the quest '{title}'.",
-        };
-        context.State.RecordEvent(GameEventKind.Quest, line, notify: true);
+            if (!QuestManager.AdvanceStage(context.State, questId))
+            {
+                context.Warn(
+                    $"Dialogue effect 'set_stage' could not advance quest {questId}: "
+                    + "it is on its last stage, or has none.");
+            }
+            return;
+        }
+        if (!uint.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var stageNumber))
+        {
+            context.Warn($"Dialogue effect 'set_stage' expected a stage number or '{NextStageArg}', got '{raw}'.");
+            return;
+        }
+        // A quest already on that stage is a conversation the player is
+        // replaying, not a bad edit: silent, the same way a state move that
+        // changes nothing writes no log line.
+        if (context.State.GetQuestStage(questId) == stageNumber)
+        {
+            return;
+        }
+        if (!QuestManager.SetStage(context.State, questId, stageNumber))
+        {
+            context.Warn($"Dialogue effect 'set_stage' could not move quest {questId} to stage {stageNumber}.");
+        }
+    }
+
+    // Hands a quest state change to QuestManager, which applies it, logs it,
+    // and tells anything watching — and which is also where a quest the party
+    // isn't eligible for yet is refused. A move that changes nothing (a
+    // conversation the player is replaying) is the manager's no-op, not a log
+    // line.
+    private static void MoveQuest(DialogueContext context, uint questId, QUESTSUCCESSSTATE target)
+    {
+        if (target != QUESTSUCCESSSTATE.InProgress)
+        {
+            QuestManager.SetState(context.State, questId, target);
+            return;
+        }
+        // Starting is the one transition with a gate on it. A conversation that
+        // offers a quest whose prerequisites aren't met is a content bug — the
+        // choice should have been hidden with `quest_state` — so say so rather
+        // than starting it anyway or failing silently.
+        if (QuestManager.StartQuest(context.State, questId) is { } refusal)
+        {
+            context.Warn($"Dialogue could not start quest {questId}: {refusal}.");
+        }
     }
 
     // credits:<amount> adds (or, with a negative amount, spends) party credits,

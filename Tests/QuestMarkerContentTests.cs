@@ -3,14 +3,15 @@ using System.IO;
 using System.Text.RegularExpressions;
 using Xunit;
 
-// Guards the half of a marker's target the engine-free catalogs can't check
-// (quest-markers.md Phase 2): an npc: target names an NPC that must actually
-// exist, and NpcDatabase — the registry that would know — is Godot-facing.
+// Guards the half of a quest's NPC references the engine-free catalogs can't
+// check (quest-markers.md Phase 2, quest-system.md Phase 3): an npc: marker
+// target and a quest's GiverNpcId both name an NPC that must actually exist,
+// and NpcDatabase — the registry that would know — is Godot-facing.
 //
 // So this reads the committed .tres definitions off disk the way
 // WorldMapBakeFreshnessTests reads chunk scenes. A renamed or deleted NPC id
 // otherwise costs nothing at build time and shows up as a quest marker that
-// silently never appears.
+// silently never appears, or an indicator that never lights up.
 public class QuestMarkerContentTests
 {
     [Fact]
@@ -39,6 +40,29 @@ public class QuestMarkerContentTests
 
         Assert.True(problems.Count == 0,
             "Quest markers name NPCs that have no definition under Resources/Npcs:\n  "
+            + string.Join("\n  ", problems));
+    }
+
+    [Fact]
+    public void EveryQuestGiverNamesADefinitionOnDisk()
+    {
+        var npcIds = LoadNpcIds();
+        if (npcIds == null)
+        {
+            return;
+        }
+
+        var problems = new List<string>();
+        foreach (var quest in QuestCatalog.All)
+        {
+            if (!string.IsNullOrEmpty(quest.GiverNpcId) && !npcIds.Contains(quest.GiverNpcId))
+            {
+                problems.Add($"quest {quest.Id} ({quest.Title}) is given by unknown NPC '{quest.GiverNpcId}'");
+            }
+        }
+
+        Assert.True(problems.Count == 0,
+            "Quests name givers that have no definition under Resources/Npcs:\n  "
             + string.Join("\n  ", problems));
     }
 
