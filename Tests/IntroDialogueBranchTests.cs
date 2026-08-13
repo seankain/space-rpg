@@ -357,6 +357,85 @@ public class IntroDialogueBranchTests
     }
 
     [Fact]
+    public void PayingVexOffMovesTheBountyWithoutAFight()
+    {
+        // The bounty's second route (quest-system.md Phase 4): Marlow wants the
+        // plaza quiet and doesn't mind how, so buying Vex out reaches the same
+        // beat beating him does.
+        var state = new GameState { Credits = 250 };
+        QuestManager.StartQuest(state, BountyQuest);
+        var host = new FakeHost();
+
+        var haggle = Pick(Play("intro.vex", state, host), "Marlow sent me. Name your price.");
+        Assert.Contains("hundred and twenty", haggle.Text);
+
+        var paid = Pick(haggle, "Pay him the 120");
+        Assert.Contains("plaza's his", paid.Text);
+        Assert.Equal(130u, state.Credits);
+        Assert.True(state.IsFlagSet("vex_paid"));
+        Assert.Equal(2u, state.GetQuestStage(BountyQuest));
+        Assert.Equal(0, host.Battles);
+    }
+
+    [Fact]
+    public void VexOnlyNamesAPriceYouCouldPay()
+    {
+        var state = new GameState { Credits = 100 };
+        var greet = Play("intro.vex", state);
+        Assert.DoesNotContain(greet.Choices, choice => choice.Label.StartsWith("Marlow sent me"));
+    }
+
+    [Fact]
+    public void VexIsCordialOnceHeHasBeenPaid()
+    {
+        var state = new GameState();
+        state.SetFlag("vex_paid", "true");
+
+        var line = Play("intro.vex", state);
+
+        Assert.Contains("We're square", line.Text);
+        Assert.Null(line.Choices);
+    }
+
+    [Fact]
+    public void MarlowPaysOutForTheBoughtOffRoute()
+    {
+        var state = new GameState();
+        QuestManager.StartQuest(state, BountyQuest);
+        state.SetFlag("vex_paid", "true");
+
+        var turnin = Play("intro.chief_marlow", state);
+        turnin.OnShown?.Invoke();
+
+        Assert.Contains("Bought him off", turnin.Text);
+        Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(BountyQuest));
+        // The keycard is the quest's reward now, not a give_item in the line
+        // above — which is what lets this route pay at all.
+        Assert.Equal(1u, state.Inventory.CountOf(Keycard));
+    }
+
+    [Fact]
+    public void PayingVexBeforeTheBountyStillCountsWhenMarlowAsks()
+    {
+        var state = new GameState { Credits = 250 };
+        var paid = Pick(
+            Pick(Play("intro.vex", state), "Marlow sent me. Name your price."),
+            "Pay him the 120");
+        Assert.Contains("somewhere warmer", paid.Text);
+        // Nothing to move: the bounty hasn't been taken, and paying him off is
+        // a perfectly good order to do this in.
+        Assert.Equal(QUESTSUCCESSSTATE.Unstarted, state.GetQuestState(BountyQuest));
+
+        var offer = Play("intro.chief_marlow", state);
+        Assert.Contains("took his business two decks down", offer.Text);
+
+        var turnin = Pick(offer, "Mine");
+        Assert.Contains("Bought him off", turnin.Text);
+        Assert.Equal(QUESTSUCCESSSTATE.Success, state.GetQuestState(BountyQuest));
+        Assert.Equal(1u, state.Inventory.CountOf(Keycard));
+    }
+
+    [Fact]
     public void TheShopkeeperOpensTheShop()
     {
         var host = new FakeHost();

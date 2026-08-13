@@ -24,16 +24,18 @@ public static class QuestCatalog
             PrereqQuests = new List<QuestPrereqFlag>(),
             GiverNpcId = "intro.dockmaster_hale",
             // The same two beats the markers below describe, as the journal's
-            // "what am I doing right now" line. Nothing advances this one in
-            // play yet: the beat it turns on is picking the cube up, which is a
-            // world event, and the trigger that could say so is Phase 2.
+            // "what am I doing right now" line. The second reaches itself: the
+            // beat is holding the cube, so it is true however the party came by
+            // it — including picking it up before ever meeting Hale.
             Stages =
             {
                 QuestStage.Create(1, "Find the Maguffin Cube",
                     "The cube went missing somewhere on this deck. Search the station for it."),
                 QuestStage.Create(2, "Return the cube to Dockmaster Hale",
-                    "You have Hale's cube. He hasn't left his post by the dock."),
+                    "You have Hale's cube. He hasn't left his post by the dock.",
+                    $"has_item:{ItemCatalog.MaguffinCubeId}"),
             },
+            Reward = new QuestReward { Credits = 120, ExperiencePoints = 25 },
             Markers =
             {
                 // Two halves of one fetch: point at the cube until the party
@@ -56,12 +58,26 @@ public static class QuestCatalog
             SideQuest = true,
             PrereqQuests = new List<QuestPrereqFlag>(),
             GiverNpcId = "intro.chief_marlow",
+            // Two ways to reach the second beat, which is the point of it
+            // (quest-system.md Phase 4): putting Vex down reaches it by itself,
+            // and buying him off reaches it by `set_stage` from his own
+            // conversation. Marlow's turn-in reads the stage, so it accepts
+            // either without knowing which happened.
             Stages =
             {
                 QuestStage.Create(1, "Deal with Vex",
                     "Vex works the plaza. Marlow doesn't much mind how you go about it."),
                 QuestStage.Create(2, "Report back to Chief Marlow",
-                    "Vex is handled. Marlow owes you a maintenance keycard."),
+                    "Vex is handled. Marlow owes you a maintenance keycard.",
+                    "npc_defeated:intro.vex"),
+            },
+            // The keycard used to be a give_item in Marlow's turn-in line,
+            // which the second route would have missed.
+            Reward = new QuestReward
+            {
+                Credits = 40,
+                ExperiencePoints = 15,
+                Items = { QuestReward.Item(ItemCatalog.MaintenanceKeycardId) },
             },
             Markers =
             {
@@ -135,6 +151,10 @@ public static class QuestCatalog
         {
             yield return problem;
         }
+        foreach (var problem in RewardProblems(quest))
+        {
+            yield return problem;
+        }
     }
 
     // A giver is optional — plenty of quests will start from a trigger or
@@ -183,6 +203,43 @@ public static class QuestCatalog
             if (string.IsNullOrWhiteSpace(stages[i].SubtitleText))
             {
                 yield return $"stage {stages[i].StageNumber} has no subtitle";
+            }
+            // A stage condition the vocabulary can't evaluate is a beat the
+            // player could never reach, and it would fail silently: the watcher
+            // treats an unevaluable condition as "not yet", forever.
+            if (DialogueConditions.Validate(stages[i].ReachedWhen) is { } conditionProblem)
+            {
+                yield return $"stage {stages[i].StageNumber}: {conditionProblem}";
+            }
+        }
+    }
+
+    // A reward naming an item the catalog doesn't have, or handing over none of
+    // it, is a payout the player silently never receives.
+    private static IEnumerable<string> RewardProblems(Quest quest)
+    {
+        var reward = quest.Reward;
+        if (reward == null)
+        {
+            yield break;
+        }
+        if (reward.IsEmpty)
+        {
+            yield return "reward grants nothing; leave it null instead";
+        }
+        foreach (var stack in reward.Items ?? new List<ItemStack>())
+        {
+            if (stack == null)
+            {
+                yield return "reward item is null";
+            }
+            else if (ItemCatalog.Get(stack.ItemId) == null)
+            {
+                yield return $"reward names item {stack.ItemId}, which doesn't exist";
+            }
+            else if (stack.Quantity == 0)
+            {
+                yield return $"reward grants 0 of item {stack.ItemId}";
             }
         }
     }

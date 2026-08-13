@@ -27,11 +27,16 @@ public class Quest
     // A quest may declare none, which is what every quest did before stages
     // existed: it then runs on its success state and its markers alone.
     //
-    // Stages advance only when something says so — a dialogue `set_stage`, the
-    // console's `quest stage`, and later a world trigger. Conditions that
-    // advance a stage by themselves are Phase 4; a marker's VisibleWhen is
-    // where "the cube is in your pocket, go see Hale" lives until then.
+    // A stage moves one of three ways: something says so (a dialogue
+    // `set_stage`, the console's `quest stage`), the player walks into the
+    // place it stands for (`QuestTrigger`), or it reaches itself because its
+    // own ReachedWhen condition holds.
     public List<QuestStage> Stages {get;set;} = new();
+    // What finishing this quest hands the party (quest-system.md Phase 4), or
+    // null for a quest that pays in story alone. Granted by QuestManager the
+    // moment the quest succeeds, so it doesn't matter which conversation,
+    // trigger or console verb finished it.
+    public QuestReward Reward {get;set;}
 
     public bool HasStages => Stages is { Count: > 0 };
 
@@ -73,12 +78,47 @@ public class QuestStage
     public string SubtitleText {get;set;}
     public string Description {get;set;}
 
-    public static QuestStage Create(uint stageNumber, string subtitleText, string description = "") => new()
+    // When this stage reaches itself, from the same condition vocabulary a
+    // marker's VisibleWhen uses (quest-system.md Phase 4). Null for a beat
+    // something has to announce — a conversation's `set_stage`, a QuestTrigger
+    // — which is every beat that is an event rather than a state.
+    //
+    // A condition beats a script wherever the beat *is* a state ("you have the
+    // cube", "Vex is down"): it is true whenever it is evaluated, so it can't
+    // be missed by doing things in an order nobody anticipated. The two can
+    // share a stage — a condition reaches it, and an alternate route may still
+    // set it explicitly.
+    public ConditionRef ReachedWhen {get;set;}
+
+    public static QuestStage Create(
+        uint stageNumber, string subtitleText, string description = "", string reachedWhen = null) => new()
     {
         StageNumber = stageNumber,
         SubtitleText = subtitleText,
         Description = description,
+        ReachedWhen = ConditionRef.Parse(reachedWhen),
     };
+}
+
+// What a quest pays out. Every part is optional; a quest may reward nothing at
+// all, which is what every quest did before this existed — the keycard for
+// "Clear the Deck" was handed over by a give_item in the turn-in dialogue,
+// where a second way to finish the quest would have missed it.
+public class QuestReward
+{
+    public uint Credits {get;set;}
+
+    // Split across nobody: experience is granted to every party member, the
+    // way a battle's is.
+    public uint ExperiencePoints {get;set;}
+
+    public List<ItemStack> Items {get;set;} = new();
+
+    public bool IsEmpty =>
+        Credits == 0 && ExperiencePoints == 0 && (Items == null || Items.Count == 0);
+
+    public static ItemStack Item(uint itemId, uint quantity = 1) =>
+        new() { ItemId = itemId, Quantity = quantity };
 }
 
 

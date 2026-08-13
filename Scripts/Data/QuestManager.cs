@@ -132,6 +132,13 @@ public static class QuestManager
         var fromStage = state.GetQuestStage(questId);
         state.SetQuestState(questId, target);
         state.RecordEvent(GameEventKind.Quest, StateLine(questId, target), notify: true);
+        if (target == QUESTSUCCESSSTATE.Success)
+        {
+            // After the "completed" line and before the event, so the log reads
+            // in the order the player experienced it and a subscriber sees a
+            // quest that has already paid out.
+            GrantReward(state, QuestCatalog.Get(questId)?.Reward);
+        }
         Announce(new QuestMove
         {
             Game = state,
@@ -147,6 +154,52 @@ public static class QuestManager
 
     public static bool CompleteQuest(GameState state, uint questId) =>
         SetState(state, questId, QUESTSUCCESSSTATE.Success);
+
+    // Hands over what a finished quest pays (quest-system.md Phase 4). Granted
+    // here rather than by a subscriber to Moved: transitions already funnel
+    // through this class, and a reward that arrives inside the transition can't
+    // be missed by an ordering nobody thought about — which is the whole reason
+    // rewards moved off the turn-in conversation and onto the definition.
+    //
+    // Each part logs its own line, phrased like the ones the same gain gets
+    // from a pickup, a sale or a battle, so the log doesn't grow a second
+    // vocabulary for "you received something".
+    private static void GrantReward(GameState state, QuestReward reward)
+    {
+        if (reward == null || reward.IsEmpty)
+        {
+            return;
+        }
+        foreach (var stack in reward.Items ?? new List<ItemStack>())
+        {
+            if (stack == null || stack.Quantity == 0 || ItemCatalog.Get(stack.ItemId) is not { } item)
+            {
+                continue;
+            }
+            state.Inventory.Add(stack.ItemId, stack.Quantity);
+            state.RecordEvent(GameEventKind.Item,
+                stack.Quantity > 1
+                    ? $"Received {item.Name} x{stack.Quantity}."
+                    : $"Received {item.Name}.",
+                notify: true);
+        }
+        if (reward.Credits > 0)
+        {
+            state.Credits += reward.Credits;
+            state.RecordEvent(GameEventKind.Credits, $"Earned {reward.Credits} credits.", notify: true);
+        }
+        if (reward.ExperiencePoints > 0 && state.Party.Count > 0)
+        {
+            // The whole party, the way a battle's XP is shared — a quest is
+            // something they all did.
+            foreach (var member in state.Party)
+            {
+                member.ExperiencePoints += reward.ExperiencePoints;
+            }
+            state.RecordEvent(GameEventKind.Party,
+                $"The party gains {reward.ExperiencePoints} XP.", notify: true);
+        }
+    }
 
     public static bool FailQuest(GameState state, uint questId) =>
         SetState(state, questId, QUESTSUCCESSSTATE.Failed);
