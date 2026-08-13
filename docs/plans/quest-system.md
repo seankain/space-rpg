@@ -6,7 +6,7 @@ Depends on: dialogue plan Phase 4 (quest commands) for the primary way quests st
 
 ## Where we are
 
-*(Reviewed against the tree at `872c474`, then updated as Phases 1–3 landed.)* The plan's own phases have been worked on out of order: the parts the [quest-markers plan](quest-markers.md) needed were built first. **Quests start, advance, complete, save, display, run on authored stages, move through one place that reads prerequisites, and are visible without opening a menu — what is left is Phase 4's rewards and depth.**
+*(Reviewed against the tree at `872c474`, then updated as each phase landed.)* The plan's own phases have been worked on out of order: the parts the [quest-markers plan](quest-markers.md) needed were built first. **All four phases are in.** Quests start, advance, complete, save, display, run on authored stages, move through one place that reads prerequisites, show themselves without a menu, pay out on their own, and can be finished more than one way.
 
 What exists:
 
@@ -19,14 +19,14 @@ What exists:
 - **Markers and tracking**: `Quest.Markers`, `QuestMarkerResolver`, `QuestTargetLocator`, `QuestMarkerPlacements`, `GameState.TrackedQuestId` (save version 10) and the static `QuestTracking.Changed` hook — all four phases of [quest-markers.md](quest-markers.md), which is where the journal's objective lines come from.
 - **Catalog validation** is `QuestCatalog.Problems`, run over every definition in the static constructor and reported as one message: bad markers, stage numbers that don't run 1..n in order, a stage with no subtitle, prerequisites that name a missing quest, the quest itself, or the same quest twice, and a giver id that couldn't be an NpcId.
 
-- **World beats** are `QuestTrigger` (an Area3D: the player walks in, the quest reaches the stage that place stands for) and the same two fields on `Pickup` (collecting the Maguffin Cube puts quest 1 on stage 2, which is the fetch quest's middle beat). Both ask for "at least this stage" on a quest in progress, so they are idempotent and no trigger stores anything in the save.
+- **A stage moves three ways**: something says so (`set_stage`, `quest stage`), the player walks into the place it stands for (`QuestTrigger`, an Area3D asking for "at least stage n"), or it reaches itself because its own `ReachedWhen` condition holds — re-checked by `QuestObjectiveWatcher` whenever the party does anything worth logging. All three are idempotent and forward-only, so nothing stores a fired flag in the save.
+- **Rewards** are `Quest.Reward` (credits, party-wide XP, items), handed over by `QuestManager` the moment a quest succeeds, whichever route finished it.
 
-What is still missing, and is the substance of the rest of this plan:
+What the plan does *not* cover, and is worth knowing:
 
-- **Rewards.** No reward data on a quest definition. The keycard for "Clear the Deck" is handed over by a `give_item` in Marlow's dialogue, not by the quest completing. `QuestManager.Moved` is the hook a reward grant subscribes to.
-- **Auto-checked objectives.** "Clear the Deck" still has no way to reach its second stage in play: the beat is winning a fight, which is neither a conversation nor a place. That wants Phase 4's event-driven stage conditions (`npc_defeated`), not a third bespoke hook.
-- **Prerequisites in the fiction.** They are validated and enforced, but no shipped quest declares one, so the machinery is unexercised by content — Phase 4's quest chains are what will use it.
-- **A quest-giver indicator** (Phase 3 item 3), which now has its prerequisite check but still needs a link from a quest to the NPC who offers it.
+- **Prerequisites have no content.** They are validated at registration and enforced by `StartQuest`, but no shipped quest declares one, so the machinery is exercised only by tests. The first authored chain is a content decision, not a missing mechanism.
+- **Definitions are still C#.** `QuestCatalog` is a static registry; JSON authoring is Phase 1's one outstanding item, and markers, stages and rewards move with the definitions when it happens.
+- **The journal shows a stage and its markers separately.** They agree for the shipped content because both are authored from the same beats; a quest with more beats than markers will show the difference.
 
 ---
 
@@ -56,10 +56,10 @@ It is a **static engine-free class taking the `GameState`**, not an autoload hol
    - Events: one static `QuestManager.Moved` carrying a `QuestMove` (quest id, kind, from/to state, from/to stage, and the `GameState` it happened in) rather than the three separate `QuestStarted`/`QuestStageChanged`/`QuestCompleted` events sketched here — subscribers filter on `Kind`, and a new kind then costs nobody a second subscription. Static for the reason `GameEventLog.Recorded` is: listeners outlive any one `GameState`. `QuestLogMenu` is the first subscriber (the Quests tab now updates while it is open); a Phase 4 reward grant is the next.
    - Logging moved here from `DialogueEffects.MoveQuest`, which is what this section wanted: a console move now writes the same line a conversation's move does, instead of changing the game silently.
 2. ~~Wire the dialogue commands to these APIs~~ — **done**: `set_quest`, `advance_quest` and `set_stage` are thin wrappers over the manager, and a `set_quest … InProgress` refused by a prerequisite warns the way any other bad content does.
-3. ~~**World triggers**~~ — **done** as `QuestTrigger` (`Scripts/World/`): an Area3D that asks for "at least stage n" on a quest in progress when the player walks in. Idempotent by construction — walking back through, or reloading a save made afterwards, moves nothing — so no trigger stores a fired flag in the save. The stage is named rather than "the next one", because a trigger is a fixed place tied to a specific beat. `Pickup` carries the same two fields, which is how collecting the Maguffin Cube now puts quest 1 on stage 2: the fetch quest's middle beat is an item entering the party's pockets, not a place.
-   - **Known gap in this shape:** a beat only fires while you are standing in it. A player who picks the cube up *before* taking the quest never trips that stage, so the journal reads "Find the Maguffin Cube" while the marker — a condition, re-read every time — correctly points at Hale. Phase 4 item 2 is the fix: a stage whose `ReachedWhen` is `has_item:1` is right whenever it is evaluated, in any order.
+3. ~~**World triggers**~~ — **done** as `QuestTrigger` (`Scripts/World/`): an Area3D that asks for "at least stage n" on a quest in progress when the player walks in. Idempotent by construction — walking back through, or reloading a save made afterwards, moves nothing — so no trigger stores a fired flag in the save. The stage is named rather than "the next one", because a trigger is a fixed place tied to a specific beat. `Pickup` briefly carried the same two fields for beats that are "you have the thing"; Phase 4 removed them again, because a stage condition says that in any order and this shape could not.
+   - **The gap that showed up here:** a beat only fires while the player is standing in it, so picking the cube up before taking the quest never tripped its stage. That is what Phase 4 item 2 fixes for beats that are states; a trigger remains right for beats that are places.
 
-**Done when:** the fetch-quest loop from the dialogue plan drives quest state through `QuestManager` and survives save/load at every stage. ***Met*** — Hale's conversation starts it (stage 1), the cube's pickup advances it (stage 2), his turn-in completes it, every step through the manager, and `Tests/QuestStageTests.cs` covers the stage half of the round trip. "Clear the Deck" still can't reach its second stage in play; its beat is a battle win, which is Phase 4's auto-checked objectives rather than a fourth kind of hook.
+**Done when:** the fetch-quest loop from the dialogue plan drives quest state through `QuestManager` and survives save/load at every stage. ***Met*** — Hale's conversation starts it, holding the cube reaches its second beat, his turn-in completes it and pays for it, every step through the manager, and `Tests/QuestStageTests.cs` covers the stage half of the round trip.
 
 ## Phase 3 — Journal UI and player feedback *(done)*
 
@@ -74,22 +74,31 @@ It is a **static engine-free class taking the `GameState`**, not an autoload hol
 
 **Done when:** a player can follow the fetch quest end-to-end using only the journal and HUD cues. ***Met*** — the "!" over Hale points at the quest before it exists, the HUD line carries the current objective through the middle of it, toasts announce each move, and the journal and map are there for the detail.
 
-## Phase 4 — Rewards and depth *(not started)*
+## Phase 4 — Rewards and depth *(done)*
 
-1. **Rewards** in quest definitions: XP (build plan's `GrantXp`, applied to the whole party), items (inventory plan), currency. Granted on `QuestCompleted`. Nothing on `Quest` describes a reward; today they are authored as `give_item`/`credits` effects in the turn-in dialogue. Note `GrantXp` does not exist yet either — `CharacterEntity.ExperiencePoints` is a field, and only enemies carry an `XpReward` — so the XP half depends on the build plan landing first.
-2. **Auto-checked objectives:** item-count and npc-flag stage conditions evaluated on relevant events (inventory changed, flag set) rather than per-frame polling. Marker `VisibleWhen` conditions are the same idea one layer up, but they are re-evaluated per map refresh rather than on an event; a stage condition should be able to share whatever evaluation this builds. This is what "Clear the Deck" needs to reach stage 2 — its beat is beating Vex, which `QuestTrigger` (a place) and `Pickup` (a thing) can't express.
-3. **Branching outcomes:** quests completable in multiple ways — model as stages with alternate next-stage transitions; `Failed` state paths (e.g. quest NPC leaves) authored via dialogue/trigger commands. Partial precedent exists without stages: Hale's turn-in can be refused into a battle, and beating him leaves the quest line intact.
-4. Multi-quest chains via existing `QuestPrereqFlag` (e.g. side quest unlocked only after main quest 3 `Success`) — **unblocked**: prerequisites are validated at registration and enforced by `QuestManager.StartQuest`, so a chain is now purely a content question. Nothing shipped declares one yet.
+1. ~~**Rewards** in quest definitions~~ — **done** as `Quest.Reward`: credits, experience granted to every party member the way a battle's is, and a list of `ItemStack`s. Validated at registration (an item that doesn't exist, a quantity of zero, or a reward object that grants nothing at all), and handed over by `QuestManager` the moment the quest's state reaches `Success`.
+   - Granted **inside the transition** rather than by a subscriber to `Moved`, which is where this plan expected the hook. Transitions already funnel through one place; putting the payout there means it can't be missed by an ordering nobody thought about, and a subscriber still sees a quest that has already paid.
+   - Each part logs the line that gain always logs — "Received Maintenance Keycard.", "Earned 40 credits.", "The party gains 15 XP." — so the log doesn't grow a second vocabulary for being given something.
+   - Content: "Clear the Deck" pays the keycard that used to be a `give_item` in Marlow's turn-in line, plus credits and XP; "Return the Maguffin" pays credits and XP, where it used to pay nothing at all. The XP is written straight onto `CharacterEntity.ExperiencePoints`, exactly as `BattleScene` does on victory — levelling from it is still the build plan's business.
+2. ~~**Auto-checked objectives**~~ — **done** as `QuestStage.ReachedWhen`, a `ConditionRef` from the same vocabulary markers and dialogue branches use, so there is one condition language and the editor's form already renders it. `QuestObjectiveWatcher` re-evaluates them and walks each in-progress quest as far as its conditions allow.
+   - Driven by `GameEventLog.Recorded` rather than per-frame polling or a new signal per kind of state: every gain, purchase, battle and conversation the player has already records an entry, which is exactly the set of moments worth re-asking after. `SaveManager` also evaluates once on load, so a save made before a condition existed catches up.
+   - Forward-only, one stage at a time, and a stage with **no** condition stops the walk — a beat something has to announce can't be stepped over by the one after it happening to be true.
+   - This is what closes Phase 2's known ordering gap: "Return the Maguffin" stage 2 is now `has_item`, true whenever it is asked, so picking the cube up before taking the quest reaches the beat anyway. The `Pickup` quest fields added alongside `QuestTrigger` are **removed** — a condition says the same thing in any order, and two ways to express one beat is one too many. `QuestTrigger` stays: "reach the cargo bay" is a place, not a state.
+3. ~~**Branching outcomes**~~ — **done** for "Clear the Deck", which now has two routes to its second beat and two turn-ins to match. Beating Vex reaches stage 2 by condition (`npc_defeated`); paying him 120 credits to move two decks down reaches it by `set_stage` from his own conversation, and sets the flag everyone else reads. Marlow's turn-in branches on the same two facts and has a different opinion of each.
+   - The turn-in reads **the world** (`npc_defeated`, `flag("vex_paid")`) rather than the stage both routes converge on. A stage is a summary for the journal and the HUD; a conversation that won't take your turn-in because a summary is stale is the worst bug this system could have.
+   - The reward moving onto the definition is what makes a second route possible at all: the keycard used to live in one turn-in line, and the other route would have finished the quest without it.
+   - `Failed` paths are still unauthored. Hale's refusal already ends in a fight that leaves the quest line intact, and nothing in the shipped content wants a quest that can be lost.
+4. **Multi-quest chains** via `QuestPrereqFlag` — **mechanism done** (validated at registration, enforced by `QuestManager.StartQuest`, and `PrereqProblem` is what the quest-giver indicator asks), **unexercised by content**: no shipped quest declares a prerequisite. Authoring one is a content decision and needs no more code.
 
-**Done when:** completing a quest grants XP/items, and one authored quest has two distinct completion paths.
+**Done when:** completing a quest grants XP/items, and one authored quest has two distinct completion paths. ***Met*** — both shipped quests pay out on completion, and "Clear the Deck" can be finished by force or by money, with a different turn-in for each.
 
 ## Suggested next slice
 
-Phases 1–3 are in; everything left is Phase 4. In order:
+All four phases are in, so what follows is either content or a plan of its own:
 
-- **Rewards on the definition** (item 1) — the last thing authored in dialogue that ought to belong to the quest, and `QuestManager.Moved` is the hook a grant subscribes to. The XP half waits on the build plan's `GrantXp`; items and credits don't.
-- **Auto-checked objectives** (item 2) — the third and last way a stage can move, and the one "Clear the Deck" needs to reach its second beat. A stage gains a `ReachedWhen` `ConditionRef` re-used from the marker vocabulary, evaluated when the state it reads changes; that also closes the ordering gap under Phase 2 item 3.
-- **A quest chain** (item 4) — prerequisites are validated, enforced and unexercised. One authored chain would be the first content to prove them.
+- **JSON authoring for `QuestCatalog`** (Phase 1 item 1) — the last mechanism this plan named and didn't build. Markers, stages and rewards move with the definitions.
+- **A quest chain** — the prerequisite machinery has never been exercised by content, and one authored chain is what would prove it.
+- **Rewards that need other plans**: XP that levels a character (build plan's `GrantXp`), and a `Failed` path worth authoring.
 
 ## Decisions to settle early
 
