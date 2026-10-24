@@ -115,9 +115,55 @@ public class GameState
         return progress;
     }
 
+    // Which stage the player is on, 0 for a quest that hasn't started or that
+    // declares none (quest-system.md Phase 1).
+    public uint GetQuestStage(uint questId) =>
+        Quests.FirstOrDefault(q => q.QuestId == questId)?.CurrentStageNumber ?? 0;
+
+    // The stage definition the player is on, or null when there is none.
+    public QuestStage GetCurrentStage(uint questId) =>
+        QuestCatalog.Get(questId)?.GetStage(GetQuestStage(questId));
+
+    // Moves a quest to one of the stages its definition declares. Refuses a
+    // stage the quest doesn't have — a mistyped `set_stage` should be a warning
+    // the author sees, not a quest sitting on a beat that has no text. Returns
+    // whether it moved.
+    public bool SetQuestStage(uint questId, uint stageNumber)
+    {
+        if (QuestCatalog.Get(questId)?.GetStage(stageNumber) == null)
+        {
+            return false;
+        }
+        GetOrAddQuestProgress(questId).CurrentStageNumber = stageNumber;
+        return true;
+    }
+
+    // Steps a quest to its next authored stage. False at the last one: a quest
+    // ends by its state moving to Success, not by running off the end of its
+    // stage list.
+    public bool AdvanceQuestStage(uint questId)
+    {
+        var next = QuestCatalog.Get(questId)?.NextStageNumber(GetQuestStage(questId)) ?? 0;
+        return next != 0 && SetQuestStage(questId, next);
+    }
+
     public void SetQuestState(uint questId, QUESTSUCCESSSTATE state)
     {
-        GetOrAddQuestProgress(questId).State = state;
+        var progress = GetOrAddQuestProgress(questId);
+        progress.State = state;
+        if (state == QUESTSUCCESSSTATE.Unstarted)
+        {
+            // Winding a quest back drops its stage with it, so stage 0 only
+            // ever means "not on one".
+            progress.CurrentStageNumber = 0;
+        }
+        else if (state == QUESTSUCCESSSTATE.InProgress && progress.CurrentStageNumber == 0)
+        {
+            // A quest just taken sits on its first stage. This is also how a
+            // save written before stages existed picks one up: its quests carry
+            // stage 0 until something moves them.
+            progress.CurrentStageNumber = QuestCatalog.Get(questId)?.FirstStageNumber ?? 0;
+        }
         // Tracking follows the quest log on its own, so a player who takes a
         // quest and opens the map sees where to go without first knowing to
         // pick a row in the journal. Handled here rather than at each caller,

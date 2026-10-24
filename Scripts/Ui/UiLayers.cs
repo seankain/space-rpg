@@ -8,6 +8,10 @@
 // level's own CanvasLayer.
 public static class UiLayers
 {
+    // The tracked quest's objective line, drawn straight over the world and
+    // under everything else — it is the thing a conversation or a menu covers.
+    public const int QuestHud = 40;
+
     // The conversation box, under everything that can be raised over it.
     public const int Dialogue = 50;
 

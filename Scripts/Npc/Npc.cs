@@ -115,6 +115,16 @@ public partial class Npc : CharacterBody3D
 		};
 		AddChild(prompt);
 
+		// Sits above the prompt and shows itself only when this NPC has a quest
+		// the party could take (quest-system.md Phase 3). Added to every NPC:
+		// asking is a catalog lookup, and which NPC gives what is content that
+		// moves around.
+		AddChild(new QuestGiverIndicator
+		{
+			NpcId = NpcId,
+			Position = new Vector3(0, PromptHeight + QuestGiverIndicator.HeightAbovePrompt, 0),
+		});
+
 		var zone = new Area3D();
 		zone.AddChild(new CollisionShape3D
 		{
