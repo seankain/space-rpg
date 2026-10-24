@@ -1,0 +1,11 @@
+// intro.poopus — dialogue for the space-rpg dialogue runtime.
+// Nodes are linked with <<jump>>; $npc speaks as the NPC playing this conversation.
+
+title: start
+---
+poopus: who puppiun
+-> me
+    <<stop>>
+-> you
+    <<stop>>
+===

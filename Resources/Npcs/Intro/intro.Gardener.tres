@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="NpcDefinition" format=3 uid="uid://dgjq5fyhpn3c3"]
+
+[ext_resource type="Script" uid="uid://dp1bafhlbvmsc" path="res://Scripts/Data/NpcStatBlock.cs" id="1_5fw5l"]
+[ext_resource type="Script" uid="uid://cyspw20oeax76" path="res://Scripts/Data/NpcDefinition.cs" id="2_senqp"]
+
+[sub_resource type="Resource" id="Resource_5fw5l"]
+script = ExtResource("1_5fw5l")
+
+[resource]
+script = ExtResource("2_senqp")
+NpcId = "intro.Gardener"
+DisplayName = "Gardener"
+SpawnScenePath = "res://Scenes/Levels/Intro.tscn"
+ChunkCoords = Vector2i(1, 1)
+LocalPosition = Vector3(-9.87611, 0.5, 2.6837997)
+Stats = SubResource("Resource_5fw5l")
+Credits = 100

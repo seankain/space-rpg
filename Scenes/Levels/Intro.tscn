@@ -24,10 +24,6 @@ tonemap_mode = 2
 script = ExtResource("1_eue8q")
 PlayerScene = ExtResource("2_bd37o")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1306754410]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
-shadow_enabled = true
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1445901784]
 environment = SubResource("Environment_bepgf")
 
@@ -43,5 +39,5 @@ shape = SubResource("BoxShape3D_ff37e")
 [node name="ChunkManager" type="Node3D" parent="." unique_id=29087889]
 script = ExtResource("3_chunks")
 
-[node name="Dome" parent="." unique_id=1992000820 instance=ExtResource("6_bepgf")]
+[node name="Dome" parent="." unique_id=65094693 instance=ExtResource("6_bepgf")]
 transform = Transform3D(50, 0, 0, 0, 50, 0, 0, 0, 50, -3.2980618, 1.3349466, 10.450388)

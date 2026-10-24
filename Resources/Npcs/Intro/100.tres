@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="NpcDefinition" format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/NpcDefinition.cs" id="1_domv0"]
+[ext_resource type="Script" path="res://Scripts/Npc/Roles/NpcRole.cs" id="1_s7tmp"]
+[ext_resource type="Script" path="res://Scripts/Data/NpcStatBlock.cs" id="2_2f7e3"]
+
+[sub_resource type="Resource" id="Resource_2f7e3"]
+script = ExtResource("1_s7tmp")
+DialogueId = "100"
+
+[sub_resource type="Resource" id="Resource_s7tmp"]
+script = ExtResource("2_2f7e3")
+Level = 99
+MaxHealthPoints = 9999
+MaxMagicPoints = 9999
+Strength = 99
+Intelligence = 99
+Constitution = 99
+Dexterity = 99
+Wisdom = 99
+Charisma = 99
+
+[resource]
+script = ExtResource("1_domv0")
+NpcId = "100"
+DisplayName = "Grumbus"
+SpawnScenePath = "res://Scenes/Levels/Intro.tscn"
+LocalPosition = Vector3(-1.4603636, 0.5, 10.405614)
+Roles = [SubResource("Resource_2f7e3")]
+Stats = SubResource("Resource_s7tmp")
+Credits = 400

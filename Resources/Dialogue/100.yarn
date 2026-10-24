@@ -1,0 +1,22 @@
+// 100 — dialogue for the space-rpg dialogue runtime.
+// Nodes are linked with <<jump>>; $npc speaks as the NPC playing this conversation.
+
+title: start
+---
+$npc: Oi. Yew.
+-> Oi? <<if credits() >= 0>>
+    <<jump node_2>>
+-> Oi.
+    <<jump node_1>>
+===
+
+title: node_1
+---
+<<credits 400>>
+$npc: AHAH
+===
+
+title: node_2
+---
+$npc: AGH....
+===
